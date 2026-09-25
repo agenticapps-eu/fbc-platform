@@ -62,10 +62,9 @@
       `EventDetailPage` zeigt heute nur den Satz mit der Stufe.
       `release-geschichten.test.ts` und `release-flaechen.test.ts` grün
       (33 Zusagen)
-- [ ] 3.4b Sichtprobe `/hilfe/tutorials`: der korrigierte Satz steht dort.
-      **An Donald übergeben** (25.09.) — das chrome-devtools-Profil ist
-      einplätzig und war von einer anderen Sitzung belegt; abschiessen wäre
-      fremder Zustand gewesen. Rezept steht in der Übergabe
+- [x] 3.4b Sichtprobe `/hilfe/tutorials` gefahren: der Satz endet dort bei
+      „Daneben steht, warum: welche Stufe nötig ist.", und
+      „wo du zur Mitgliedschaft kommst" steht nicht mehr im Dokument
 - [x] 3.4c Belegt, dass die Migration den **korrigierten** Text trägt:
       `grep -c "wo du zur Mitgliedschaft kommst"` auf der Migrationsdatei
       liefert **0**, und der Satz steht dort als „Daneben steht, warum: welche
@@ -197,20 +196,29 @@
 
 - [x] 7.1 Migration lokal fahren; Zahlen vor/nach aus 2.3 gegenüberstellen
 - [x] 7.2 Zweiten Lauf fahren, 0 neue Zeilen belegen
-> **7.3 bis 7.6 sind an Donald übergeben** (25.09.). Das
-> chrome-devtools-Profil trägt nur EINE Sitzung und war belegt; es
-> abzuschiessen hätte fremden Browserzustand gekostet. Donald hat die
-> Übergabe gewählt. Alles Maschinelle ist belegt — was fehlt, ist der
-> Augenschein. Rezept und Aufräumhinweise stehen in `session-handoff.md`.
+> **Gefahren im verbundenen Chrome** (claude-in-chrome), nicht im
+> chrome-devtools-Profil — das ist einplätzig und war belegt. Donald hat den
+> Browser am 25.09. selbst ausgewählt. Die Anmeldung lief über eine
+> **serverseitig gemintete Sitzung**, in `localStorage` gesetzt: kein Passwort
+> in ein Feld getippt.
 
-- [ ] 7.3 Sichtprobe der Aktivität, eigenes Konto: sechs Ausgaben in
-      Datumsordnung, innerhalb einer Ausgabe in Leseordnung; Glocke und
-      Ungelesen-Zähler unverändert
-- [ ] 7.4 Sichtprobe `/neues`: alle 23 erreichbar, „Ältere laden" holt die
-      letzten drei, Tiefenlink von der ältesten Karte öffnet ihre Mitteilung
-- [ ] 7.5 Festhalten, wie weit man von oben scrollt, bis die erste
-      Release-Karte kommt (der 58-%-Punkt aus `design.md`)
-- [ ] 7.6 Ausgeloggt prüfen: keine Release-Karte im Schaufenster
+- [x] 7.3 Aktivität: 23 Release-Karten nach zweimal „Ältere Beiträge".
+      **Leseordnung stimmt** — die ersten vier sind Ausgabe 05.09. in der
+      Ordnung aus `geschichten[]` („Eine Terminreihe…", „…grauer Knopf…",
+      „Platz schaffen…", „Rückmeldung geben…"), die letzten vier Ausgabe
+      01.08. Glocke ohne Abzeichen, **0 Hinweise** für das Konto — bei 23
+      Karten im Feed
+- [x] 7.4 `/neues`: 20 Einträge, nach „Ältere laden" **23**, Knopf
+      verschwindet. Tiefenlink auf die **älteste** Mitteilung
+      (`?note=7d8d9c76…`) öffnet ihr Modal, obwohl die Liste nur 20 zeigt —
+      genau der Fall, der vorher nichts geöffnet hätte
+- [x] 7.5 Gemessen: die erste Release-Karte steht bei **9874 px**,
+      Seitenhöhe 21699 px, Viewport 1240 px — rund **acht Bildschirmhöhen**
+      Scrollweg. Der 58-%-Anteil liegt vollständig unten, wie im Design
+      vorhergesagt; oben verdrängt er nichts
+- [x] 7.6 Ausgeloggt: keine Release-Karte im Schaufenster, und `anon` liest
+      über die API `posts?kind=eq.release` **0 Zeilen** — die Grenze hält in
+      der RLS, nicht nur in der Oberfläche
 - [x] 7.7 Fremde Konten nicht angefasst. `age907-sichtprobe@example.invalid`
       (fbc-platform-61) blieb unberührt und wurde **nicht** weggeräumt, obwohl
       61 das freigestellt hat — fremdes wegzuräumen ist nicht meine
