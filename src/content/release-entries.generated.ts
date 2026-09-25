@@ -5,6 +5,21 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-25-testflight-upload",
+    "datum": "2026-09-25",
+    "titel": "testflight-upload",
+    "linear": null,
+    "aenderungen": [
+      "**Der Workflow lädt nach TestFlight hoch** — `xcrun altool --upload-app`, mit demselben ASC-Schlüssel, der schon für Archiv und Export authentifiziert.",
+      "**Nur auf ein geschobenes Tag `ios-v*`.** Ein Handstart (`workflow_dispatch`) baut, prüft und legt das Artefakt ab wie bisher, lädt aber **nicht** hoch — auch dann nicht, wenn er auf eine Tag-Referenz gerichtet wird. Die Bedingung prüft deshalb den **Auslöser** mit, nicht nur den Namen der Referenz. Damit bleibt der gefahrlose Probebau möglich, und eine Auslieferung an Apple braucht eine bewusste, benannte Handlung.",
+      "**Der Upload steht hinter dem Signaturnachweis**, nie davor. Was die vier Prüfungen am `.ipa` nicht besteht, erreicht Apple nicht.",
+      "**`--validate-app` läuft vor `--upload-app`** — es prüft gegen Apples Regeln, ohne eine Build-Nummer zu verbrauchen. Denselben Weg ist dieses Repo am 07.09. schon gegangen.",
+      "**Das Artefakt wird vor der Übertragung abgelegt.** Scheitert die Übertragung, ist das der Fall, in dem man das geprüfte Bündel am dringendsten braucht; dahinter entfiele die Ablage nach der üblichen Überspringregel.",
+      "Der Wächter `scripts/ios-release.workflow.test.ts` bekommt Zusagen für Reihenfolge und Tag-Bedingung.",
+      "**Nebenbei, auf Donalds Entscheidung vom 25.09.:** drei Dokumentstellen, die PR #419 zu Waisen gemacht hat — sie beschreiben Kaufwege, die es nicht mehr gibt. Kein Wächter findet sie, weil keiner Fließtext liest."
+    ]
+  },
+  {
     "slug": "2026-09-25-support-bereich",
     "datum": "2026-09-25",
     "titel": "support-bereich",

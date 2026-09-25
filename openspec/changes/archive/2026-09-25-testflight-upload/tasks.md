@@ -122,11 +122,11 @@ weil keiner Fließtext liest.
 
 ## 8. Abschluss
 
-- [ ] 8.1 Conventional Commit mit `AGE-907`, signiert.
-- [ ] 8.2 PR gegen `main`. In den Text: die gemessene `--p8-file-path`-Probe,
+- [x] 8.1 Conventional Commit mit `AGE-907`, signiert. `95ae973`.
+- [x] 8.2 PR gegen `main` — #423, als `53a5577` gemerged. In den Text: die gemessene `--p8-file-path`-Probe,
       warum Tag **und** Auslöser, warum das Artefakt vorgezogen ist, und dass
       der erste getaggte Lauf zugleich die erste Erprobung ist.
-- [ ] 8.3 Archivieren nach dem Merge, solange der Worktree steht, dann
+- [x] 8.3 Archivieren nach dem Merge, solange der Worktree steht, dann
       `pnpm release:entries`. Der codex-Reviewer wollte es vor den Merge; die
       Begründung fürs Beibehalten steht in `REVIEWS.md` (CLAUDE.md verlangt
       „vor oder zusammen mit `wt merge`", nicht vor dem PR-Merge, und AGE-904
