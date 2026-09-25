@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/cn";
 import { useDesignVariantValue } from "../../providers/design-variant-context";
@@ -43,6 +43,27 @@ export interface SidebarNavSection {
    * nicht zu einem zweiten Menü werden.
    */
   klappbar?: boolean;
+  /**
+   * EIN Eintrag, der keine Route öffnet sondern eine Aktion auslöst (AGE-929).
+   *
+   * Es gibt genau einen: „Feedback" im Support-Abschnitt. Sein Formular hängt
+   * portalisiert an `body`, und an seinem Offen-Zustand hängen zwei Zusagen —
+   * die Schublade gibt ihr `aria-modal` ab, solange es über ihr liegt
+   * (AGE-688), und Escape trifft in der Capture-Phase erst das Formular
+   * (AGE-697). Beide wohnen in `FeedbackButton`, also wandert der fertige Knopf
+   * hierher statt seines Zustands nach oben.
+   *
+   * Bewusst KEIN Eintrags-Union `{ path } | { aktion }`: der hätte denselben
+   * Zustand aus `FeedbackButton` herausheben müssen, und damit die beiden
+   * Zusagen umgebaut, um ein Layout zu ändern. Kommt ein ZWEITER Aufrufer, ist
+   * das der Anlass, auf den Union umzustellen — nicht dieses Feld zu dehnen.
+   *
+   * Der Nachtrag steht HINTER den Einträgen und teilt ihr Schicksal am
+   * Akkordeon: zugeklappt ist auch er fort. Ein Knopf, der unter einer
+   * zugeklappten Überschrift stehenbleibt, sieht offen richtig aus und fällt
+   * erst auf, wenn jemand klappt.
+   */
+  nachtrag?: ReactNode;
 }
 
 /**
@@ -217,6 +238,7 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               )}
             </NavLink>
           ))}
+          {offen && section.nachtrag}
         </div>
         );
       })}

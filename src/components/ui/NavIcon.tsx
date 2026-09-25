@@ -23,6 +23,16 @@ const NACH_ROUTE: Record<string, GlyphName> = {
   "/mitgliedschaft": "membership",
   "/einstellungen": "settings",
   "/admin": "admin",
+  // AGE-929: Seit der Support-Abschnitt ein gewöhnlicher Abschnitt ist, holt
+  // sich „Tutorials" sein Symbol hier statt es selbst zu zeichnen. Ohne diese
+  // Zeile griffe der Rückfall unten, und der Eintrag trüge einen Punkt — still,
+  // nichts schlüge fehl, das Symbol sagte nur nichts mehr.
+  //
+  // NICHT `academy`: dieses Symbol trägt zwei Zeilen höher den Menüeintrag
+  // „Academy". Zwei Einträge derselben Leiste mit demselben Symbol heben sich
+  // gegenseitig auf — es unterscheidet dann nicht mehr, es dekoriert nur noch
+  // (dieselbe Begründung stand an `FeedbackIcon`, AGE-904).
+  "/hilfe/tutorials": "bulb",
 };
 
 export function NavIcon({
