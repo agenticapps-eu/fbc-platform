@@ -15,12 +15,20 @@ Je fünf Bildschirme: Aktivität (Feed) · Mitglieder (Verzeichnis) · Events ·
 Profil · Nachrichten. Beide Stores nehmen mindestens zwei, Apple bis zu zehn,
 Google bis zu acht.
 
-> ⚠️ **Auf dem Profil-Screenshot ist der Knopf „Mitgliedschaft verwalten" zu
-> sehen.** Er führt nach `/mitgliedschaft` und von dort zu Stripe. Solange die
-> Entscheidung zu Richtlinie 3.1.1 nicht gefallen ist
-> (`docs/store-datenschutzangaben.md`, Befund 2), sollte dieses Bild **nicht**
-> an Apple gehen — oder der Knopf vorher verschwinden und das Bild neu
-> entstehen.
+> ⚠️ **Der Profil-Screenshot ist veraltet und muss vor der Einreichung neu
+> entstehen.** Er zeigt den Knopf „Mitgliedschaft verwalten", den es in der App
+> seit `935b987` (PR #419, AGE-907) nicht mehr gibt.
+>
+> Die Entscheidung zu Richtlinie 3.1.1 **ist gefallen**: Der Kaufweg ruht,
+> `/mitgliedschaft` leitet auf `/` um, und sieben Einstiege sind entfernt. Damit
+> hat sich die frühere Warnung („sollte dieses Bild nicht an Apple gehen")
+> erledigt — und in ihr Gegenteil verkehrt. Das Bild zeigt jetzt einen
+> Kaufeinstieg, den die App nicht mehr hat, und geht damit **doppelt** falsch an
+> Apple: als veraltete Oberfläche und als Beleg für genau die Richtlinie, die
+> #419 entschärft hat.
+>
+> Das Aufnahmeskript unten erzeugt den Screenshot neu; die App unter ihm ist
+> bereits richtig. Es muss also nur jemand den Lauf wiederholen.
 
 ## Warum die Bilder keine echten Personen zeigen
 

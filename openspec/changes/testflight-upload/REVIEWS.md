@@ -151,3 +151,58 @@ Entwurf steht: dass `--p8-file-path` von `--upload-app` honoriert wird. Der ist
 lokal gemessen (altool 27.0.5, erfundene Werte, ohne Netz) und im Entwurf mit
 der Fehlermeldung belegt. Ich lasse ihn stehen — nicht weil niemand widersprach,
 sondern weil er eine Messung ist und kein Argument.
+
+---
+
+# Code-Review (Gate 4) — auf dem Diff
+
+Getrennt vom Plan-Review oben: Dieser Lauf hat den **Diff** gelesen, nicht die
+Planung. Reviewer `codex` (gpt-6-sol, OpenAI), Exit 0, Linse
+`the-pragmatic-programmer` + `refactoring` (nach eigener Angabe angewandt).
+
+VERDICT: REQUEST-CHANGES
+
+- **[HIGH]** `scripts/ios-release.workflow.test.ts` — Der Wächter prüft, ob der
+  Text der Bedingung im Schrittblock **vorkommt**, nicht ob sie eine **aktive**
+  `if:`-Zeile ist. Wer beide `if:`-Zeilen **auskommentiert**, lässt den Text
+  stehen: Test grün, Upload unbedingt — und ein Handstart auf ein Tag liefert
+  aus. → Die aktive `if:`-Zeile messen.
+- **[LOW]** Dieselbe Schwäche beim Schlüsselpfad: ein auskommentiertes
+  `--p8-file-path` erfüllte die Zusage. → Den aktiven Befehl messen.
+
+Nicht beanstandet: Shell-Quoting, Verhalten unter `set -euo pipefail`, und die
+Bedingung `push` + Tag selbst.
+
+## Resolution
+
+**Beide übernommen — der HIGH-Befund war ein echter Loch im Wächter**, und zwar
+eines, das meine eigene Gegenprobe nicht finden konnte: Sie hat nur
+**entfernt**, nie **auskommentiert**. Eine Mutation, die den Text stehen lässt,
+war schlicht nicht in der Menge.
+
+Zwei Helfer eingezogen: `ifBedingung()` liest die aktive `if:`-Zeile (eine
+auskommentierte beginnt nach `trim()` mit `#` und zählt nicht),
+`ohneKommentare()` schneidet Kommentarzeilen aus dem Block. Die Zusagen messen
+jetzt beides am aktiven Text. Der Schritt **darf** `private_keys` im Kommentar
+erklären — er darf es nur nicht benutzen.
+
+Die Gegenprobe ist um genau diese zwei Mutationen erweitert worden. Stand
+danach, alle acht rot, Positivkontrolle grün, Datei zeichengleich
+wiederhergestellt:
+
+| Mutation | Wächter |
+|---|---|
+| Auslöser-Hälfte entfernt | rot |
+| Tag-Hälfte entfernt | rot |
+| Konventionsverzeichnis statt Pfad | rot |
+| Validierungsschritt entfernt | rot |
+| Upload vor den Nachweis geschoben | rot |
+| Artefakt hinter den Upload geschoben | rot |
+| **Bedingung auskommentiert statt entfernt** | **rot** |
+| **Schlüsselpfad auskommentiert** | **rot** |
+
+Die zwei unausgesprochenen Annahmen, die der Reviewer benennt, stehen als
+offene Fragen in `design.md`: Upload-Rechte des ASC-Schlüssels, und dass
+`altool` keinen Schlüsselinhalt ins öffentliche Lauf-Log schreibt. Für den
+einen gemessenen Fehlerfall ist das belegt (die Meldung nannte nur den Pfad);
+für jeden anderen nicht.

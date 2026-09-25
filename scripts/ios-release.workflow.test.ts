@@ -105,6 +105,141 @@ describe("Der Schluessel bleibt aus dem Arbeitsbaum", () => {
   });
 });
 
+/**
+ * Der Textblock **eines** Schritts: von seinem Namen bis zum nächsten Schritt.
+ *
+ * Warum nicht `INHALT.indexOf(…)` wie oben: Der Dateikopf dieses Workflows
+ * erklärt seit jeher `xcrun altool --validate-app` im Fließtext, und mit
+ * diesem Change erklärt er zusätzlich, warum `./private_keys` verworfen wurde.
+ * Eine Zusage, die den ganzen Dateitext absucht, fände also den **Kommentar**
+ * und wäre grün, ohne dass der Schritt existiert — beziehungsweise rot, obwohl
+ * der Schlüsselpfad stimmt. Der Schnitt auf den Schrittblock trennt die Zusage
+ * vom Kommentar über sie.
+ */
+function schrittBlock(yaml: string, name: string): string {
+  const start = yaml.indexOf(`- name: ${name}`);
+  if (start === -1) return "";
+  const rest = yaml.slice(start + 1);
+  const ende = rest.search(/\n {6}- (?:name|uses):/);
+  return ende === -1 ? rest : rest.slice(0, ende);
+}
+
+/**
+ * Ein Schrittblock **ohne** seine Kommentarzeilen.
+ *
+ * Der Code-Review hat gezeigt, warum das nötig ist: Eine Zusage auf den rohen
+ * Blocktext bliebe grün, wenn jemand die Zeile **auskommentiert** statt sie zu
+ * entfernen — der Text steht ja weiter da. Genau diese Mutation fehlte in der
+ * ersten Gegenprobe, weil sie nur gelöscht und nie auskommentiert hat.
+ */
+function ohneKommentare(block: string): string {
+  return block
+    .split("\n")
+    .filter((z) => !z.trim().startsWith("#"))
+    .join("\n");
+}
+
+/** Die **aktive** `if:`-Zeile eines Schritts. Auskommentiert zählt nicht. */
+function ifBedingung(block: string): string {
+  const zeile = block
+    .split("\n")
+    .map((z) => z.trim())
+    .find((z) => z.startsWith("if:"));
+  return zeile ? zeile.slice("if:".length).trim() : "";
+}
+
+describe("Der Upload nach TestFlight", () => {
+  const validieren = schrittBlock(INHALT, "Nach TestFlight validieren");
+  const hochladen = schrittBlock(INHALT, "Nach TestFlight hochladen");
+
+  // Die Selbstprüfung gegen den stillen Leerlauf, dieselbe wie beim
+  // Auslöser-Block: fände der Schnitt nichts, wären alle Zusagen darunter
+  // grün, ohne etwas gesehen zu haben.
+  it("findet ueberhaupt beide Schrittbloecke", () => {
+    expect(validieren.trim().length).toBeGreaterThan(0);
+    expect(hochladen.trim().length).toBeGreaterThan(0);
+  });
+
+  it("laedt mit `altool --upload-app` hoch", () => {
+    expect(ohneKommentare(hochladen)).toContain("--upload-app");
+    expect(ohneKommentare(hochladen)).toContain("export/App.ipa");
+  });
+
+  it("validiert vorher, ohne eine Build-Nummer zu verbrauchen", () => {
+    expect(ohneKommentare(validieren)).toContain("--validate-app");
+  });
+
+  // ══ DER BEFUND, DER DIESEN BLOCK NOETIG MACHT ═══════════════════════════
+  // Der Plan-Review hat gezeigt: `startsWith(github.ref, 'refs/tags/ios-v')`
+  // allein hält die Zusage NICHT. GitHubs „Use workflow from" führt auch Tags,
+  // ein Handstart auf `ios-v1.0.0` hätte also hochgeladen — bei grünem Lauf.
+  //
+  // Gemessen wird die **aktive** `if:`-Zeile, nicht der Blocktext: Sonst bliebe
+  // die Zusage grün, wenn jemand die Bedingung auskommentiert (Code-Review,
+  // HIGH). Und **je Hälfte eine Zusage**, nicht eine über den ganzen Ausdruck,
+  // damit auch das Entfernen einer Hälfte auffällt und die Meldung sagt,
+  // welcher.
+  it("traegt an beiden Schritten ueberhaupt eine aktive Bedingung", () => {
+    expect(ifBedingung(validieren)).not.toBe("");
+    expect(ifBedingung(hochladen)).not.toBe("");
+  });
+
+  it.each([
+    ["den Ausloeser", "github.event_name == 'push'"],
+    ["die Tag-Referenz", "startsWith(github.ref, 'refs/tags/ios-v')"],
+  ])("prueft %s — in der aktiven Bedingung, je Haelfte", (_was, ausdruck) => {
+    expect(ifBedingung(validieren)).toContain(ausdruck);
+    expect(ifBedingung(hochladen)).toContain(ausdruck);
+  });
+
+  it("authentifiziert ueber den Pfad, nicht ueber ein Konventionsverzeichnis", () => {
+    // `altool` sucht `AuthKey_<id>.p8` sonst u. a. in `./private_keys` — das
+    // läge im ARBEITSBAUM eines öffentlichen Repos. Gemessen am 25.09.:
+    // `--p8-file-path` wird von `--upload-app` honoriert.
+    //
+    // Auch hier der Schnitt ohne Kommentare: Der Schritt DARF `private_keys`
+    // im Fließtext erklären — er darf es nur nicht benutzen.
+    for (const block of [validieren, hochladen]) {
+      const befehl = ohneKommentare(block);
+      expect(befehl).toContain('--p8-file-path "$RUNNER_TEMP/asc.p8"');
+      expect(befehl).not.toContain("private_keys");
+    }
+  });
+});
+
+describe("Die Reihenfolge, in der etwas nach aussen geht", () => {
+  // Zwei Zusagen, zwei verschiedene Fehler:
+  //
+  //  1. Der Nachweis ist das Tor. Stünde die Übertragung davor, prüfte man ein
+  //     Bündel, das Apple schon hat.
+  //  2. Das Artefakt muss VOR die Übertragung. GitHub überspringt Folgeschritte
+  //     nach einem Fehlschlag — ausgerechnet im Fehlerfall fehlte sonst das
+  //     geprüfte `.ipa`. (Plan-Review, HIGH.)
+  const stelle = (marke: string) => INHALT.indexOf(marke);
+
+  it("nennt alle vier Marken genau einmal", () => {
+    for (const marke of [
+      "- name: Signatur und Profil nachweisen",
+      "actions/upload-artifact",
+      "- name: Nach TestFlight validieren",
+      "- name: Nach TestFlight hochladen",
+    ]) {
+      expect(INHALT.split(marke)).toHaveLength(2);
+    }
+  });
+
+  it("legt erst nach dem Nachweis ab und uebertraegt zuletzt", () => {
+    const nachweis = stelle("- name: Signatur und Profil nachweisen");
+    const artefakt = stelle("actions/upload-artifact");
+    const validieren = stelle("- name: Nach TestFlight validieren");
+    const hochladen = stelle("- name: Nach TestFlight hochladen");
+
+    expect(nachweis).toBeLessThan(artefakt);
+    expect(artefakt).toBeLessThan(validieren);
+    expect(validieren).toBeLessThan(hochladen);
+  });
+});
+
 describe("Der Web-Deploy baut weiterhin nicht nativ", () => {
   const deploy = readFileSync(".github/workflows/deploy.yml", "utf8");
 

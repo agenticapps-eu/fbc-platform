@@ -29,12 +29,48 @@ name: ios-release
 #     Wahrheit, und die erste, die auseinanderlaeuft, sobald jemand eine davon
 #     rotiert.
 #
-# ══ WAS DIESER WORKFLOW NICHT TUT ══════════════════════════════════════════
-# Er laedt NICHT zu TestFlight hoch. Wie die Android-Seite legt er ein
-# signiertes Artefakt ab und hoert dort auf; die Einreichung ist M4 und ein
-# eigener Vorgang. Der Weg ist gemessen und funktioniert
-# (`xcrun altool --validate-app` → „VERIFY SUCCEEDED with no errors"), er ist
-# hier nur bewusst nicht verdrahtet.
+# ══ WAS DIESER WORKFLOW NACH AUSSEN GIBT — UND WANN (AGE-907) ══════════════
+# Er laedt nach TestFlight hoch, aber NUR auf ein GESCHOBENES Tag `ios-v*`.
+# Ein Handstart baut, prueft und legt das Artefakt ab wie bisher und gibt
+# nichts nach aussen. Bis zum 25.09. endete der Lauf beim Artefakt; der Weg war
+# am 07.09. gemessen (`--validate-app` → „VERIFY SUCCEEDED"), aber bewusst
+# nicht verdrahtet.
+#
+#  1. DIE BEDINGUNG PRUEFT DEN AUSLOESER MIT, NICHT NUR DIE REFERENZ. GitHubs
+#     „Use workflow from" fuehrt auch TAGS. Ein `startsWith(github.ref,
+#     'refs/tags/ios-v')` allein haette also bei einem HANDSTART auf `ios-v1.0.0`
+#     hochgeladen — und der Lauf waere dabei gruen gewesen. Deshalb steht
+#     `github.event_name == 'push'` daneben, und der Waechter misst beide
+#     Haelften EINZELN: eine Zusage ueber den zusammengesetzten Ausdruck bliebe
+#     gruen, wenn jemand die Ausloeser-Haelfte entfernt.
+#
+#  2. DAS ARTEFAKT WIRD VOR DER UEBERTRAGUNG ABGELEGT. GitHub ueberspringt
+#     Folgeschritte nach einem Fehlschlag. Stuende die Ablage dahinter, fehlte
+#     das geprüfte `.ipa` ausgerechnet dann, wenn man es braucht: wenn die
+#     Uebertragung gescheitert ist.
+#
+#  3. `--p8-file-path` STATT DER NAMENSKONVENTION. `altool` sucht sonst
+#     `AuthKey_<id>.p8` in `./private_keys`, `~/private_keys`,
+#     `~/.private_keys`, `~/.appstoreconnect/private_keys` und
+#     `$API_PRIVATE_KEYS_DIR`. Das ERSTE davon liegt im ARBEITSBAUM, und dieses
+#     Repo ist oeffentlich. Am 25.09. lokal nachgestellt (altool 27.0.5,
+#     erfundene Werte, ohne Netz): die Fehlermeldung nennt den UEBERGEBENEN
+#     Pfad, nicht ein Konventionsverzeichnis — der Schalter greift, der
+#     Schluessel bleibt unter `$RUNNER_TEMP`.
+#
+#  4. VALIDIEREN VOR DEM HOCHLADEN. `--validate-app` prueft gegen Apples Regeln,
+#     OHNE eine Build-Nummer zu verbrauchen. `--upload-app` validiert
+#     serverseitig ohnehin; der Gewinn ist nicht „findet mehr", sondern „findet
+#     es, bevor etwas uebertragen ist", und zwei Schritte sagen im Log, welche
+#     Haelfte brach.
+#
+#  5. GRUEN HEISST „UEBERTRAGEN", NICHT „VON APPLE ANGENOMMEN". Ohne `--wait`
+#     endet der Lauf mit der Uebertragung; Apples Verarbeitung laeuft danach
+#     und kann fehlschlagen. Das steht in App Store Connect, nicht hier.
+#
+# Die Store-Einreichung selbst — Konto, Angaben, Pruefgruppen, Freigabe — bleibt
+# Handarbeit. Die Android-Seite laedt weiterhin NICHT hoch: das Play-Service-
+# Konto existiert nicht, das erste AAB geht von Hand.
 #
 # ══ SCHUTZ ════════════════════════════════════════════════════════════════
 # Wie bei Android haengt der Job an einem geschuetzten Environment. Und wie
@@ -248,3 +284,36 @@ jobs:
           path: ${{ runner.temp }}/export/App.ipa
           if-no-files-found: error
           retention-days: 14
+
+      # ══ AB HIER GEHT ETWAS NACH AUSSEN UND KOMMT NICHT ZURUECK ═════════════
+      # Alles darueber laeuft bei jedem angeforderten Bau. Die beiden Schritte
+      # unten laufen NUR auf ein geschobenes Tag — siehe Punkt 1 im Kopf, das
+      # ist die Stelle, an der ein Handstart auf eine Tag-Referenz sonst still
+      # ausliefern wuerde.
+      #
+      # ⚠ VORAUSSETZUNG AUSSERHALB DIESES REPOS: Die App muss in App Store
+      # Connect unter der Bundle-ID aus `APNS_BUNDLE_ID` bereits angelegt sein.
+      # Fehlt sie, schlaegt der Schritt mit einer Meldung fehl, die nicht
+      # offensichtlich darauf zeigt.
+      - name: Nach TestFlight validieren
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ios-v')
+        run: |
+          set -euo pipefail
+          xcrun altool --validate-app \
+            -f "$RUNNER_TEMP/export/App.ipa" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" \
+            --p8-file-path "$RUNNER_TEMP/asc.p8"
+
+      # Der Build-Nummer-Fehler tritt HIER auf, nicht oben: `run_number` bleibt
+      # bei einem Re-Run gleich, und App Store Connect lehnt eine doppelte
+      # Build-Nummer ab. Bei einem Re-Run also neu ausloesen statt wiederholen —
+      # dieselbe Regel wie fuer den Archivschritt, hier nur mit lauterem Echo.
+      - name: Nach TestFlight hochladen
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ios-v')
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app \
+            -f "$RUNNER_TEMP/export/App.ipa" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" \
+            --p8-file-path "$RUNNER_TEMP/asc.p8"
+          echo "Uebertragen. Apples Verarbeitung laeuft danach und kann noch fehlschlagen — siehe App Store Connect."
