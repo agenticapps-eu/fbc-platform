@@ -1,12 +1,30 @@
-export const PAID_LEVELS = ["discover", "exchange", "focus", "impact"] as const;
+/**
+ * Die kaufbaren Stufen — seit AGE-903 genau die drei CLUBSTUFEN. ACTIVE, BOOST
+ * und CONNECT liegen ausserhalb des Clubs und tragen 0 €; eine Stufe ohne
+ * Funktion und ohne Preis hat keinen Kaufweg.
+ *
+ * **Stripe ruht (Apple 3.1.1), und das bleibt so.** Diese Datei wird nur so weit
+ * nachgezogen, dass nichts bricht und dass die Liste nicht als Beleg für eine
+ * Leiter gelesen wird, die es nicht mehr gibt.
+ *
+ * ACHTUNG BEIM WIEDERANSCHALTEN: `priceEnvKey()` leitet den Namen der
+ * Umgebungsvariablen aus dem SCHLÜSSEL ab. Mit `exchange` ist
+ * `STRIPE_PRICE_EXCHANGE_*` verschwunden, und `STRIPE_PRICE_DISCOVER_*` meint
+ * jetzt 300 €/30 € statt 150 €/15 € — derselbe Variablenname, ein anderer
+ * Preis. Wer alte Werte weiterverwendet, verkauft die Clubstufe zum halben
+ * Preis, und zwar ohne Fehlermeldung.
+ */
+export const PAID_LEVELS = ["discover", "focus", "impact"] as const;
 export type PaidLevel = (typeof PAID_LEVELS)[number];
 export type Interval = "month" | "year";
 
+/** Spiegelt `membership_tiers.level_rank` (AGE-903). `connect` und `discover`
+ *  tragen hier ANDERE Zahlen als vor dieser Umstellung (2→3 bzw. 3→4). */
 export const LEVEL_RANK: Record<string, number> = {
-  basic: 1,
-  connect: 2,
-  discover: 3,
-  exchange: 4,
+  active: 1,
+  boost: 2,
+  connect: 3,
+  discover: 4,
   focus: 5,
   impact: 6,
 };

@@ -127,9 +127,21 @@ See `openspec/specs/access-control/spec.md` und `openspec/specs/membership-tiers
 
 Das **Datenmodell** ist die Menge der Supabase-Migrationen unter
 `supabase/migrations/` (Quelle der Wahrheit fürs Schema). Mitgliedsstufen folgen
-dem **6-Level-Modell** (`basic` → `connect` → `discover` → `exchange` → `focus` →
-`impact`, aufsteigende Rechte; AGE-311) — nicht mehr dem alten 3-/7-Stufen-Modell
-der Legacy-Docs. See `openspec/specs/membership-tiers/spec.md`.
+der **Zugangsleiter V5** (`active` → `boost` → `connect` → `discover` → `focus`
+→ `impact`, aufsteigende Rechte; AGE-903) — nicht mehr dem 6-Level-Modell aus
+AGE-311 und erst recht nicht dem 3-/7-Stufen-Modell der Legacy-Docs.
+See `openspec/specs/membership-tiers/spec.md`.
+
+**Der Club beginnt bei `discover` (Rang 4).** ACTIVE, BOOST und CONNECT werden
+nur technisch vorgehalten, tragen 0 € und keine Clubfunktion. Jede Clubschwelle
+lautet `has_level(4)`.
+
+> **Zwei Schlüssel haben ihre Bedeutung gewechselt, ohne ihren Namen zu
+> wechseln:** `connect` stand bis AGE-903 auf Rang 2 und steht jetzt auf Rang 3;
+> `discover` stand auf Rang 3 und steht jetzt auf Rang 4. Ein Schlüsselname sagt
+> deshalb nichts darüber, welche Rechte er trug — nur der Rang tut das, und nur
+> zu einem genannten Zeitpunkt. Prüfe die Stufe immer über
+> `membership_tiers.level_rank`, nie über `profiles.tier` allein.
 
 <!-- BEGIN: agentic-apps-workflow sections (do not remove this marker) -->
 <!-- section-version: 1.1.0 -->

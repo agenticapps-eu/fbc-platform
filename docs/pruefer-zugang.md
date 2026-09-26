@@ -23,7 +23,7 @@ Gemessen am 2026-09-12/13:
   `org_id` kommen in `supabase/migrations/` und `src/` null Mal vor.
 - **Die Stufe ist kein Werkzeug.** Feed und Events lesen über
   `visibility in ('public','members')` — jedes angemeldete Konto sieht sie, auf
-  `basic` genauso wie auf `impact`.
+  `active` genauso wie auf `impact`.
 - **Namen maskiert nur die Aktivierung, nicht die Stufe.**
   `resolve_display_name` gibt `'Mitglied'` zurück, wenn `is_activated()` falsch
   ist; ein aktiviertes Konto sieht Klarnamen auf **jeder** Stufe.
@@ -43,48 +43,59 @@ die verworfenen Alternativen unten.
 | --- | --- | --- |
 | `/aktivitaet` (Feed) | **keins** (`src/config/nav.ts:107`) | Beiträge, Klarnamen, Bilder, Kommentare |
 | `/events` | **keins** (`src/config/nav.ts:87`) | Veranstaltungen, Gastgeber, Anmeldungen |
-| `/mitglieder` (Liste) | `connect` (Rang 2) | Name, Bild, Region, Firma, Kurzbio, Branche, Rollen |
-| Kompetenzen, Suchen/Bieten | `discover` (Rang 3) | erst ab dieser Stufe |
+| `/mitglieder` (Liste) | `discover` (Rang 4) | Name, Bild, Region, Firma, Kurzbio, Branche, Rollen |
+| Kompetenzen, Suchen/Bieten | `discover` (Rang 4) | **dieselbe Schwelle** — seit AGE-903 gibt es keine zweistufige Trennung mehr |
+| `/academy` | `discover` (Rang 4) | seit AGE-903; vorher trug sie gar keine Stufenprüfung |
 | Kontaktdaten | Kontaktanfrage | nie automatisch — unverändert |
 | Chat | akzeptierte Kontakte | ein neues Konto hat keine |
 
-## Welche Stufe das Prüferkonto bekommt: `connect`
+## Welche Stufe das Prüferkonto bekommt: `discover` (Rang 4)
 
-**`connect` (Rang 2), nicht `basic` und nicht `impact`.**
+**Die unterste Clubstufe — nicht `active` und nicht `impact`.**
 
-- **Nicht `basic`:** Dort fehlt die Mitgliederliste. Eine App, in der ein
-  Hauptmenüpunkt ins Leere läuft, lädt zu genau der Ablehnung nach Richtlinie
-  4.2 ein, die dieses Vorhaben ohnehin fürchtet.
-- **Nicht `impact`:** Kompetenzen sowie Suchen/Bieten aller Mitglieder sind für
-  eine Store-Prüfung ohne Nutzen. Was der Prüfer nicht braucht, muss er nicht
-  sehen.
-- **`connect`** zeigt eine vollständig wirkende App und lässt die Rang-3-Felder
-  aus. Es ist die kleinste Stufe, die beides leistet.
+Seit AGE-903 (26.09.2026) lautet die Leiter `active`(1) · `boost`(2) ·
+`connect`(3) · `discover`(4) · `focus`(5) · `impact`(6), und **der FBC beginnt
+bei `discover`**. Die Entscheidung vom 13.09. — „die kleinste Stufe, die eine
+vollständig wirkende App zeigt" — trifft damit `discover`:
+
+- **Nicht `active`, `boost` oder `connect`:** dort fehlen Mitgliederliste und
+  Academy. Eine App, in der zwei Hauptmenüpunkte ins Leere laufen, lädt zu genau
+  der Ablehnung nach Richtlinie 4.2 ein, die dieses Vorhaben ohnehin fürchtet.
+- **Nicht `impact`:** der Unterschied zu `discover` liegt heute in keinem Gate —
+  jede Clubschwelle lautet `has_level(4)`. `impact` brächte also keinen weiteren
+  Einblick, nur eine höhere Stufe im Profil.
+- **`discover`** zeigt eine vollständig wirkende App und ist die kleinste Stufe,
+  die das leistet.
 
 Reicht es wider Erwarten nicht, ist das Hochsetzen ein Feldwechsel in
 `profiles.tier` und **ohne Neuanmeldung wirksam** — die Prüfung muss dafür nicht
 neu beginnen.
 
-### ⚠ Nach AGE-903 heißt diese Stufe DISCOVER — und der Wechsel ist Pflicht
+### ⚠ Die Falle ist der Schlüsselname, nicht der Rang
 
-`connect` gilt, **solange die heutige Leiter gilt**: `basic`(1) · `connect`(2) ·
-`discover`(3) · `exchange`(4) · `focus`(5) · `impact`(6). Stand 25.09. ist das so;
-AGE-903 steht auf *Todo*, und `boost`/`active` kommen in `src/config/` und
-`supabase/migrations/` null Mal vor.
+Dieser Abschnitt hiess bis AGE-903 „Nach AGE-903 heisst diese Stufe DISCOVER —
+und der Wechsel ist Pflicht". Der Wechsel ist vollzogen; die Warnung bleibt, weil
+sie jetzt erst recht gilt.
 
-AGE-903 verschiebt die ganze Leiter. Dort ist **DISCOVER der neue Rang 4**
-(heute `exchange`), und der FBC beginnt erst dort. Alles, was heute unter Rang 4
-freigeschaltet ist — auch die Mitgliederliste — wandert auf Rang 4. Ein
-Prüferkonto, das dann noch auf Rang 2 steht, sähe genau den ins Leere laufenden
-Hauptmenüpunkt, den die Entscheidung oben vermeiden wollte. Der Nachzug steht in
-AGE-903 in Umfang und Abnahme.
+**`discover` bezeichnet inzwischen in drei Modellen etwas anderes:** im
+Prototyp-Modell die kostenlose Einstiegsstufe, ab AGE-311 die erste bezahlte
+(Rang 3, 150 €), seit AGE-903 die unterste Clubstufe (Rang 4, 300 €). Dasselbe
+gilt für `connect`: Rang 2 ab AGE-311, Rang 3 seit AGE-903 — und damit
+**ausserhalb** des Clubs.
 
-**Die Falle ist der Schlüsselname, nicht der Rang.** „DISCOVER" aus AGE-903 ist
-*nicht* der heutige Schlüssel `discover` (Rang 3). Wer das Konto vor AGE-903
-anlegt und `discover` einträgt, trifft weder die Entscheidung vom 13.09. noch
-AGE-903. Genau diese Verwechslung ist hier schon einmal passiert — siehe den
-Warnhinweis im Kopf von `src/config/levels.ts`: „ACHTUNG: `discover` existierte
-vorher mit ANDERER Bedeutung."
+Wer in einem älteren Dokument „`connect`" liest und es einträgt, setzt das Konto
+heute auf Rang 3 und damit vor genau die Wände, die dieses Dokument vermeiden
+will. Genau diese Verwechslung ist hier schon zweimal passiert.
+
+**Prüfe deshalb am RANG, nicht am Namen:**
+
+```sql
+select p.tier, m.level_rank
+  from public.profiles p
+  join public.membership_tiers m on m.key = p.tier
+ where p.id = '<uuid des prueferkontos>';
+-- erwartet: discover | 4
+```
 
 ## Der Text für die Prüfhinweise
 
@@ -134,8 +145,10 @@ Funktionen hinter der Anmeldung liegen — sonst fragt die Prüfung nach.
    Aktivierungslink zwar das Kennwort (200), die Anmeldung scheitert danach aber
    mit `400 email_not_confirmed` — der Fehler zeigt sich erst *nach* der
    Aktivierung und sieht nicht nach seiner Ursache aus.
-2. **Stufe auf `connect` setzen** (`profiles.tier`). Achtung: `on_auth_user_created`
-   legt die Profilzeile bereits beim Anlegen mit `tier = 'basic'` an. Ein
+2. **Stufe auf `discover` setzen** (`profiles.tier`, Rang 4 — am Rang prüfen,
+   siehe die Warnung oben). Achtung: `on_auth_user_created`
+   legt die Profilzeile bereits beim Anlegen mit `tier = 'active'` an (bis
+   AGE-903: `'basic'`). Ein
    `insert … on conflict do update` muss `tier` deshalb im `do update set`
    führen — eine Spalte, die nur in der Einfügeliste steht, kommt nie an.
 3. **Kennung und Kennwort nach Infisical**, nicht ins Repository und nicht in

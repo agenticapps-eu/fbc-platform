@@ -115,39 +115,63 @@ entlastet (siehe unten).
       `authenticated` und `service_role` sind vor und nach der Migration
       **identisch**. Die Migration ändert kein einziges Recht
 
-## 4 · Frontend
+## 4 · Frontend — erledigt
 
-- [ ] `src/config/levels.ts`: Schlüssel, Labels, Preise, Ränge, `DEFAULT_LEVEL`
-- [ ] `src/config/nav.ts`: `minTier` auf `/mitglieder` → neuer `discover`;
+RED war die neue Zusage in `src/config/levels.test.ts` (7 von 9 rot), danach
+fielen **31 Zusagen in 13 Bestandsdateien**. Jetzt **2927 Zusagen in 253 Dateien
+grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
+
+- [x] `src/config/levels.ts`: Schlüssel, Labels, Preise, Ränge, `DEFAULT_LEVEL`
+      — plus **neu `CLUB_LEVEL` und `CLUB_RANK`**. Die Zahl 4 steht damit im
+      Frontend an EINER Stelle; jede Fläche liest sie von dort
+- [x] `src/config/nav.ts`: `minTier` auf `/mitglieder` → `discover` (Rang 4);
       **neu** `minTier` auf `/academy`
-- [ ] `src/pages/MitgliedschaftPage.tsx`: `PAID` → `["discover","focus","impact"]`
-      (die drei Clubstufen — sonst trüge eine Stufe ohne Funktion einen
-      Kaufknopf), `RECOMMENDED`, `zeigtPreise`
-- [ ] `src/components/ui/TierBadge.tsx`: `LEVEL_WEIGHT` auf die neuen Schlüssel
-- [ ] `src/lib/contact-requests.ts`: Staffelungs-Spiegel entfernen
-- [ ] Stufentexte in `HeaderSearch`, `MemberDirectory`, `HomePage`
-- [ ] `AdminMitgliederPage`: Auswahl nur DISCOVER · FOCUS · IMPACT, bestehende
-      tiefere Stufe trotzdem anzeigen
-- [ ] `src/lib/directory.ts`: Kopfkommentar richtigstellen — er behauptet
-      `minTier: "discover"` für `/mitglieder` und `has_level(3)`; tatsächlich
-      steht in `nav.ts:110` heute `"connect"`. Schon jetzt falsch, und dieser
-      Change verschiebt genau diese Schwelle
-- [ ] `membershipVisuals.ts` **nicht** anfassen — rechnet nur mit `rank`
-- [ ] Vitest für jede geänderte Schwelle, RED vor GREEN
+- [x] `src/pages/MitgliedschaftPage.tsx`: `PAID` → die drei Clubstufen
+- [x] `src/components/ui/TierBadge.tsx`: `LEVEL_WEIGHT` — die drei Stufen
+      ausserhalb des Clubs tragen `muted`, die Grenze liegt auch optisch
+      zwischen Rang 3 und 4
+- [x] `src/lib/contact-requests.ts`: Staffelungs-Spiegel entfernt. Der
+      **Parameter** ist weg, nicht bloss seine Wirkung — ein ungenutzter
+      Parameter liest sich wie eine Bedingung, die noch gilt
+- [x] `src/pages/PublicProfilePage.tsx`: die Kontaktkarte trug zwei Sätze für
+      zwei Hürden und trägt jetzt einen. Zwei wären nicht genauer, sondern
+      irreführend
+- [x] Stufentexte in `HeaderSearch`, `MemberDirectory`, `HomePage`
+- [x] `src/lib/directory.ts`: Kopfkommentar richtiggestellt — er behauptete
+      `minTier: "discover"`, während `nav.ts` seit AGE-598 `"connect"` trug.
+      Schon vor diesem Change falsch
+- [x] `AdminMitgliederPage`: Auswahl nur DISCOVER · FOCUS · IMPACT, bestehende
+      tiefere Stufe trotzdem angezeigt und vorbelegt
+- [x] `membershipVisuals.ts` **nicht** angefasst — rechnet nur mit `rank`
+- [x] Vitest für jede geänderte Schwelle, RED vor GREEN. Umgedreht sind unter
+      anderem „Connect sieht das Verzeichnis" (AGE-598) und „ein connect-Konto
+      darf ein connect-Profil anschreiben" — beide waren an ihrem Tag richtig
+- [x] `PublicProfilePage.staffelung.test.tsx` → `…kontaktstufe.test.tsx`
 
-## 5 · Kaufweg und Doku
+## 5 · Kaufweg und Doku — erledigt
 
-- [ ] `create-checkout-session`: `PAID_LEVELS` und README auf die neuen
-      Schlüssel; Stripe bleibt ruhend, keine Kaufknöpfe
-- [ ] `docs/lastenheft.md` Teil C: Namensfrage BOOST/Basic als entschieden
-- [ ] `docs/pruefer-zugang.md`: Checklistenpunkt 2 auf DISCOVER, die Tabelle
-      „Was das Konto sieht" auf **eine** Schwelle bei Rang 4, der Abschnitt
-      „⚠ Nach AGE-903 …" von Ankündigung auf Vollzug
-- [ ] `AGENTS.md:130` — nennt wörtlich die alte Leiter
-      (`basic → connect → discover → exchange → focus → impact`). Die Datei
-      liest jede Folgesitzung zuerst; bliebe sie stehen, gäbe sie die alte
-      Bedeutung von `discover` als Wahrheit aus
-- [ ] Release-Geschichten **nicht** anfassen
+- [x] `create-checkout-session`: `PAID_LEVELS` auf die drei Clubstufen,
+      `LEVEL_RANK` auf die neuen Ränge, 15 Deno-Zusagen grün. Stripe bleibt
+      ruhend, keine Kaufknöpfe. **Zwei Fallen stehen jetzt in der README**, weil
+      `priceEnvKey()` den Variablennamen aus dem Schlüssel ableitet:
+      `STRIPE_PRICE_EXCHANGE_*` gibt es nicht mehr, und
+      `STRIPE_PRICE_DISCOVER_*` meint jetzt 300 €/30 € statt 150 €/15 € —
+      derselbe Name, ein anderer Preis, ohne Fehlermeldung
+- [x] `AGENTS.md`: die Leiter und die Warnung vor der Schlüssel-Verwechslung.
+      Diese Datei liest jede Folgesitzung zuerst
+- [x] `docs/lastenheft.md` Teil C: Leiter, Preise, Rechte-Matrix und die
+      **Namensfrage BOOST/Basic als entschieden** — es gibt jetzt beide Namen,
+      und sie meinen Verschiedenes (ACTIVE = Rang 1, BOOST = Rang 2)
+- [x] `docs/pruefer-zugang.md`: Prüferkonto auf `discover` (Rang 4), die Tabelle
+      „Was der Prüfer sieht" auf **eine** Schwelle, `/academy` ergänzt, und der
+      Abschnitt „⚠ Nach AGE-903 …" von Ankündigung auf Vollzug — samt einer
+      SQL-Zeile, die am Rang prüft statt am Namen
+- [x] `docs/technisches-handbuch.md`, `docs/demo-zugang.md`,
+      `docs/demo-script.md`: je eine Zeile mit der alten Leiter
+- [x] `docs/superpowers/**` **nicht** angefasst — das sind abgeschlossene Pläne
+      und Specs vergangener Changes, also Chronik wie die Release-Geschichten
+- [x] Release-Geschichten **nicht** angefasst; nach `pnpm build` wurde
+      `src/content/release-entries.generated.ts` zurückgesetzt
 
 ## 6 · Abnahme
 

@@ -10,8 +10,10 @@
 > neutralisiert** — auf DEV ist derzeit kein Konto anmeldefähig.
 >
 > Auch die Stufen stimmen nicht mehr: dieses Dokument spricht von
-> *Discover → Prime → Legacy*. Gültig ist seit AGE-311 das Sechs-Stufen-Modell
-> `basic → connect → discover → exchange → focus → impact`.
+> *Discover → Prime → Legacy*. Gültig ist seit AGE-903 die Zugangsleiter V5
+> `active → boost → connect → discover → focus → impact`, und der Club beginnt
+> bei `discover` (Rang 4). Achtung: `discover` und `connect` gab es auch im
+> Modell davor, mit ANDEREN Rängen — der Name allein sagt nichts.
 >
 > **Nicht ausführen:** `pnpm demo:seed` oder `pnpm demo:reset` gegen DEV
 > zerstören den Spiegel.

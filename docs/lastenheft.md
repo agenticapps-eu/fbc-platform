@@ -200,32 +200,52 @@ Country Lead, Moderator, Sponsor Manager und weitere.
 
 ## C.1 Das gültige Modell
 
-Sechs Stufen, aufsteigende Rechte, von Detlev am **15.07.2026** bestätigt
-(AGE-311). Das Modell ist im Repository als verbindliche Spezifikation
-hinterlegt (`openspec/specs/membership-tiers/spec.md`).
+Sechs Stufen, aufsteigende Rechte. Vorgelegt von Detlev am **23.09.2026**
+(V5-Funktionsmatrix), telefonisch nachgeschärft am **25.09.** (AGE-903). Das
+Modell ist im Repository als verbindliche Spezifikation hinterlegt
+(`openspec/specs/membership-tiers/spec.md`).
 
 | Rang | Schlüssel | Name in der Plattform | Preis / Jahr | Löst ab |
 |---|---|---|---|---|
-| 1 | `basic` | Basic | 0 € | *(neu)* |
-| 2 | `connect` | Connect | 0 € | `discover` (alt) |
-| 3 | `discover` | Discover | 150 € | `explore` |
-| 4 | `exchange` | Exchange | 300 € | `impuls` |
-| 5 | `focus` | Focus | 600 € | `active` |
-| 6 | `impact` | Impact | 1.200 € | `prime` |
+| 1 | `active` | Active | 0 € | `basic` |
+| 2 | `boost` | Boost | 0 € | *(neu)* |
+| 3 | `connect` | Connect | 0 € | `connect` (Rang 2) |
+| 4 | `discover` | Discover | 300 € | `discover` (Rang 3) · `exchange` |
+| 5 | `focus` | Focus | 600 € | — |
+| 6 | `impact` | Impact | 1.200 € | — |
 
-> **Namensabweichung:** Das Konzeptpapier vom 18.07.2026 nennt die erste
-> Stufe durchgehend **BOOST**. In Datenbank und Oberfläche heißt sie
-> **Basic** (`20260715150000_six_level_model.sql`, `src/config/levels.ts`).
-> „BOOST" kommt im Produkt nirgends vor. Wenn die Marketing-Sprache gelten
-> soll, ist das eine offene Entscheidung — kein Versehen der Umsetzung.
+**Der FBC beginnt erst bei DISCOVER.** ACTIVE, BOOST und CONNECT liegen
+ausserhalb des Clubs und werden nur technisch vorgehalten.
 
-Die früheren Stufen `circle` (2.400 €) und `legacy` (4.800 €) sind **ersatzlos
-entfallen**. Neue Konten starten auf `basic`.
+> **Die Namensfrage BOOST/Basic ist damit entschieden.** Das Konzeptpapier vom
+> 18.07.2026 nannte die erste Stufe durchgehend **BOOST**, während Datenbank und
+> Oberfläche **Basic** sagten; das war bis AGE-903 eine offene Entscheidung.
+> Jetzt gibt es beide Namen, und sie meinen Verschiedenes: **ACTIVE** ist Rang 1,
+> **BOOST** ist Rang 2.
 
-> **Achtung, häufige Verwechslung:** `discover` bezeichnet in beiden Modellen
-> etwas anderes. Im alten Modell war es die kostenlose Einstiegsstufe, im
-> neuen ist es die erste bezahlte. Bestandsmitglieder auf altem `discover`
-> (0 €) wurden auf `connect` überführt (Entscheidung Donald, 15.07.).
+> **Die drei Stufen ausserhalb des Clubs tragen 0 €** (Donald, 25. und 26.09.:
+> „aktuell 0, wird ja später kommen"). Die 75 € für BOOST aus der V5-Matrix und
+> ein Preis für CONNECT kommen als eigene Änderung. Begründung: eine Stufe, die
+> niemand kaufen kann, braucht keinen Preis — ein Preis ohne Kaufweg wäre eine
+> Zusage ohne Gegenstand.
+
+Die früheren Stufen `circle` (2.400 €) und `legacy` (4.800 €) sind mit AGE-311
+ersatzlos entfallen, `basic` und `exchange` mit AGE-903. Neue Konten starten auf
+`active`.
+
+> **Achtung, häufige Verwechslung — sie ist mit AGE-903 schlimmer geworden:**
+> `discover` bezeichnet inzwischen in DREI Modellen etwas anderes. Im
+> Prototyp-Modell war es die kostenlose Einstiegsstufe, ab AGE-311 die erste
+> bezahlte (Rang 3, 150 €), und seit AGE-903 die unterste Clubstufe (Rang 4,
+> 300 €). Dasselbe gilt für `connect`: Rang 2 ab AGE-311, Rang 3 seit AGE-903.
+> **Der Schlüsselname ist kein Beleg — nur der Rang, und nur zu einem genannten
+> Zeitpunkt.**
+>
+> Die Bestandsmitglieder sind deshalb bewusst **nicht rangtreu** umgezogen:
+> `impact`→IMPACT, `focus`→FOCUS, `connect`·`discover`·`exchange`→DISCOVER,
+> `basic`→ACTIVE. Rangtreu verlöre ein Konto auf altem `discover` seinen
+> Clubzugang (Entscheidung Donald, 25.09.; vorher AGE-311: altes `discover` →
+> `connect`).
 
 ## C.2 Was die Stufen freischalten
 
@@ -237,12 +257,18 @@ Preise und der Vorgabewert.
 
 | Ab Stufe | Was freigeschaltet wird |
 |---|---|
-| `basic` | Profil anlegen, Kompass beginnen, entdecken |
-| `connect` | Kompass vervollständigen, erste Matchings, Favoriten |
-| `discover` | Academy, volles Verzeichnis, erweiterte Matchings |
-| `exchange` | Events, Kontaktanfragen, Aktivitätsbereich |
-| `focus` | Als Anbieter auftreten, Leistungen veröffentlichen, Leads |
-| `impact` | Volle Plattform, Priorität, Teams, Partnerprogramme |
+| `active` (1) | Profil anlegen, Kompass beginnen, öffentliche Events |
+| `boost` (2) | dasselbe — ausserhalb des Clubs |
+| `connect` (3) | dasselbe — ausserhalb des Clubs |
+| `discover` (4) | **Der Club beginnt hier:** Mitgliederverzeichnis, Academy, Mitglieder-Events, Kontaktanfragen, erweiterte Profildaten |
+| `focus` (5) | Als Anbieter auftreten, Leistungen veröffentlichen, Leads |
+| `impact` (6) | Volle Plattform, Priorität, Teams, Partnerprogramme |
+
+> **Offen (AGE-903):** FOCUS und IMPACT schalten im GATING heute nichts frei,
+> was DISCOVER nicht auch hat — jede Clubschwelle lautet `has_level(4)`. Die
+> Zeilen oben beschreiben die Absicht aus der V5-Matrix, nicht den gemessenen
+> Ist-Zustand. Die Differenzierung (SUCHE/BIETE, gezielte Suche, eigene Events)
+> ist eine Rückfrage an Detlev und kommt später.
 
 **Immer gratis, unabhängig von der Stufe:** Nachrichten an bereits
 akzeptierte Kontakte.
