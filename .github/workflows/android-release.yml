@@ -331,5 +331,13 @@ jobs:
           serviceAccountJson: ${{ runner.temp }}/play.json
           packageName: com.effbeezee.app
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
-          track: internal
+          # `tracks` (Plural), NICHT `track`. Der erste Lauf am 26.09. hat es
+          # selbst gemeldet: „'track' is deprecated and will be removed in a
+          # future release. Please migrate to 'tracks'."
+          #
+          # Der Plan-Review hatte das vorhergesagt, und ich hatte ihn zur
+          # Haelfte widerlegt — mit der README der gepinnten Fassung, die
+          # `track:` in ihren eigenen Beispielen fuehrt. Die Laufzeit ist die
+          # staerkere Quelle. Er hatte in BEIDEN Punkten recht.
+          tracks: internal
           status: completed
