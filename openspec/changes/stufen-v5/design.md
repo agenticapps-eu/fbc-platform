@@ -283,14 +283,10 @@ Rückweg ist deshalb eine eigene Migration, keine Umkehrung dieser.
   Suche, eigene Events) später.
 - **Die Adresse des Prüferkontos** entscheidet Donald. Kennung und Kennwort
   gehören nach Infisical, nicht ins Repo.
-- **Trägt CONNECT wirklich 150 €?** Die Anforderung „Six-level tier ladder"
-  begründet ausdrücklich, warum BOOST 0 € trägt — „ein Preis, den niemand
-  zahlen kann, wäre eine Zusage ohne Gegenstand" —, setzt CONNECT aber auf
-  150 €. CONNECT liegt nach derselben Spec ebenso ausserhalb des Clubs und ist
-  ebenso nicht kaufbar. Im Frontend ist `PAID` (`MitgliedschaftPage.tsx:13`)
-  die Liste der Stufen **mit Kaufknopf**; CONNECT landete dort und böte einen
-  Kauf für eine Stufe ohne Funktion. Ob die 150 € aus Detlevs V5-Matrix
-  stammen oder aus der alten Rang-3-Zeile mitgeschleift sind, ist nicht
-  prüfbar, solange die Matrix nicht lesbar ist. Bis zu Donalds Entscheidung
-  bleibt der Wert wie im Delta; die Alternative wäre CONNECT 0 € und
-  `PAID = ["discover", "focus", "impact"]`.
+- ~~**Trägt CONNECT wirklich 150 €?**~~ **Entschieden am 26.09.: CONNECT trägt
+  0 €** — „aktuell 0, wird ja später kommen" (Donald). Damit tragen alle drei
+  Stufen ausserhalb des Clubs 0 €, und `PAID` wird
+  `["discover", "focus", "impact"]`: die Preisseite bietet genau die drei
+  Clubstufen an. Die Begründung, die schon für BOOST galt, gilt jetzt
+  einheitlich — ein Preis ohne Kaufweg ist eine Zusage ohne Gegenstand. Preise
+  für BOOST (75 €) und CONNECT kommen als eigene Änderung.

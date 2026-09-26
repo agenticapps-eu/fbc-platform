@@ -5,7 +5,7 @@
 The system SHALL define exactly six membership tiers, each with a unique
 ascending `level_rank`: `active` (1), `boost` (2), `connect` (3), `discover`
 (4), `focus` (5), `impact` (6). Each tier SHALL carry a `label` and an annual
-price in EUR (`price_year`): ACTIVE 0, BOOST 0, CONNECT 150, DISCOVER 300,
+price in EUR (`price_year`): ACTIVE 0, BOOST 0, CONNECT 0, DISCOVER 300,
 FOCUS 600, IMPACT 1200.
 
 **Der Club beginnt bei `discover` (Rang 4).** ACTIVE, BOOST und CONNECT werden
@@ -17,15 +17,22 @@ Rang 3 und danach auf Rang 4. Ein Schlüssel allein sagt deshalb nichts mehr
 darüber, welche Rechte er trug — nur der Rang tut das, und nur zu einem
 genannten Zeitpunkt.
 
-**BOOST trägt 0 €, nicht die 75 € der V5-Matrix** (Donald, 25.09.). Die Stufe
-ist nicht kaufbar; ein Preis, den niemand zahlen kann, wäre eine Zusage ohne
-Gegenstand.
+**Die drei Stufen ausserhalb des Clubs tragen 0 €** — ACTIVE, BOOST und
+CONNECT (Donald, 25. und 26.09.). Keine von ihnen ist kaufbar; ein Preis, den
+niemand zahlen kann, wäre eine Zusage ohne Gegenstand. Die 75 € für BOOST aus
+der V5-Matrix und ein Preis für CONNECT kommen später, als eigene Änderung.
+
+Daraus folgt für die Oberfläche: **nur DISCOVER, FOCUS und IMPACT tragen einen
+Preis und damit einen Kaufweg.** Eine Preiskarte mit Kaufknopf für eine Stufe
+ohne Clubfunktion wäre ein Angebot ohne Gegenstand — derselbe Grund, aus dem
+die drei Stufen 0 € tragen.
 
 #### Scenario: Tiers are seeded in rank order
 
 - **WHEN** the database is provisioned
 - **THEN** `public.membership_tiers` contains the six keys above with unique
-  `level_rank` values 1–6 and the prices listed
+  `level_rank` values 1–6 and the prices listed — die drei Stufen unterhalb des
+  Clubs auf 0 €
 
 #### Scenario: A superseded tier key is absent
 

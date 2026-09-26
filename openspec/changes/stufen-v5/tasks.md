@@ -29,33 +29,48 @@ sie prüfen, und der Fremdschlüssel `profiles_tier_fkey` erzwingt die Reihenfol
       verifiziert und die RLS-/Kommentar-Folgeschuld gefunden; das ist derselbe
       Lauf und dieselbe fremde Sicht.
 
-## 2 · Migration (eine Datei, forward-only)
+## 2 · Migration (eine Datei, forward-only) — erledigt
 
-- [ ] RED: pgTAP-Test, der die sechs Zielschlüssel mit ihren Rängen und Preisen
-      erwartet — muss gegen den heutigen Stand rot sein
-- [ ] `active` (Rang 101) und `boost` (Rang 102) anlegen — nur diese zwei
+`supabase/migrations/20260926120000_stufen_v5.sql`. RED war 8 von 12 Zusagen rot,
+GREEN ist 12 von 12 — belegt in einer Transaktion mit `rollback`, damit der
+GETEILTE lokale Stack nicht umgestellt wird, solange die Bestandstests noch auf
+die alten Schlüssel zeigen.
+
+- [x] RED: pgTAP-Test, der die sechs Zielschlüssel mit ihren Rängen und Preisen
+      erwartet — war rot (`supabase/tests/stufen_v5_leiter_test.sql`, 8/12)
+- [x] `active` (Rang 101) und `boost` (Rang 102) anlegen — nur diese zwei
       Schlüssel sind neu; `connect`·`discover`·`focus`·`impact` bestehen weiter
-- [ ] Profile umhängen: `basic`→`active`, `exchange`·`connect`→`discover`;
+- [x] Profile umhängen: `basic`→`active`, `exchange`·`connect`→`discover`;
       `focus` und `impact` bleiben unberührt
-- [ ] `basic` und `exchange` löschen — erst danach sind Rang 1 und 4 frei
-- [ ] `discover` 3→4, **danach** `connect` 2→3 (umgekehrt kollidiert es),
+- [x] `basic` und `exchange` löschen — erst danach sind Rang 1 und 4 frei
+- [x] `discover` 3→4, **danach** `connect` 2→3 (umgekehrt kollidiert es),
       zuletzt `active` 101→1 und `boost` 102→2
-- [ ] `profiles.tier` DEFAULT `'basic'` → `'active'`
-- [ ] `handle_new_user()` neu deklarieren — schreibt `'active'` statt `'basic'`
-- [ ] Sechs SELECT-Policies auf `has_level(4)`
-- [ ] `search_directory()` Eintrittstor auf `has_level(4)`
-- [ ] `register_for_event()` auf `has_level(4)` im `members`-Zweig
-- [ ] `darf_kontaktanfrage_senden()` auf `has_level(4)`, Rang-2-Zweig ersatzlos
-- [ ] `regs_write_own` WITH CHECK spiegelt die Bedingung aus
+- [x] `profiles.tier` DEFAULT `'basic'` → `'active'`
+- [x] `handle_new_user()` neu deklarieren — schreibt `'active'` statt `'basic'`
+- [x] Sechs SELECT-Policies auf `has_level(4)`
+- [x] `search_directory()` Eintrittstor auf `has_level(4)`
+- [x] `register_for_event()` auf `has_level(4)` im `members`-Zweig
+- [x] `darf_kontaktanfrage_senden()` auf `has_level(4)`, Rang-2-Zweig ersatzlos
+- [x] `regs_write_own` WITH CHECK spiegelt die Bedingung aus
       `register_for_event` (öffentlich ohne Rang, `members` ab 4, Host frei)
-- [ ] Schlussprüfung in derselben Migration: kein Profil auf einem entfallenen
-      Schlüssel, sonst `raise`
-- [ ] Sechs Katalog-Kommentare richtigstellen, in **derselben** Migration:
+- [x] Schlussprüfung in derselben Migration — **eine**, nicht zwei. „Kein Profil
+      auf einem entfallenen Schlüssel" braucht keinen eigenen Wächter:
+      `profiles_tier_fkey` macht den Löschschritt unmöglich, solange ein Profil
+      noch darauf zeigt (Gegenprobe gefahren: 23503, mit Nennung des
+      Schlüssels). Ein zweiter Wächter daneben könnte nie feuern, sähe aber wie
+      eine echte Prüfung aus. Geprüft wird stattdessen, was der Fremdschlüssel
+      **nicht** fängt — Rang und Preis, beides gültige Werte in gültigen Zeilen
+      (Gegenprobe gefahren: mit `boost` auf Rang 9 bricht sie ab und schreibt
+      die vorgefundene Leiter in die Meldung)
+- [x] Sechs Katalog-Kommentare richtigstellen, in **derselben** Migration:
       `has_level(int)`, `membership_tiers`, `darf_kontaktanfrage_senden`,
       `register_for_event`, `search_directory` und ein neuer Kommentar auf
-      `profiles_select_self_or_discover` (er fehlt heute). `apply_upgrade` und
-      `profiles_public` bleiben richtig und werden nicht angefasst
-- [ ] Migrationskopf trägt die Entscheidungen und die Zwischenrang-Begründung
+      `profiles_select_self_or_discover` (er fehlte). `apply_upgrade` und
+      `profiles_public` bleiben richtig und wurden nicht angefasst
+- [x] Migrationskopf trägt die Entscheidungen und die Zwischenrang-Begründung
+- [x] Neue Testdatei in `.github/workflows/ci.yml` eingetragen — der Wächter
+      `scripts/pgtap-dateiliste.test.ts` prüft die Liste in beide Richtungen
+      und ist grün
 
 ## 3 · pgTAP (je Stufe 1–6, was lesbar und erlaubt ist)
 
@@ -82,7 +97,9 @@ sie prüfen, und der Fremdschlüssel `profiles_tier_fkey` erzwingt die Reihenfol
 - [ ] `src/config/levels.ts`: Schlüssel, Labels, Preise, Ränge, `DEFAULT_LEVEL`
 - [ ] `src/config/nav.ts`: `minTier` auf `/mitglieder` → neuer `discover`;
       **neu** `minTier` auf `/academy`
-- [ ] `src/pages/MitgliedschaftPage.tsx`: `PAID`, `RECOMMENDED`, `zeigtPreise`
+- [ ] `src/pages/MitgliedschaftPage.tsx`: `PAID` → `["discover","focus","impact"]`
+      (die drei Clubstufen — sonst trüge eine Stufe ohne Funktion einen
+      Kaufknopf), `RECOMMENDED`, `zeigtPreise`
 - [ ] `src/components/ui/TierBadge.tsx`: `LEVEL_WEIGHT` auf die neuen Schlüssel
 - [ ] `src/lib/contact-requests.ts`: Staffelungs-Spiegel entfernen
 - [ ] Stufentexte in `HeaderSearch`, `MemberDirectory`, `HomePage`
@@ -135,10 +152,8 @@ sie prüfen, und der Fremdschlüssel `profiles_tier_fkey` erzwingt die Reihenfol
 ## Offen, nicht in diesem Change
 
 - [ ] `open_contact` umlegen — gehört zu AGE-930
-- [ ] BOOST auf 75 € — später (Donald, 25.09.); gehört auch in den PR-Text,
-      nicht nur in diesen Change, der archiviert wird
-- [ ] **Entscheidung ausstehend: trägt CONNECT 150 € oder 0 €?** Siehe
-      „Open Questions" im Entwurf. Solange offen, bleibt der Wert wie im Delta
-      und CONNECT wäre in `PAID` — eine Stufe mit Kaufknopf und ohne Funktion
+- [ ] Preise für BOOST (75 €) und CONNECT — später (Donald, 25. und 26.09.:
+      „aktuell 0, wird ja später kommen"); gehört auch in den PR-Text, nicht nur
+      in diesen Change, der archiviert wird
 - [ ] Sichtbarer Fokusring auf den `NavLink`s der Seitenleiste (Befund aus
       AGE-929, eigenes Issue)

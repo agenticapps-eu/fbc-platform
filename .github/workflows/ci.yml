@@ -260,6 +260,7 @@ jobs:
           supabase/tests/release_beitrag_test.sql
           supabase/tests/anforderung_drossel_test.sql
           supabase/tests/release_backfill_test.sql
+          supabase/tests/stufen_v5_leiter_test.sql
 
       # Die Datenschicht des Feeds gegen den LAUFENDEN Stack (AGE-582, 5.13).
       #
