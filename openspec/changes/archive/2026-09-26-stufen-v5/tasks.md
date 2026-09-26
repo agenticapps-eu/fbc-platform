@@ -226,9 +226,44 @@ grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
 
 ## 7 · Nach dem Merge (ausdrückliche Freigabe nötig)
 
-- [ ] `migrate-prod` dispatchen — **nicht** von der Merge-Freigabe gedeckt
-- [ ] `gh run rerun --failed` für den von `drift-gate` blockierten Deploy
-- [ ] Verteilung auf PROD nach dem Lauf zählen und vorlegen
+- [x] `migrate-prod` dispatchen — **nicht** von der Merge-Freigabe gedeckt.
+      Freigegeben von Donald am 26.09. („Bitte deploye auf prod"). Lauf
+      `36259620920`, `plan` und `apply` beide grün; die Schlussprüfung der
+      Migration (Rang UND Preis) hat nicht ausgelöst, und
+      `migration-drift-gate.ts` lief nach dem `db push` abweichungsfrei
+- [x] `gh run rerun --failed` für den von `drift-gate` blockierten Deploy —
+      Lauf `36257009989` auf `94b73ef`, dem **jüngsten** Stand von `main`.
+      Danach alle vier Jobs grün. Der `functions`-Job hat **keine**
+      Rückfall-Warnung ausgegeben; der ausgelieferte Chunk trägt
+      `SENTRY_RELEASE.id = 94b73ef148e9…`, also genau diesen Commit. Der
+      ältere blockierte Lauf `36255511834` wurde bewusst NICHT wiederholt —
+      er hätte `4002637` ausgeliefert und zwei Vorgänge zurückgerollt
+- [x] Verteilung auf PROD nach dem Lauf zählen und vorlegen — 78 Konten vorher
+      wie nachher, kein Profil verloren:
+
+      | Rang | vorher | n | nachher | n |
+      | --- | --- | --- | --- | --- |
+      | 1 | `basic` 0 € | 3 | `active` 0 € | 3 |
+      | 2 | `connect` 0 € | 0 | `boost` 0 € | 0 |
+      | 3 | `discover` 150 € | 1 | `connect` 0 € | 0 |
+      | 4 | `exchange` 300 € | 1 | `discover` 300 € | **2** |
+      | 5 | `focus` 600 € | 0 | `focus` 600 € | 0 |
+      | 6 | `impact` 1200 € | 73 | `impact` 1200 € | 73 |
+
+      Die beiden Konten auf altem `discover` (Rang 3) und `exchange` (Rang 4)
+      sind auf Rang 4 zusammengezogen — niemand hat Zugang verloren, eines hat
+      welchen gewonnen. Mitgemessen: `profiles.tier` DEFAULT steht auf
+      `'active'`, `basic` und `exchange` sind aus `membership_tiers` weg, es
+      gibt **null Waisen**, und `platform_settings.open_contact` steht
+      unverändert auf `true` — nicht angefasst, es gehört zu AGE-930.
+
+      Und die Schwellen selbst, aus dem Katalog gelesen statt angenommen:
+      **zwölf** Stellen messen `has_level(4)`, keine einzige mehr 2 oder 3 —
+      sieben Policies (`profiles`, `offers`, `needs`, `profile_interests`,
+      `profile_badges`, `profile_theme_scores`, `regs_write_own`) und fünf
+      Funktionen (`search_directory`, `register_for_event`,
+      `darf_kontaktanfrage_senden`, `former_member_entries`,
+      `post_engagement_counts`)
 - [x] ~~Prüferkonto auf dem neuen DISCOVER anlegen~~ — **vorgezogen und erledigt
       am 26.09.**, auf ausdrückliche Freigabe Donalds. Grund: die externe
       TestFlight-Gruppe verlangt Benutzername und Kennwort als Pflichtfeld, und
@@ -251,9 +286,11 @@ grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
       Verzeichniszeilen, 7 Events, 40 Beiträge, `search_directory` 27 Zeilen.
       Zugangsdaten in Infisical `prod` (`STORE_REVIEW_LOGIN`,
       `STORE_REVIEW_PASSWORD`), nichts davon im Repo.
-- [ ] **Nach `migrate-prod`:** eine Zeile nachsehen, ob das Prüferkonto auf
-      `discover` / Rang 4 gelandet ist — am RANG geprüft, nicht am Namen. Die
-      Abfrage steht in `docs/pruefer-zugang.md`
+- [x] **Nach `migrate-prod`:** eine Zeile nachgesehen, ob das Prüferkonto auf
+      `discover` / Rang 4 gelandet ist — am RANG geprüft, nicht am Namen, mit
+      der Abfrage aus `docs/pruefer-zugang.md`. Ergebnis: `discover` | `4`,
+      `is_public = false`, aktiviert. Ohne Sonderregel mitgewandert, wie
+      geplant
 - [x] Vollzug an die Parallelsitzung gemeldet (AGE-907)
 
 ## Offen, nicht in diesem Change

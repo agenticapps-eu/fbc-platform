@@ -6,30 +6,17 @@
 
 > ## ⚠ ZUERST
 >
-> **PR #436 und #437 sind gemergt**, AGE-903 steht auf Done. **Der Deploy
-> steht still, und das ist gewollt:** `drift-gate` bricht ab mit „DRIFT — lokal
-> vorhanden, auf dem Ziel fehlend: 20260926120000". Genau eine Migration, meine.
+> **AGE-903 ist vollstaendig ausgeliefert.** PR #436/#437/#438 gemergt,
+> `migrate-prod` gelaufen (`36259620920`), Deploy freigegeben (`36257009989`,
+> alle vier Jobs gruen). Der ausgelieferte Chunk traegt
+> `SENTRY_RELEASE.id = 94b73ef148e9…` — der Kopf von `main`, kein Rueckfall.
 >
-> **Die nächsten zwei Handgriffe brauchen Donalds AUSDRÜCKLICHE Freigabe** und
-> sind von der stehenden Merge-Freigabe NICHT gedeckt:
+> **Es ist nichts mehr offen, das eine Freigabe braucht.** Was bleibt, gehoert
+> in eigene Vorgaenge: `open_contact` (AGE-930), die Preise fuer BOOST und
+> CONNECT, und der Fokusring aus AGE-929.
 >
-> 1. `gh workflow run migrate-prod` (PROD-Schreibzugriff)
-> 2. den blockierten Deploy wiederholen — gibt Deploy und Functions frei
->
-> **Die Lauf-ID hier NICHT abschreiben.** Jeder weitere Merge auf `main` erzeugt
-> einen neuen blockierten Lauf, und `gh run rerun` baut den Commit *jenes*
-> Laufs, nicht den aktuellen `main` — ein Re-Run auf einem alten Lauf rollt das
-> Frontend zurück (achte Deploy-Falle, 27.08.). Den jüngsten holen:
->
-> ```
-> gh run list --branch main --workflow Deploy --limit 1 --json databaseId,headSha
-> gh run rerun --failed <diese ID>
-> ```
->
-> Beim Verlassen war das `36256499264` auf `93730e4`.
->
-> `migrate-dev` ist in jedem dieser Läufe **durchgelaufen** — DEV trägt die
-> Leiter V5 bereits.
+> Naechster Handgriff: `wt remove` fuer den Worktree `stufen-v5`. Danach die
+> Schritte 3–5 des Auftrags: AGE-927, AGE-928, AGE-930.
 
 ## Accomplished
 
@@ -83,8 +70,19 @@ TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
 * `is_public = false`, `activated_at` gesetzt, abgenommen mit einer **echten
   Anmeldung**: 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge.
 
-**PROD-Verteilung vor `migrate-prod`:** `basic` 3 · `discover` 1 · `exchange` 1 ·
-`impact` 73 = 78 Profile.
+**PROD-Verteilung, vorher und nachher gezaehlt** — 78 Profile, keines verloren:
+
+| Rang | vorher | n | nachher | n |
+|---|---|---|---|---|
+| 1 | `basic` 0 € | 3 | `active` 0 € | 3 |
+| 2 | `connect` 0 € | 0 | `boost` 0 € | 0 |
+| 3 | `discover` 150 € | 1 | `connect` 0 € | 0 |
+| 4 | `exchange` 300 € | 1 | `discover` 300 € | **2** |
+| 5 | `focus` 600 € | 0 | `focus` 600 € | 0 |
+| 6 | `impact` 1200 € | 73 | `impact` 1200 € | 73 |
+
+Das Prueferkonto steht danach auf `discover` / **Rang 4**, `is_public = false`,
+aktiviert — am Rang geprueft, nicht am Namen.
 
 ## Files modified
 
@@ -101,17 +99,13 @@ TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
 
 ## Next session: start here
 
-`cd /Users/donald/worktrees/fbc-platform/stufen-v5`. Der Arbeitsbaum steht auf
-Branch `donald/age-903-archiv`; der Branch `stufen-v5` ist gemergt und kann weg.
+**AGE-903 ist fertig und ausgeliefert — hier ist nichts mehr aufzunehmen.** Der
+Worktree `/Users/donald/worktrees/fbc-platform/stufen-v5` kann mit `wt remove`
+weg; er steht auf einem gemergten Branch, der Arbeitsbaum ist sauber.
 
-**Fragen, nicht tun:** Donald um die Freigabe für `migrate-prod` bitten. Danach
-`gh run rerun --failed 36255511834`, dann die Verteilung auf PROD zählen und
-gegen die 78 oben halten, und die Gegenprobe, ob das Prüferkonto auf Rang 4
-gelandet ist — die Abfrage steht in `docs/pruefer-zugang.md` und prüft am RANG,
-nicht am Namen. Erst danach `wt remove`.
-
-Aus dem Fünf-Punkte-Auftrag stehen dann noch AGE-927, AGE-928 und AGE-930 aus
-(AGE-930 legt auch `open_contact` um).
+Danach die Schritte 3–5 des Fuenf-Punkte-Auftrags, in dieser Reihenfolge:
+**AGE-927** (Admin legt Mitglied an), **AGE-928** (Mitgliedschaft anzeigen),
+**AGE-930** (Selbstregistrierung schliessen — legt auch `open_contact` um).
 
 ## Zustand der Umgebung
 

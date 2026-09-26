@@ -87,8 +87,8 @@ in der Migration und keinen Handschritt danach — nur die Gegenprobe unten.
 | | |
 |---|---|
 | Adresse und Kennwort | Infisical `prod`: `STORE_REVIEW_LOGIN`, `STORE_REVIEW_PASSWORD` |
-| Stufe heute | `exchange`, Rang 4 |
-| Stufe nach AGE-903 | `discover`, Rang 4 |
+| Stufe | `discover`, Rang 4 — **gemessen am 26.09. nach `migrate-prod`** |
+| Stufe davor | `exchange`, Rang 4 (gleiche Stufe, alter Name) |
 | `is_public` | `false` — das Konto ist kein Mitglied und gehört nicht ins Verzeichnis |
 
 Wie es angelegt wurde, und warum nicht über den Aktivierungslink: der gebaute
@@ -105,7 +105,7 @@ nur, solange jemand auf den Zugangslink angewiesen ist.
 Identität 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge,
 `search_directory` 27 Zeilen.
 
-**Nach `migrate-prod` bitte einmal nachsehen** — eine Zeile, und sie prüft am
+**Nachgesehen am 26.09., nach `migrate-prod`** — eine Zeile, und sie prüft am
 Rang statt am Namen:
 
 ```sql
@@ -113,8 +113,13 @@ select p.tier, m.level_rank
   from public.profiles p
   join public.membership_tiers m on m.key = p.tier
  where p.name = 'App Store Pruefer';
--- erwartet danach: discover | 4
+-- gemessen: discover | 4
 ```
+
+**Ergebnis: `discover` | `4`**, `is_public = false`, aktiviert. Das Konto ist
+ohne Sonderregel mitgewandert, wie geplant — die Key-Migration hat die Kohorte
+`connect`·`discover`·`exchange` geschlossen nach `discover` umgehängt. Es
+brauchte keine Zeile in der Migration und keinen Handgriff danach.
 
 ### ⚠ Die Falle ist der Schlüsselname, nicht der Rang
 
