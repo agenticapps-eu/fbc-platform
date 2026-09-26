@@ -26,7 +26,7 @@ import {
 } from "../lib/public-profile";
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
 import { kompassAnzeige, type KompassAnzeige } from "../lib/kompass-anzeige";
-import { LEVELS, LEVEL_RANK } from "../config/levels";
+import { CLUB_LEVEL, LEVELS } from "../config/levels";
 import { cn } from "../lib/cn";
 import { istGeplant } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
@@ -83,17 +83,20 @@ export default function PublicProfilePage() {
   // erreicht der Admin über die Suche auf /admin, weil profiles_public sie für
   // niemanden führt.
   const istAdmin = staffRole === "admin" && !isOwn;
-  // Bis AGE-311 war beides dieselbe Schwelle (Prime). §2 trennt sie, und
-  // AGE-598 trennt sie noch einmal anders: die erweiterten Felder gehören zum
-  // „vollständigen Verzeichnis" (ab `discover`), das Kontaktrecht ist seit dem
-  // 02.09. nicht mehr eine Stufe teurer, sondern GESTAFFELT — `basic` gar
-  // nicht, `connect` nur an genau `connect`, ab `discover` an alle. Der Kern
-  // bleibt: Sichtbarkeit ≠ Kontaktrecht.
+  // Die Geschichte dieser Trennung in vier Schritten: bis AGE-311 war
+  // Sichtbarkeit dasselbe wie Kontaktrecht (Prime), §2 trennte sie, AGE-598
+  // staffelte das Kontaktrecht nach der EMPFÄNGERstufe, und AGE-903 hat die
+  // Staffelung ersatzlos gestrichen. Jetzt gilt beides ab derselben Stufe —
+  // Rang 4, die unterste Clubstufe — und hängt allein am BETRACHTER.
+  //
+  // Der Kern bleibt trotzdem: Sichtbarkeit ≠ Kontaktrecht. Die zwei Schwellen
+  // sind heute gleich hoch, aber sie sind zwei Zusagen, und `open_contact` hebt
+  // nur die zweite auf.
   //
   // Der Admin-Flag open_contact (AGE-455) steht davor und öffnet es für alle.
   // Dieselbe Veroderung wie in `cr_insert_self`, und die RLS bleibt die Grenze.
   const canRequestContact =
-    (platform?.openContact ?? false) || darfKontaktanfrageSenden(levelRank, profile.tier);
+    (platform?.openContact ?? false) || darfKontaktanfrageSenden(levelRank);
 
   return (
     <div className="flex flex-col gap-6">
@@ -542,32 +545,25 @@ function ContactBody({
        dann null) — auch dort ist „wir wissen es nicht" die Wahrheit. */
     if (absenderRang === null) return null;
 
-    /* Zwei Huerden, zwei Begruendungen (AGE-598, D5-Gedanke auf die
-       Kontaktflaeche uebertragen). Ein `basic`-Konto kann NIEMANDEN
-       anschreiben; ein `connect`-Konto kann es schon, nur nicht dieses Profil.
-       Dieselbe Meldung fuer beide beantwortete jeweils die falsche Frage.
+    /* EINE Huerde, EINE Begruendung (AGE-903).
 
-       Der Fall `absenderRang >= discover` steht hier nicht: dann waere
+       Hier standen bis AGE-903 zwei Saetze: ein `basic`-Konto konnte NIEMANDEN
+       anschreiben, ein `connect`-Konto schon, nur nicht dieses Profil. Das war
+       die Staffelung nach Empfaengerstufe aus AGE-598, und der zweite Satz war
+       ihre einzige Stelle an der Oberflaeche.
+
+       Die Staffelung ist ersatzlos entfallen: es entscheidet allein die
+       ABSENDERstufe. Damit gibt es nur noch eine Huerde, und zwei Saetze waeren
+       jetzt nicht mehr genauer, sondern irrefuehrend — der zweite behauptete
+       eine Bedingung, die es nicht gibt.
+
+       Der Fall `absenderRang >= CLUB_RANK` steht hier nicht: dann waere
        `canRequestContact` wahr. */
     return (
       <p className="text-sm text-muted">
-        {(absenderRang ?? 0) >= LEVEL_RANK.connect ? (
-          <>
-            Auf der Mitgliedsstufe{" "}
-            <span className="font-medium text-ink">{LEVELS.connect.label}</span> kannst du
-            Mitglieder der Stufe{" "}
-            <span className="font-medium text-ink">{LEVELS.connect.label}</span> anschreiben. Ab{" "}
-            <span className="font-medium text-ink">{LEVELS.discover.label}</span> erreichst du
-            jedes Mitglied.
-          </>
-        ) : (
-          <>
-            Kontaktanfragen sind ab der Mitgliedsstufe{" "}
-            <span className="font-medium text-ink">{LEVELS.connect.label}</span> möglich — dort an
-            Mitglieder derselben Stufe, ab{" "}
-            <span className="font-medium text-ink">{LEVELS.discover.label}</span> an jedes Mitglied.
-          </>
-        )}
+        Kontaktanfragen sind ab der Mitgliedsstufe{" "}
+        <span className="font-medium text-ink">{LEVELS[CLUB_LEVEL].label}</span> möglich — dort an
+        jedes Mitglied, unabhängig von dessen Stufe.
       </p>
     );
   }

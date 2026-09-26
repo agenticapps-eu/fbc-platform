@@ -6,7 +6,7 @@ import { PageHero } from "../components/ui/PageHero";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
-import { LEVELS, LEVEL_ORDER } from "../config/levels";
+import { CLUB_LEVEL, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
 import { displayAuthor } from "../lib/displayAuthor";
 import { REGISTRIEREN_PFAD } from "./LoginPage";
 import {
@@ -173,7 +173,8 @@ function Stufenschiene() {
         Mitglied werden
       </h2>
       <p className="text-sm text-muted">
-        Sechs Stufen, aufsteigend. Du startest kostenlos und wechselst, wenn du mehr brauchst.
+        Sechs Stufen, aufsteigend. Der Club beginnt bei {levelLabel(CLUB_LEVEL)} — darunter
+        legst du kostenlos ein Profil an und siehst öffentliche Events.
       </p>
 
       <ul className="space-y-2">
@@ -207,8 +208,8 @@ function Stufenschiene() {
  *  weil eine Null neben fünf Preisen wie ein Fehler aussieht.
  *
  *  Der JAHRESPREIS steht vorn, der Monatspreis darunter. Das ist keine Frage
- *  des Geschmacks: bei `discover` sind es 150 € im Jahr, aber 15 € im Monat —
- *  zwölf Monate ergäben 180. Der Monatspreis allein verschwiege also, dass die
+ *  des Geschmacks: bei `discover` sind es 300 € im Jahr, aber 30 € im Monat —
+ *  zwölf Monate ergäben 360. Der Monatspreis allein verschwiege also, dass die
  *  Jahreszahlung günstiger ist, und das wäre auf genau der Seite falsch, deren
  *  Zweck es ist, keine unbelegten Angaben mehr zu machen. */
 function preis(stufe: { priceMonth: number; priceYear: number }) {

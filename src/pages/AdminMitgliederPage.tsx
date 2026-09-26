@@ -13,7 +13,7 @@ import { PageSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
-import { LEVEL_ORDER, levelLabel } from "../config/levels";
+import { CLUB_RANK, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
 import { requestActivationLink } from "../lib/activation";
 import {
   activateMember,
@@ -1290,6 +1290,26 @@ function StufenDialog({
   // Vorbelegt mit der Stufe, auf der das Mitglied steht: der Dialog beantwortet
   // „worauf setzen", und dazu gehört sichtbar, wovon aus.
   const [tier, setTier] = useState<string>(member.tier);
+
+  // ── Angeboten werden nur die drei CLUBSTUFEN (AGE-903, Detlev 25.09.) ──────
+  //
+  // ACTIVE, BOOST und CONNECT liegen ausserhalb des Clubs und sind nicht
+  // wählbar. Die Beschränkung liegt HIER und nicht in `admin_set_tier()`: die
+  // Funktion nimmt weiterhin alle sechs Schlüssel und setzt in beide Richtungen.
+  // Zwei Gründe, beide aus dem Entwurf: eine Korrektur nach unten muss möglich
+  // bleiben, wenn ein Konto versehentlich zu hoch gesetzt wurde — genau dafür
+  // gibt es `admin_set_tier()` neben `apply_upgrade()`; und eine
+  // Oberflächenregel in einer SECURITY-DEFINER-Funktion zu verankern machte aus
+  // einer Anzeigeentscheidung eine Rechtegrenze, die sich nur noch per Migration
+  // ändern lässt. Daraus folgt ausdrücklich: das ist KEINE Sicherheitsgrenze.
+  //
+  // Die BESTEHENDE Stufe bleibt in der Liste, auch wenn sie darunter liegt. Eine
+  // Auswahl, die eine gesetzte Stufe verschweigt, liesse den Admin glauben, das
+  // Konto stehe auf der ersten angebotenen — und `value={tier}` fiele auf einen
+  // Wert zurück, den niemand gewählt hat.
+  const waehlbar = LEVEL_ORDER.filter(
+    (key) => LEVELS[key].rank >= CLUB_RANK || key === member.tier,
+  );
   const [grund, setGrund] = useState("");
 
   return (
@@ -1311,7 +1331,7 @@ function StufenDialog({
           <Field label="Neue Stufe">
             {({ id }) => (
               <Select id={id} value={tier} onChange={(e) => setTier(e.target.value)}>
-                {LEVEL_ORDER.map((key) => (
+                {waehlbar.map((key) => (
                   <option key={key} value={key}>
                     {levelLabel(key)}
                   </option>

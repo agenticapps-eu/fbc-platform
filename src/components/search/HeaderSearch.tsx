@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
 import { useOverlay } from "../ui/useOverlay";
-import { LEVEL_RANK, levelLabel } from "../../config/levels";
+import { CLUB_LEVEL, CLUB_RANK, levelLabel } from "../../config/levels";
 import { useAuth } from "../../providers/auth-context";
 import { Icon } from "../ui/icons";
 import {
@@ -44,7 +44,7 @@ import {
  *    Wand.
  */
 
-const DISCOVER_RANK = LEVEL_RANK.discover;
+const DISCOVER_RANK = CLUB_RANK;
 const ENTPRELLUNG_MS = 300;
 
 export default function HeaderSearch() {
@@ -222,8 +222,8 @@ export default function HeaderSearch() {
     if (!begriff) return;
     schliessen();
     // AGE-907: Die Verzweigung ist weg. Bis zum 25.09. ging Enter unterhalb
-    // `discover` auf `/mitgliedschaft` — in den Kaufweg, der jetzt ruht. Beide
-    // Stufen gehen deshalb ins Verzeichnis: ein Konto unter `connect` findet
+    // die Clubstufe auf `/mitgliedschaft` — in den Kaufweg, der jetzt ruht. Alle
+    // Stufen gehen deshalb ins Verzeichnis: ein Konto unter Rang 4 findet
     // dort die Wand von `MembershipGate`, die die nötige Stufe nennt und sagt,
     // wer sie freischaltet. Der Hinweis über dem Knopf hat das ohnehin schon
     // angekündigt.
@@ -448,7 +448,7 @@ function Ergebnisse({
     ) : (
       <div className="px-4 py-5 text-center">
         <p className="text-sm text-muted">
-          Das Mitgliederverzeichnis ist ab {levelLabel("discover")} verfügbar.
+          Das Mitgliederverzeichnis ist ab {levelLabel(CLUB_LEVEL)} verfügbar.
         </p>
         {/* AGE-907: hieß „Mitgliedschaft ansehen" und führte in den ruhenden
             Kaufweg. Beide Zweige tragen jetzt dasselbe Ziel und deshalb dieselbe

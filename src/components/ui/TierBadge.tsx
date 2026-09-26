@@ -5,11 +5,14 @@ import { Badge, type BadgeVariant } from "./Badge";
  *  accent-only (AGE-237) — sechs unterscheidbare Akzenttöne wären nicht lesbar, also
  *  gruppiert die Medaille nach dem, was ein Mitglied ohnehin unterscheidet:
  *  gratis → erste zahlende Stufen → oberes Ende. */
+/** Die drei Stufen ausserhalb des Clubs tragen `muted`, die drei Clubstufen
+ *  heben sich ab. Die Grenze liegt damit auch optisch zwischen Rang 3 und 4 —
+ *  dieselbe Grenze, die `has_level(4)` in der Datenbank zieht (AGE-903). */
 const LEVEL_WEIGHT: Record<MembershipLevel, BadgeVariant> = {
-  basic: "muted",
+  active: "muted",
+  boost: "muted",
   connect: "muted",
   discover: "soft",
-  exchange: "soft",
   focus: "strong",
   impact: "strong",
 };

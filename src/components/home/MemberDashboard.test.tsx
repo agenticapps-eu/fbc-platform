@@ -48,7 +48,7 @@ const DASH: DashboardData = {
     region: "Stuttgart",
     company: "Müller GmbH",
     short_bio: null,
-    tier: "exchange",
+    tier: "discover",
     roles: [],
     headline: null,
     member_number: null,
@@ -120,7 +120,7 @@ describe("MemberDashboard", () => {
     // Compass % kommt direkt aus profile_completion.
     expect(screen.getByText("60%")).toBeInTheDocument();
     // Mein Plan zeigt das Stufen-Label (levelLabel), nicht den rohen Key.
-    expect(screen.getByText("Exchange")).toBeInTheDocument();
+    expect(screen.getByText("Discover")).toBeInTheDocument();
   });
 
   it("empfiehlt sichtbare Mitglieder und leitet einen Compass-Schritt aus der Lücke ab", async () => {

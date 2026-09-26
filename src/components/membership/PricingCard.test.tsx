@@ -22,17 +22,21 @@ describe("PricingCard", () => {
     renderCard();
     const card = screen.getByTestId("level-discover");
     expect(within(card).getByText("Discover")).toBeInTheDocument();
-    expect(within(card).getByText("III")).toBeInTheDocument(); // rank monogram (Roman numeral)
-    expect(within(card).getByText(/150 € \/ Jahr/)).toBeInTheDocument();
+    // Das Monogramm ist die roemische Zahl des RANGS, nicht des Schluessels.
+    // `discover` stand bis AGE-903 auf Rang 3 und steht jetzt auf Rang 4 — die
+    // Karte trug also dieselbe Beschriftung und eine andere Zahl, ohne dass sich
+    // ihr Name aenderte.
+    expect(within(card).getByText("IV")).toBeInTheDocument();
+    expect(within(card).getByText(/300 € \/ Jahr/)).toBeInTheDocument();
   });
 
   it("shows the monthly price when interval is month", () => {
     renderCard({ interval: "month" });
-    expect(screen.getByText(/15 € \/ Monat/)).toBeInTheDocument();
+    expect(screen.getByText(/30 € \/ Monat/)).toBeInTheDocument();
   });
 
   it("shows Gratis for a free tier", () => {
-    renderCard({ level: LEVELS.basic, canUpgrade: false });
+    renderCard({ level: LEVELS.active, canUpgrade: false });
     expect(screen.getByText("Gratis")).toBeInTheDocument();
   });
 
@@ -59,7 +63,7 @@ describe("PricingCard", () => {
     const onUpgrade = vi.fn();
     render(
       <PricingCard
-        level={LEVELS.exchange}
+        level={LEVELS.discover}
         interval="year"
         isCurrent={false}
         canUpgrade
@@ -68,7 +72,7 @@ describe("PricingCard", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /upgrade/i }));
-    expect(onUpgrade).toHaveBeenCalledWith("exchange");
+    expect(onUpgrade).toHaveBeenCalledWith("discover");
   });
 
   it("shows the Testzahlung hint for upgradeable tiers", () => {

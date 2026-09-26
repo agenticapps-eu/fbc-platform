@@ -10,7 +10,11 @@ import PricingCard from "../components/membership/PricingCard";
 import { MembershipSummary } from "../components/membership/MembershipSummary";
 
 type Interval = "month" | "year";
-const PAID: MembershipLevel[] = ["discover", "exchange", "focus", "impact"];
+/** Die Stufen mit Preis UND Kaufweg — nach AGE-903 genau die drei Clubstufen.
+ *  ACTIVE, BOOST und CONNECT tragen 0 € und liegen ausserhalb des Clubs; eine
+ *  Preiskarte mit Kaufknopf für eine Stufe ohne Funktion wäre ein Angebot ohne
+ *  Gegenstand (Donald, 26.09.: „aktuell 0, wird ja später kommen"). */
+const PAID: MembershipLevel[] = ["discover", "focus", "impact"];
 const RECOMMENDED: MembershipLevel = "discover";
 
 export default function MitgliedschaftPage() {

@@ -118,9 +118,9 @@ beforeEach(() => {
 });
 
 describe("Öffentliche Profilseite (AGE-239)", () => {
-  it("zeigt Basic nur öffentliche Felder (Name, Rollen, Tier) — keine erweiterten Blöcke", async () => {
+  it("zeigt Active nur öffentliche Felder (Name, Rollen, Tier) — keine erweiterten Blöcke", async () => {
     mockedFetch.mockResolvedValue(discoverView);
-    renderPage(authAsTier("basic"));
+    renderPage(authAsTier("active"));
 
     expect(await screen.findByRole("heading", { name: "Legacy Demo" })).toBeInTheDocument();
     expect(screen.getByText("Investor")).toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.queryByRole("heading", { name: "Hobbys" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Kompetenzen" })).not.toBeInTheDocument();
     expect(screen.queryByText("842")).not.toBeInTheDocument();
-    // Kein Kontakt-Senden-Button für Basic; stattdessen der Upgrade-Hinweis-Block.
+    // Kein Kontakt-Senden-Button für Active; stattdessen der Upgrade-Hinweis-Block.
     expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Erweiterte Profilangaben" })).toBeInTheDocument();
   });
@@ -272,9 +272,9 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.queryByText(/Kontaktanfragen sind ab der Mitgliedsstufe/)).not.toBeInTheDocument();
   });
 
-  it("zeigt Exchange zusätzlich den Kontaktanfrage-Button", async () => {
+  it("zeigt Discover zusätzlich den Kontaktanfrage-Button", async () => {
     mockedFetch.mockResolvedValue(fullView);
-    renderPage(authAsTier("exchange"));
+    renderPage(authAsTier("discover"));
 
     expect(await screen.findByRole("heading", { name: "Hobbys" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kontaktanfrage senden" })).toBeInTheDocument();
@@ -296,7 +296,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
 
   it("zeigt vor Annahme keine Kontaktdaten — Hinweis ist präsent, keine E-Mail/Telefon", async () => {
     mockedFetch.mockResolvedValue(fullView);
-    renderPage(authAsTier("exchange"));
+    renderPage(authAsTier("discover"));
 
     expect(
       await screen.findByText("E-Mail, Telefon und Anschrift werden nie automatisch angezeigt."),
@@ -319,7 +319,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
       },
       matchId: null,
     });
-    renderPage(authAsTier("exchange"));
+    renderPage(authAsTier("discover"));
 
     expect(await screen.findByText("Kontakt freigegeben")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "legacy@example.com" })).toHaveAttribute(
@@ -334,10 +334,10 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
     expect(screen.queryByRole("button", { name: "Kontaktanfrage senden" })).not.toBeInTheDocument();
   });
 
-  it("zeigt bei open_contact auch Basic den Kontaktanfrage-Button (AGE-455)", async () => {
+  it("zeigt bei open_contact auch Active den Kontaktanfrage-Button (AGE-455)", async () => {
     mockedFetch.mockResolvedValue(fullView);
     mockedPlatform.mockResolvedValue({ openContact: true });
-    renderPage(authAsTier("basic"));
+    renderPage(authAsTier("active"));
 
     expect(
       await screen.findByRole("button", { name: "Kontaktanfrage senden" }),
@@ -350,7 +350,7 @@ describe("Öffentliche Profilseite (AGE-239)", () => {
       code: "42501",
       message: 'new row violates row-level security policy for table "contact_requests"',
     });
-    renderPage(authAsTier("exchange"));
+    renderPage(authAsTier("discover"));
 
     fireEvent.click(await screen.findByRole("button", { name: "Kontaktanfrage senden" }));
     fireEvent.click(await screen.findByRole("button", { name: "Anfrage senden" }));

@@ -109,7 +109,7 @@ beforeEach(() => {
 describe("Der Anmeldeknopf hält sich an die Teilnahmeschwelle (AGE-594)", () => {
   it("sperrt ihn für eine Stufe unter discover bei einem Mitglieder-Event", async () => {
     mEvent.mockResolvedValue(evt());
-    renderMitStufe("basic");
+    renderMitStufe("active");
 
     const knopf = await screen.findByRole("button", { name: /Anmelden/ });
     expect(knopf).toBeDisabled();
@@ -143,7 +143,7 @@ describe("Der Anmeldeknopf hält sich an die Teilnahmeschwelle (AGE-594)", () =>
    */
   it("sperrt bei einem öffentlichen Event NICHT", async () => {
     mEvent.mockResolvedValue(evt({ visibility: "public" }));
-    renderMitStufe("basic");
+    renderMitStufe("active");
 
     expect(await screen.findByRole("button", { name: /Anmelden/ })).toBeEnabled();
   });
@@ -155,7 +155,7 @@ describe("Der Anmeldeknopf hält sich an die Teilnahmeschwelle (AGE-594)", () =>
    */
   it("lässt den Host zu seinem eigenen Mitglieder-Event, auch auf basic", async () => {
     mEvent.mockResolvedValue(evt({ host: host(ICH) }));
-    renderMitStufe("basic");
+    renderMitStufe("active");
 
     expect(await screen.findByRole("button", { name: /Anmelden/ })).toBeEnabled();
   });

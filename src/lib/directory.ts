@@ -7,16 +7,27 @@ import type { Database } from "./database.types";
  *
  * Sichtbarkeit entscheidet AUSSCHLIESSLICH die RLS, nicht das Frontend: die RPC
  * `search_directory` ist SECURITY INVOKER, die Policy
- * `profiles_select_self_or_discover` (`has_level(3)`) gibt vollständige Profilzeilen
- * nur am eigenen Profil ODER ab `discover` zurück. Eine Abfrage darunter liefert
- * höchstens die eigene Zeile — niemals fremde Mitglieder. `/mitglieder` ist seit
- * AGE-314 eine eigene Route mit `minTier: "discover"` (Spec §2), die unterhalb davon
- * per MembershipGate die Wand zeigt (Komfort, nicht die Grenze).
+ * `profiles_select_self_or_discover` (`has_level(4)`) gibt vollständige
+ * Profilzeilen nur am eigenen Profil ODER ab Rang 4 zurück. Eine Abfrage
+ * darunter liefert höchstens die eigene Zeile — niemals fremde Mitglieder.
  *
- * (Der Kopf nannte bis AGE-494 `profiles_select_self_or_prime` und „Prime+" — das
- * 6-Level-Modell hat die Policy in 20260715150000_six_level_model.sql ersetzt, der
- * Kommentar war seitdem falsch. Mitgezogen, weil dieser Change genau das
- * vergrößert, was hinter dieser Grenze preisgegeben wird.)
+ * Seit AGE-903 tragen die LISTE und die erweiterten Spalten DIESELBE Schwelle:
+ * das Eintrittstor der RPC steht auf `has_level(4)`, wie die Policy. Die
+ * zweistufige Trennung aus AGE-598 (Liste ab Rang 2, erweiterte Felder ab
+ * Rang 3) ist entfallen.
+ *
+ * `/mitglieder` ist seit AGE-314 eine eigene Route; ihr `minTier` in `nav.ts`
+ * zeigt seit AGE-903 wieder auf `discover` und damit auf dieselbe Zahl wie die
+ * RLS. Unterhalb davon zeigt `MembershipGate` die Wand (Komfort, nicht die
+ * Grenze).
+ *
+ * ── ZWEI KORREKTUREN AN DIESEM KOPF, BEIDE AUS DEMSELBEN GRUND ─────────────
+ * Er nannte bis AGE-494 `profiles_select_self_or_prime` und „Prime+"; das
+ * 6-Level-Modell hatte die Policy längst ersetzt. Und er behauptete bis AGE-903
+ * `minTier: "discover"`, während in `nav.ts` seit AGE-598 `"connect"` stand —
+ * gemessen, nicht vermutet. Zweimal blieb der Kommentar stehen, während die
+ * Zahl darunter wanderte. Der Name `profiles_select_self_or_discover` ist
+ * deshalb kein Beleg: die Autorität ist die Zahl im Rumpf der Policy.
  */
 
 export type DirectoryMember =

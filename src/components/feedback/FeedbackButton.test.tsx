@@ -57,7 +57,7 @@ function renderAt(
   optionen: { collapsed?: boolean } = {},
   user: AuthContextValue["user"] | null = { id: "u1" } as AuthContextValue["user"],
 ) {
-  const value = fakeAuthValue({ user, tier: "basic", levelRank: 1 });
+  const value = fakeAuthValue({ user, tier: "active", levelRank: 1 });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>

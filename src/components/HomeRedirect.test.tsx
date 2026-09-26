@@ -65,7 +65,7 @@ describe("Erstlogin (AGE-494)", () => {
     const settings = await import("../lib/member-settings");
     vi.spyOn(settings, "fetchOnboardedAt").mockResolvedValue("2026-08-14T10:00:00Z");
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
 
     // Auf ein Signal warten, das NUR der Nicht-Assistenten-Pfad erzeugt. Die
     // Shell-Navigation taugt dafür nicht: sie steht auch, während die alte Weiche
@@ -96,7 +96,7 @@ describe("Erstlogin (AGE-494)", () => {
     const settings = await import("../lib/member-settings");
     vi.spyOn(settings, "fetchOnboardedAt").mockResolvedValue("2026-08-14T10:00:00Z");
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
     await screen.findByRole("link", { name: "Aktivität" });
 
     expect(spy).not.toHaveBeenCalled();
@@ -164,7 +164,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
     await mockMerker(null);
     await dashboardScheitern();
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
 
     expect(await screen.findByRole("heading", { name: STRECKE })).toBeInTheDocument();
     expect(screen.queryByText(DASHBOARD_KAPUTT)).not.toBeInTheDocument();
@@ -174,7 +174,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
     await mockMerker("2026-08-14T10:00:00Z");
     await dashboardScheitern();
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
 
     expect(await screen.findByText(DASHBOARD_KAPUTT)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
   it("zeigt einem nicht aktivierten Konto den Aktivierungsbildschirm", async () => {
     await mockMerker(null);
 
-    renderAt("/", { ...authAsTier("basic"), isActivated: false });
+    renderAt("/", { ...authAsTier("active"), isActivated: false });
 
     expect(await screen.findByRole("heading", { name: "Noch ein Schritt" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();
@@ -220,7 +220,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
     await mockMerker("laedt");
     const dashboard = await dashboardScheitern();
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
 
     // Die Shell steht — die Weiche entscheidet innerhalb von ihr.
     await screen.findByRole("link", { name: "Aktivität" });
@@ -237,7 +237,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
     await mockMerker("fehler");
     await dashboardScheitern();
 
-    renderAt("/", authAsTier("basic"));
+    renderAt("/", authAsTier("active"));
 
     expect(await screen.findByText(DASHBOARD_KAPUTT)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: STRECKE })).not.toBeInTheDocument();

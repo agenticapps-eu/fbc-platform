@@ -364,7 +364,7 @@ describe("Der Erfolgsradar ist fort (AGE-597)", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}>
-        <AuthFixture value={authAsTier("basic")}>
+        <AuthFixture value={authAsTier("active")}>
           <ToastProvider>
             <MemoryRouter initialEntries={[`/p/${ZIEL}`]}>
               <Routes>

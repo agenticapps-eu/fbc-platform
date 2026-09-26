@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { navItems } from "./nav";
+import { CLUB_LEVEL, LEVEL_RANK } from "./levels";
 
 /**
  * Die Go-Live-Navigation (AGE-494): sieben Einträge in zwei Gruppen. Reihenfolge
@@ -61,9 +62,34 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     }
   });
 
-  it("hält das Verzeichnis ab Connect — die Schranke bleibt, sie steht nur eine Stufe tiefer", () => {
+  /* AGE-903 — die Schranke stand bis AGE-598 auf `discover`, dann auf
+     `connect`, und steht jetzt wieder auf `discover`. Das ist NICHT dieselbe
+     Stufe wie beim ersten Mal: `discover` hiess damals Rang 3 und heisst jetzt
+     Rang 4. Die Zusage lautet deshalb auf BEIDES — den Schlüssel und die Zahl —,
+     sonst wäre sie schon zweimal richtig gewesen, während die Schwelle wanderte. */
+  it("hält das Verzeichnis ab der untersten Clubstufe (Rang 4)", () => {
     const mitglieder = navItems.find((i) => i.path === "/mitglieder");
-    expect(mitglieder?.minTier).toBe("connect");
+    expect(mitglieder?.minTier).toBe(CLUB_LEVEL);
+    expect(LEVEL_RANK[mitglieder!.minTier!]).toBe(4);
+  });
+
+  /* AGE-903 — eine NEUE Zusage, keine Anhebung. Gemessen vor der Änderung: der
+     Academy-Eintrag trug ausschliesslich `requiresAuth: true` und gar keine
+     Stufenprüfung. Dass sie jedem aktivierten Konto offenstand, war nie
+     beschlossen, sondern nie gebaut. */
+  it("verlangt für die Academy die Clubstufe — vorher trug sie gar keine", () => {
+    const academy = navItems.find((i) => i.path === "/academy");
+    expect(academy?.minTier).toBe(CLUB_LEVEL);
+    expect(academy?.requiresAuth).toBe(true);
+  });
+
+  /* Die Gegenprobe zu den beiden darüber: `minTier` ist die AUSNAHME und nicht
+     die Regel. Ohne sie wäre „die Academy trägt jetzt eine Schwelle" auch dann
+     grün, wenn versehentlich jede Route eine bekommen hätte — und ein Feed oder
+     eine Aktivität hinter einer Stufenwand fiele beim Bauen niemandem auf. */
+  it("legt eine Stufenschwelle NUR auf /mitglieder und /academy", () => {
+    const mitSchwelle = navItems.filter((i) => i.minTier).map((i) => i.path).sort();
+    expect(mitSchwelle).toEqual(["/academy", "/mitglieder"]);
   });
 
   /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese Routen

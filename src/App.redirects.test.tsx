@@ -45,7 +45,7 @@ describe("Redirects alter URLs", () => {
   });
 
   it("/community → /aktivitaet (jede eingeloggte Stufe)", async () => {
-    renderAt("/community", authAsTier("basic"));
+    renderAt("/community", authAsTier("active"));
 
     // AGE-642: Ziel der Weiterleitung kommt asynchron nach. Geprüft wird
     // unverändert, dass die Weiterleitung DORT landet.
@@ -63,7 +63,7 @@ describe("Redirects alter URLs", () => {
   });
 
   it("/angebote-gesuche → /kompass (jede eingeloggte Stufe)", async () => {
-    renderAt("/angebote-gesuche", authAsTier("basic"));
+    renderAt("/angebote-gesuche", authAsTier("active"));
 
     // "Mini-Kompass" ist die Karten-Überschrift des Mini-Kompass-Tabs — eindeutig
     // gegenüber der Wand, die stattdessen "Dieser Bereich ist Mitgliedern
@@ -74,7 +74,7 @@ describe("Redirects alter URLs", () => {
 
   // AGE-494: Die Route heißt sichtbar „Kompass"; der alte Pfad bleibt als Brücke.
   it("/compass → /kompass (alte Links und Lesezeichen)", async () => {
-    renderAt("/compass", authAsTier("basic"));
+    renderAt("/compass", authAsTier("active"));
 
     await screen.findByRole("heading", { name: "Mini-Kompass" });
     expect(screen.getByRole("heading", { name: "Mini-Kompass" })).toBeInTheDocument();

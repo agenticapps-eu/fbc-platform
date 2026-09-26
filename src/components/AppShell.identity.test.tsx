@@ -76,7 +76,7 @@ describe("Identität im Rahmen (AGE-494)", () => {
   });
 
   it("lässt die Navigation für Gäste unverändert", () => {
-    renderApp({ ...authAsTier("basic"), user: null, tier: null, levelRank: null });
+    renderApp({ ...authAsTier("active"), user: null, tier: null, levelRank: null });
 
     const sidebar = document.querySelector("aside") as HTMLElement;
     expect(within(sidebar).getByRole("link", { name: "Aktivität" })).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("Identität im Rahmen (AGE-494)", () => {
    * Stufe wahr und würde nicht mehr bemerken, wenn der Eintrag für die anderen
    * zurückkäme. Deshalb wird über ALLE sechs Stufen gemessen.
    */
-  it.each([["basic"], ["connect"], ["discover"], ["exchange"], ["focus"], ["impact"]] as const)(
+  it.each([["active"], ["connect"], ["discover"], ["discover"], ["focus"], ["impact"]] as const)(
     "zeigt „Mitgliedschaft\" im Profilmenü auf keiner Stufe — hier %s",
     (stufe) => {
       renderApp(

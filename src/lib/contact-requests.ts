@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { LEVEL_RANK } from "../config/levels";
+import { CLUB_RANK } from "../config/levels";
 
 /**
  * Kontaktanfrage-Flow (AGE-247) — Datenschicht. Spec: docs/matching-spec.md §6.
@@ -20,13 +20,12 @@ import { LEVEL_RANK } from "../config/levels";
  * garantiert die RLS (`contacts_select_self_or_released`), nicht dieses Modul.
  */
 
-// ── Staffelung (AGE-598) ──────────────────────────────────────────────────────
+// ── Die Stufenschwelle (AGE-903) ─────────────────────────────────────────────
 /**
- * Darf ein Konto dieser Stufe ein Profil jener Stufe anschreiben?
+ * Darf ein Konto dieser Stufe eine Kontaktanfrage senden?
  *
- *   `basic`       gar nicht
- *   `connect`     nur an GENAU `connect`
- *   ab `discover` an alle
+ *   ab Rang 4 (`discover`, die unterste Clubstufe)  an JEDEN
+ *   darunter                                        an NIEMANDEN
  *
  * Das ist die Frontend-Fassung von `public.darf_kontaktanfrage_senden(uuid)`.
  * Die Kopie ist Absicht und aus demselben Grund harmlos wie die Ränge in
@@ -34,17 +33,21 @@ import { LEVEL_RANK } from "../config/levels";
  * vom Client. Was hier steht, entscheidet nur, ob ein Knopf ein Versprechen
  * bricht — und ein Knopf, der systematisch in einen `42501` läuft, tut das.
  *
+ * **Die Empfängerstufe entscheidet nichts mehr.** Bis AGE-903 war sie eine
+ * Bedingung: „`connect` nur an genau `connect`". Diese Staffelung ist ersatzlos
+ * entfallen, weil sie eine Aussage über eine Stufe war, die es in dieser
+ * Bedeutung nicht mehr gibt — `connect` stand auf Rang 2 und steht jetzt auf
+ * Rang 3, beides ausserhalb des Clubs. Der Parameter ist damit weg, nicht bloss
+ * ungenutzt: ein ungenutzter Parameter liest sich wie eine Bedingung, die noch
+ * gilt.
+ *
  * `open_contact` steht in der Policy VOR dieser Regel und gehört deshalb nicht
- * hierher: der Aufrufer verodert selbst, so wie es die Klausel tut.
+ * hierher: der Aufrufer verodert selbst, so wie es die Klausel tut. Auf PROD
+ * steht der Schalter auf `true` und hebt diese Schwelle vollständig auf — was
+ * hier steht, ist der Rückfallwert.
  */
-export function darfKontaktanfrageSenden(
-  absenderRang: number | null,
-  zielStufe: string | null,
-): boolean {
-  const rang = absenderRang ?? 0;
-  if (rang >= LEVEL_RANK.discover) return true;
-  if (rang >= LEVEL_RANK.connect) return zielStufe === "connect";
-  return false;
+export function darfKontaktanfrageSenden(absenderRang: number | null): boolean {
+  return (absenderRang ?? 0) >= CLUB_RANK;
 }
 
 // ── Senden (Sender-Seite, §6.1) ───────────────────────────────────────────────

@@ -8,23 +8,25 @@ import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
 import type { PublicProfileData } from "../lib/public-profile";
 
 /**
- * AGE-598, Aufgabengruppe 7 — die Oberfläche der Kontaktanfrage.
+ * Die Oberfläche der Kontaktanfrage (AGE-598 Gruppe 7, AGE-903).
  *
- * Seit `20260902180000_kontaktanfrage_staffelung.sql` gilt statt „ab Rang 4":
+ * Seit AGE-903 entscheidet allein die ABSENDERstufe:
  *
- *   `basic`       gar nicht
- *   `connect`     nur an GENAU `connect`
- *   ab `discover` an alle
+ *   ab Rang 4 (`discover`)  an JEDEN, unabhängig von dessen Stufe
+ *   darunter                an NIEMANDEN
  *
- * Die Seite muss das benennen, nicht bloss den Knopf wegnehmen. Und sie muss
- * es UNTERSCHEIDBAR benennen: ein `basic`-Konto und ein `connect`-Konto stehen
- * vor verschiedenen Hürden, und eine gemeinsame Meldung beantwortete für
- * beide die falsche Frage.
+ * Die Staffelung nach Empfängerstufe — „`connect` nur an genau `connect`" —
+ * ist ersatzlos entfallen. Diese Datei hiess danach: sie prüft jetzt, dass es
+ * die Staffelung NICHT mehr gibt.
  *
- * Der Ziel-Stufe wegen zwei Fixtures: dasselbe `connect`-Konto darf das eine
- * Profil anschreiben und das andere nicht. Ein Test mit nur einem Ziel sähe
- * die Regel nie, die vom ZIEL abhängt — dieselbe Lücke, die pgTAP mit sechs
- * Absenderstufen gegen zwei Zielstufen schliesst.
+ * Die Seite muss die Hürde benennen und nicht bloss den Knopf wegnehmen. Es ist
+ * aber nur noch EINE: zwei Meldungen wären jetzt nicht genauer, sondern
+ * irreführend — die zweite behauptete eine Bedingung, die es nicht gibt.
+ *
+ * Die zwei Ziel-Fixtures bleiben, und zwar mit umgekehrter Aufgabe: sie sagen
+ * jetzt zu, dass die Zielstufe NICHTS ändert. Ein Test mit nur einem Ziel
+ * liesse offen, ob die Staffelung wirklich weg ist oder an diesem einen Ziel
+ * bloss nicht auffällt.
  *
  * Die Sicherheitsgrenze bleibt `cr_insert_self`; hier wird Komfort gemessen.
  */
@@ -106,56 +108,77 @@ beforeEach(() => {
   mockedRelation.mockReset();
   mockedRelation.mockResolvedValue(NO_RELATION);
   mockedPlatform.mockReset();
-  // Geschlossener Modus — nur dort wirkt die Staffelung überhaupt. Bei offenem
-  // Schalter darf jeder jeden anschreiben, und der Test misste nichts.
+  // Geschlossener Modus — nur dort wirkt die Stufenschwelle überhaupt. Bei
+  // offenem Schalter darf jeder jeden anschreiben, und der Test misste nichts.
+  // Auf PROD steht der Schalter auf `true`; eine Sichtprobe an der Oberfläche
+  // würde die Schwelle dort also fälschlich bestätigen.
   mockedPlatform.mockResolvedValue({ openContact: false });
 });
 
-describe("Kontaktanfrage: die Staffelung an der Oberfläche (AGE-598, 7.1)", () => {
-  it("nennt einem basic-Konto die Stufe, statt nur den Knopf wegzunehmen", async () => {
+describe("Kontaktanfrage an der Oberfläche: allein die Absenderstufe (AGE-903)", () => {
+  it("nennt einem active-Konto die Stufe, statt nur den Knopf wegzunehmen", async () => {
     mockedFetch.mockResolvedValue(sicht("impact"));
-    renderPage(authAsTier("basic"));
+    renderPage(authAsTier("active"));
 
     await screen.findByText(KONTAKTKARTE);
     expect(screen.queryByRole("button", KNOPF)).not.toBeInTheDocument();
-    // Die erste Stufe, auf der überhaupt etwas geht, heisst Connect — und dass
-    // es dort nur an Connect geht, gehört mit dazu. „Ab Discover" allein wäre
-    // bequemer und würde eine Stufe verschweigen, die es gibt.
+    // Genau EINE Stufe wird genannt, und es ist die Clubstufe. Bis AGE-903
+    // standen hier zwei — `Connect` als „dort geht schon etwas" und `Discover`
+    // als „dort geht alles". Der erste Satz beschrieb die Staffelung; sie ist
+    // weg, und ihn stehen zu lassen behauptete eine Stufe, auf der etwas ginge.
     const karte = kontaktkarte();
-    expect(within(karte).getByText("Connect")).toBeInTheDocument();
     expect(within(karte).getByText("Discover")).toBeInTheDocument();
+    expect(within(karte).queryByText("Connect")).toBeNull();
   });
 
-  it("lässt ein connect-Konto ein connect-Profil anschreiben", async () => {
+  // AGE-903 — DIESE ZUSAGE IST UMGEDREHT. Sie hiess „lässt ein connect-Konto
+  // ein connect-Profil anschreiben" und war die einzige Stelle, an der die
+  // Staffelung an der Oberfläche sichtbar wurde. Jetzt sagt sie das Gegenteil
+  // zu: Rang 3 darf niemanden anschreiben, auch kein gleichstufiges Profil.
+  it("verwehrt einem connect-Konto auch ein connect-Profil", async () => {
     mockedFetch.mockResolvedValue(sicht("connect"));
     renderPage(authAsTier("connect"));
+
+    await screen.findByText(KONTAKTKARTE);
+    expect(screen.queryByRole("button", KNOPF)).not.toBeInTheDocument();
+    const karte = kontaktkarte();
+    expect(within(karte).getByText(/ab der Mitgliedsstufe/)).toBeInTheDocument();
+  });
+
+  it("verwehrt demselben connect-Konto ein impact-Profil — mit DERSELBEN Begründung", async () => {
+    mockedFetch.mockResolvedValue(sicht("impact"));
+    renderPage(authAsTier("connect"));
+
+    await screen.findByText(KONTAKTKARTE);
+    expect(screen.queryByRole("button", KNOPF)).not.toBeInTheDocument();
+    // Dieselbe Begründung wie beim gleichstufigen Ziel — das IST die Zusage.
+    // Stünde hier ein anderer Satz, wäre die Staffelung noch da.
+    const karte = kontaktkarte();
+    expect(within(karte).getByText(/ab der Mitgliedsstufe/)).toBeInTheDocument();
+    // Und ausdrücklich nicht mehr der Staffelungs-Satz.
+    expect(within(karte).queryByText(/Mitglieder der Stufe/)).toBeNull();
+  });
+
+  /**
+   * Die Positivkontrolle an der untersten Clubstufe. Ohne sie wären die drei
+   * Verneinungen darüber auch von einer Fläche erfüllt, die den Knopf NIEMANDEM
+   * mehr gibt.
+   */
+  it("gibt einem discover-Konto den Knopf — an jedes Ziel", async () => {
+    mockedFetch.mockResolvedValue(sicht("impact"));
+    renderPage(authAsTier("discover"));
 
     await screen.findByText(KONTAKTKARTE);
     expect(screen.getByRole("button", KNOPF)).toBeInTheDocument();
   });
 
-  it("verwehrt demselben connect-Konto ein impact-Profil — und sagt, warum", async () => {
-    mockedFetch.mockResolvedValue(sicht("impact"));
-    renderPage(authAsTier("connect"));
-
-    await screen.findByText(KONTAKTKARTE);
-    expect(screen.queryByRole("button", KNOPF)).not.toBeInTheDocument();
-    // Die Begründung ist eine ANDERE als beim basic-Konto: hier geht schon
-    // etwas, nur nicht dieses Profil.
-    const karte = kontaktkarte();
-    expect(within(karte).getByText(/Mitglieder der Stufe/)).toBeInTheDocument();
-    expect(within(karte).getByText("Discover")).toBeInTheDocument();
-    // Und ausdruecklich NICHT die basic-Meldung — zwei Huerden, zwei Saetze.
-    expect(within(karte).queryByText(/sind ab der Mitgliedsstufe/)).toBeNull();
-  });
-
   /**
-   * Die Erweiterung, ausdrücklich. Bis zum 02.09. lag das Kontaktrecht bei
-   * `exchange` (Rang 4), und die Bestandszusage in `PublicProfilePage.test.tsx`
-   * sagte genau das zu. Sie ist mit dieser Aufgabe umgeschrieben.
+   * Und dasselbe Konto an ein Ziel AUSSERHALB des Clubs. Das ist die Zusage,
+   * dass die Empfängerstufe wirklich nichts mehr entscheidet — die Gegenprobe
+   * zur entfallenen Staffelung, von der anderen Seite.
    */
-  it("gibt einem discover-Konto den Knopf — die Erweiterung", async () => {
-    mockedFetch.mockResolvedValue(sicht("impact"));
+  it("… auch an ein Ziel ausserhalb des Clubs", async () => {
+    mockedFetch.mockResolvedValue(sicht("connect"));
     renderPage(authAsTier("discover"));
 
     await screen.findByText(KONTAKTKARTE);
@@ -188,15 +211,15 @@ describe("Kontaktanfrage: die Staffelung an der Oberfläche (AGE-598, 7.1)", () 
   });
 
   /**
-   * Positivkontrolle für den Schalter: er steht VOR der Staffelung. Ohne diese
-   * Zusage bliebe offen, ob die Oberfläche ihn überhaupt noch liest — und ein
-   * `basic`-Konto sähe im offenen Modus eine Wand, die die Datenbank gar nicht
-   * aufstellt.
+   * Positivkontrolle für den Schalter: er steht VOR der Stufenschwelle. Ohne
+   * diese Zusage bliebe offen, ob die Oberfläche ihn überhaupt noch liest — und
+   * ein Konto ausserhalb des Clubs sähe im offenen Modus eine Wand, die die
+   * Datenbank gar nicht aufstellt. Auf PROD ist das der Ist-Zustand.
    */
-  it("öffnet open_contact auch einem basic-Konto den Knopf", async () => {
+  it("öffnet open_contact auch einem active-Konto den Knopf", async () => {
     mockedPlatform.mockResolvedValue({ openContact: true });
     mockedFetch.mockResolvedValue(sicht("impact"));
-    renderPage(authAsTier("basic"));
+    renderPage(authAsTier("active"));
 
     await screen.findByText(KONTAKTKARTE);
     expect(screen.getByRole("button", KNOPF)).toBeInTheDocument();
