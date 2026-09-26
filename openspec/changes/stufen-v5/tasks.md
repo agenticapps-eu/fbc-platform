@@ -191,10 +191,32 @@ grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
 - [ ] `migrate-prod` dispatchen — **nicht** von der Merge-Freigabe gedeckt
 - [ ] `gh run rerun --failed` für den von `drift-gate` blockierten Deploy
 - [ ] Verteilung auf PROD nach dem Lauf zählen und vorlegen
-- [ ] Prüferkonto auf dem neuen DISCOVER anlegen: `email_confirm: true`,
-      **kein Passwort im Admin-Rumpf**, Kennwort über den Aktivierungslink;
-      Zugangsdaten nach Infisical, nichts davon ins Repo
-- [ ] Vollzug an die Parallelsitzung melden, die den Handschritt in AGE-907 abhakt
+- [x] ~~Prüferkonto auf dem neuen DISCOVER anlegen~~ — **vorgezogen und erledigt
+      am 26.09.**, auf ausdrückliche Freigabe Donalds. Grund: die externe
+      TestFlight-Gruppe verlangt Benutzername und Kennwort als Pflichtfeld, und
+      die Mitglieder-Beta stand.
+
+      Angelegt auf `exchange` (Rang 4 der HEUTIGEN Leiter) statt auf dem neuen
+      `discover` — dieselbe Stufe, anderer Name zu einem anderen Zeitpunkt. Die
+      Key-Migration hängt die Kohorte `connect`·`discover`·`exchange`
+      geschlossen nach `discover` um; das Konto wandert also **ohne
+      Sonderregel** mit und braucht keine Zeile in der Migration.
+
+      Weg: `email_confirm: true`, **kein Kennwort im Admin-Rumpf**, danach
+      `PUT /auth/v1/admin/users/{id}` mit dem Kennwort. Das weicht vom
+      Aktivierungslink ab, und zwar begründet: der setzt einen Menschen voraus,
+      der ihn einlöst: hier muss das Kennwort bekannt sein, weil es in eine
+      Prüfmaske gehört. Es ist der zweite der beiden dokumentierten Wege.
+
+      Abgenommen mit einer **echten Anmeldung** über den ANON-Schlüssel, nicht
+      mit dem 200 des Setzens: unter eigener Identität 28 Vollprofile, 27
+      Verzeichniszeilen, 7 Events, 40 Beiträge, `search_directory` 27 Zeilen.
+      Zugangsdaten in Infisical `prod` (`STORE_REVIEW_LOGIN`,
+      `STORE_REVIEW_PASSWORD`), nichts davon im Repo.
+- [ ] **Nach `migrate-prod`:** eine Zeile nachsehen, ob das Prüferkonto auf
+      `discover` / Rang 4 gelandet ist — am RANG geprüft, nicht am Namen. Die
+      Abfrage steht in `docs/pruefer-zugang.md`
+- [x] Vollzug an die Parallelsitzung gemeldet (AGE-907)
 
 ## Offen, nicht in diesem Change
 

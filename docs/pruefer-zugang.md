@@ -71,6 +71,51 @@ Reicht es wider Erwarten nicht, ist das Hochsetzen ein Feldwechsel in
 `profiles.tier` und **ohne Neuanmeldung wirksam** — die Prüfung muss dafür nicht
 neu beginnen.
 
+### Das Konto EXISTIERT seit dem 26.09. — und steht bis `migrate-prod` auf `exchange`
+
+Angelegt am 26.09.2026 auf PROD, **vor** der AGE-903-Migration und deshalb auf
+dem Schlüssel, der die unterste Clubstufe der HEUTIGEN Leiter ist: `exchange`
+(Rang 4, 300 €). Entscheidung Donald, weil die externe TestFlight-Gruppe
+Benutzername und Kennwort als Pflichtfeld verlangt und die Mitglieder-Beta sonst
+gestanden hätte.
+
+**Es wandert von selbst mit.** Die Key-Migration hängt die Kohorte
+`connect` · `discover` · `exchange` geschlossen nach `discover` um; das Konto
+landet also ohne Sonderregel auf dem neuen Rang 4. Es braucht dafür keine Zeile
+in der Migration und keinen Handschritt danach — nur die Gegenprobe unten.
+
+| | |
+|---|---|
+| Adresse und Kennwort | Infisical `prod`: `STORE_REVIEW_LOGIN`, `STORE_REVIEW_PASSWORD` |
+| Stufe heute | `exchange`, Rang 4 |
+| Stufe nach AGE-903 | `discover`, Rang 4 |
+| `is_public` | `false` — das Konto ist kein Mitglied und gehört nicht ins Verzeichnis |
+
+Wie es angelegt wurde, und warum nicht über den Aktivierungslink: der gebaute
+Weg setzt einen Menschen voraus, der den Link einlöst und sich dabei SELBST ein
+Kennwort setzt. Hier muss das Kennwort **bekannt** sein, weil es in eine
+Prüfmaske gehört. Gewählt wurde deshalb der zweite der beiden dokumentierten
+Wege: anlegen mit `email_confirm: true` und ohne Kennwort im Rumpf, dann
+`PUT /auth/v1/admin/users/{id}` mit dem Kennwort. `activated_at` ist gesetzt,
+und das ist hier unbedenklich — die Einbahnstraße aus der Warnung unten greift
+nur, solange jemand auf den Zugangslink angewiesen ist.
+
+**Abgenommen wurde mit einer echten Anmeldung, nicht mit dem 200 des Setzens**
+(26.09.): Token über den ANON-Schlüssel wie in der App, danach unter der eigenen
+Identität 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge,
+`search_directory` 27 Zeilen.
+
+**Nach `migrate-prod` bitte einmal nachsehen** — eine Zeile, und sie prüft am
+Rang statt am Namen:
+
+```sql
+select p.tier, m.level_rank
+  from public.profiles p
+  join public.membership_tiers m on m.key = p.tier
+ where p.name = 'App Store Pruefer';
+-- erwartet danach: discover | 4
+```
+
 ### ⚠ Die Falle ist der Schlüsselname, nicht der Rang
 
 Dieser Abschnitt hiess bis AGE-903 „Nach AGE-903 heisst diese Stufe DISCOVER —
@@ -109,8 +154,8 @@ association. Membership is granted offline; there is no public sign-up, so a
 reviewer cannot create a working account without the credentials below.
 
 Review account
-  Username: <aus Infisical>
-  Password: <aus Infisical>
+  Username: <Infisical prod, STORE_REVIEW_LOGIN>
+  Password: <Infisical prod, STORE_REVIEW_PASSWORD>
 
 This is a real member account on the production system. The content it shows —
 posts, events, member profiles — is genuine association content, not sample
