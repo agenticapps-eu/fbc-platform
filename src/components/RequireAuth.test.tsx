@@ -73,8 +73,8 @@ describe("Auth-Gating für /mein-bereich", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Basic-Nutzer Mein Bereich sehen", async () => {
-    renderAt("/mein-bereich", authAsTier("basic"));
+  it("lässt eingeloggte Active-Nutzer Mein Bereich sehen", async () => {
+    renderAt("/mein-bereich", authAsTier("active"));
 
     // /mein-bereich leitet auf /profil weiter; der Auth-Gate hat durchgelassen
     // und die Profilansicht rendert (Beleg: Lade-Skeleton sichtbar, kein Login).
@@ -121,8 +121,8 @@ describe("Auth-Gating für /profil", () => {
     expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
   });
 
-  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Basic)", async () => {
-    renderAt("/profil/bearbeiten", authAsTier("basic"));
+  it("lässt eingeloggte Mitglieder den Profil-Editor öffnen (jede Stufe, auch Active)", async () => {
+    renderAt("/profil/bearbeiten", authAsTier("active"));
 
     // Kein Redirect auf /login → der Auth-Gate hat durchgelassen; der Editor
     // mountet und lädt seine Daten.

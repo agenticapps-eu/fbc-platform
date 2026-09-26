@@ -26,10 +26,28 @@ Secrets come from Infisical → `supabase secrets set` (see
 
 - `STRIPE_SECRET_KEY`
 - `STRIPE_PRICE_DISCOVER_YEAR`, `STRIPE_PRICE_DISCOVER_MONTH`
-- `STRIPE_PRICE_EXCHANGE_YEAR`, `STRIPE_PRICE_EXCHANGE_MONTH`
 - `STRIPE_PRICE_FOCUS_YEAR`, `STRIPE_PRICE_FOCUS_MONTH`
 - `STRIPE_PRICE_IMPACT_YEAR`, `STRIPE_PRICE_IMPACT_MONTH`
 - `APP_URL` (optional, falls back to `http://localhost:5173`)
+
+### ⚠ Zwei Fallen aus AGE-903, bevor Stripe wieder angeschaltet wird
+
+Die Zugangsleiter wurde am 26.09.2026 umgestellt (`20260926120000_stufen_v5.sql`),
+und `priceEnvKey()` leitet den Variablennamen aus dem SCHLÜSSEL ab. Zwei Dinge
+haben sich damit geändert, ohne dass ein Name danach aussieht:
+
+1. **`STRIPE_PRICE_EXCHANGE_*` gibt es nicht mehr.** Die Stufe `exchange` ist
+   entfallen; ihre Rolle — die unterste Clubstufe, 300 € — hat `discover`
+   übernommen. Die zwei Werte gehören in Infisical gelöscht, sonst stehen dort
+   Preise für eine Stufe, die niemand mehr kaufen kann.
+2. **`STRIPE_PRICE_DISCOVER_*` meint jetzt einen ANDEREN Preis** — 300 €/30 €
+   statt 150 €/15 €. Derselbe Variablenname, ein anderer Betrag. Wer die alten
+   Werte stehen lässt, verkauft die Clubstufe zum halben Preis, und zwar ohne
+   Fehlermeldung: die Funktion prüft, ob die Variable GESETZT ist, nicht was
+   drinsteht.
+
+Die drei Stufen ausserhalb des Clubs (ACTIVE, BOOST, CONNECT) tragen 0 € und
+haben keinen Kaufweg. Sie brauchen deshalb auch keine Preis-Variablen.
 
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` are platform-injected. Missing key or
 price env fails closed (500 `server_misconfigured`).

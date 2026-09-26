@@ -139,19 +139,19 @@ insert into auth.users (id, aud, role, email) values
   ('fc000000-0000-0000-0000-00000000000d', 'authenticated', 'authenticated', 'schuss-admin-deaktiviert@test.fbc'),
   ('fc000000-0000-0000-0000-00000000000e', 'authenticated', 'authenticated', 'schuss-eigentuemer-deaktiviert@test.fbc');
 
-update public.profiles set tier = 'basic', name = 'Verfasser', activated_at = now()
+update public.profiles set tier = 'active', name = 'Verfasser', activated_at = now()
  where id = 'fc000000-0000-0000-0000-00000000000a';
-update public.profiles set tier = 'basic', name = 'Drittes Mitglied', activated_at = now()
+update public.profiles set tier = 'active', name = 'Drittes Mitglied', activated_at = now()
  where id = 'fc000000-0000-0000-0000-00000000000b';
-update public.profiles set tier = 'basic', name = 'Admin', activated_at = now()
+update public.profiles set tier = 'active', name = 'Admin', activated_at = now()
  where id = 'fc000000-0000-0000-0000-00000000000c';
 -- Beide bewusst OHNE activated_at. Der Admin hat seine Staff-Zeile trotzdem —
 -- genau darum geht es in 2.8. Das Mitglied daneben ist EIGENTUEMER eines
 -- Screenshots und traegt damit den Fall, den `is_activated()` in der Policy
 -- wirklich abfaengt (siehe Abschnitt 5b).
-update public.profiles set tier = 'basic', name = 'Admin ohne Bestaetigung'
+update public.profiles set tier = 'active', name = 'Admin ohne Bestaetigung'
  where id = 'fc000000-0000-0000-0000-00000000000d';
-update public.profiles set tier = 'basic', name = 'Eigentuemer ohne Bestaetigung'
+update public.profiles set tier = 'active', name = 'Eigentuemer ohne Bestaetigung'
  where id = 'fc000000-0000-0000-0000-00000000000e';
 
 insert into public.staff_roles (profile_id, role) values

@@ -56,8 +56,12 @@ insert into auth.users (id, aud, role, email) values
   ('a0000000-0000-0000-0000-000000000013', 'authenticated', 'authenticated', 'age605-warte@test.fbc'),
   ('a0000000-0000-0000-0000-000000000014', 'authenticated', 'authenticated', 'age605-bewertet@test.fbc');
 
--- `regs_write_own` verlangt `has_level(4)` (= exchange). Ohne diese Zeile fiele
--- jede Zusage an der Stufe durch, und keine hätte je die Kapazität gefragt.
+-- `regs_write_own` spiegelt seit AGE-903 die Bedingung von `register_for_event`
+-- (public ohne Rangprüfung, `members` ab Rang 4 oder Host) — bis dahin verlangte
+-- es pauschal `has_level(4)`. Alle Fixtures hier stehen auf `impact` und
+-- passieren beides; ohne diese Zeile fiele jede Zusage an der Stufe durch, und
+-- keine hätte je die Kapazität gefragt. Die Schwelle selbst wird in
+-- `stufen_v5_absage_test.sql` gemessen, nicht hier.
 update public.profiles set tier = 'impact', activated_at = now()
  where id::text like 'a0000000-0000-0000-0000-%';
 

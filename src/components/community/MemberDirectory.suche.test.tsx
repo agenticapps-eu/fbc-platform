@@ -33,13 +33,18 @@ vi.mock("../../lib/directory", async (importOriginal) => ({
    von <AuthProvider> verwendet werden" — die Datei praefte dann gar nichts
    mehr. Ein Konto mit Kennung und ohne Kontakte ist hier der neutrale Fall.
 
-   AGE-598: Die Stufe kommt dazu. Seit D5 blendet die Filterspalte unterhalb
-   Rang 3 die Filter auf maskierten Spalten aus — ohne `levelRank` waere dieses
-   Konto ein `basic`-Konto, und die Zusagen dieser Datei ueber Kompetenz-,
-   Themen- und Chip-Filter waeren still an der falschen Stufe gescheitert. Rang 3
-   ist der Fall, den sie immer gemeint haben. */
+   AGE-598: Die Stufe kommt dazu. Seit D5 blendet die Filterspalte unterhalb der
+   Clubstufe die Filter auf maskierten Spalten aus — ohne `levelRank` waere
+   dieses Konto ein Konto auf Rang 0, und die Zusagen dieser Datei ueber
+   Kompetenz-, Themen- und Chip-Filter waeren still an der falschen Stufe
+   gescheitert.
+
+   AGE-903: die Zahl ist von 3 auf 4 gewandert, die ABSICHT nicht. Gemeint war
+   immer „gerade eben ueber der Schwelle", und das ist jetzt Rang 4. Ein
+   Fortschreiben der 3 haette diese Datei stillschweigend unter die Schwelle
+   gesetzt. */
 vi.mock("../../providers/auth-context", () => ({
-  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: 3 }),
+  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: 4 }),
 }));
 
 function renderDirectory(pfad = "/mitglieder") {

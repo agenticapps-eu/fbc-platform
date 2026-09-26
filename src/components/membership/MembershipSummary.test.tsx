@@ -12,9 +12,12 @@ function renderSummary(current: string | null) {
 
 describe("MembershipSummary", () => {
   it("shows the current tier label and its next step", () => {
-    renderSummary("basic");
-    expect(screen.getByText("Basic")).toBeInTheDocument();
-    expect(screen.getByText(/Nächster Schritt: Connect/)).toBeInTheDocument();
+    renderSummary("active");
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    // Der nächste Schritt ist die Stufe mit `rank + 1`, nicht die nächste
+    // KAUFBARE. Über ACTIVE (Rang 1) liegt BOOST (Rang 2) — auch das noch
+    // ausserhalb des Clubs und ebenfalls für 0 €.
+    expect(screen.getByText(/Nächster Schritt: Boost/)).toBeInTheDocument();
   });
 
   it("has no next step for the top tier", () => {
@@ -23,9 +26,9 @@ describe("MembershipSummary", () => {
     expect(screen.queryByText(/Nächster Schritt/)).toBeNull();
   });
 
-  it("falls back to Basic for null/unknown tier", () => {
+  it("falls back to Active for null/unknown tier", () => {
     renderSummary(null);
-    expect(screen.getByText("Basic")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
   // AGE-907: Zwei Zusagen standen hier — „renders the manage CTA only when

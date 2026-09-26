@@ -13,7 +13,7 @@ import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { cn } from "../../lib/cn";
-import { LEVEL_RANK, levelLabel } from "../../config/levels";
+import { CLUB_LEVEL, CLUB_RANK, levelLabel } from "../../config/levels";
 import {
   deriveFacets,
   DIRECTORY_QUERY_PARAM,
@@ -39,7 +39,8 @@ import {
  * Mitgliederverzeichnis (AGE-241). Durchsuchbare Profilkarten mit
  * Filtern (Thema · Branche · Region · Kompetenz · sucht/bietet). Suche + Filter laufen
  * serverseitig über die RPC `search_directory`. Die RLS ist die Sichtbarkeitsgrenze —
- * Discover/anon erhalten höchstens die eigene Zeile (siehe lib/directory.ts).
+ * unterhalb Rang 4 und anon erhalten höchstens die eigene Zeile (siehe
+ * lib/directory.ts).
  */
 export default function MemberDirectory() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -113,14 +114,11 @@ export default function MemberDirectory() {
   const { user, levelRank } = useAuth();
   const uid = user?.id ?? null;
 
-  // ── Welche Filter überhaupt etwas finden können (AGE-598, D5) ─────────────
+  // ── Welche Filter überhaupt etwas finden können (AGE-598 D5, AGE-903) ─────
   //
-  // Seit `20260902150000_verzeichnis_ab_connect.sql` beginnt die LISTE bei
-  // `connect` (Rang 2), die ERWEITERTEN FELDER aber weiterhin bei `discover`
-  // (Rang 3): `search_directory` joint `profiles_public` (RLS-umgehend) mit
-  // `public.profiles` (Rang-3-Policy), und unterhalb Rang 3 kommt die rechte
-  // Seite als NULL an. Vier Filter arbeiten auf genau diesen Spalten —
-  // Kompetenz, Thema, Angebotsart und die beiden Chip-Gruppen — und finden
+  // Vier Filter arbeiten auf Spalten aus `public.profiles` — Kompetenz, Thema,
+  // Angebotsart und die beiden Chip-Gruppen. Unterhalb der Clubstufe kommt die
+  // rechte Seite des Joins in `search_directory` als NULL an, und sie finden
   // dort SYSTEMATISCH nichts.
   //
   // Sie werden deshalb ausgeblendet und nicht leer laufen gelassen: ein
@@ -128,14 +126,26 @@ export default function MemberDirectory() {
   // bricht es bei jeder Benutzung und erzeugt dabei die Frage, die er nicht
   // beantwortet — „liegt es an mir?".
   //
-  // Branche und Region stehen in `profiles_public` und bleiben deshalb —
-  // `branche` erst seit dieser Migration, vorher wäre der Filter für `connect`
-  // wortlos leer gelaufen.
+  // Branche und Region stehen in `profiles_public` und bleiben deshalb.
   //
-  // `levelRank` ist hier ohne Flackern zu haben: die Route liegt hinter
-  // <MembershipGate min="connect">, und das rendert erst, wenn die Stufe steht.
+  // **Seit AGE-903 ist das dieselbe Schwelle wie die der Seite selbst** (Rang 4
+  // in `nav.ts`), nicht mehr eine höhere: die zweistufige Trennung aus AGE-598
+  // (Liste ab Rang 2, erweiterte Felder ab Rang 3) ist entfallen. Die Prüfung
+  // bleibt trotzdem stehen, und zwar aus einem messbaren Grund: `MembershipGate`
+  // sperrt NICHT, solange die Stufe noch unbekannt ist (MembershipGate.tsx) —
+  // in diesem Fenster rendert die Fläche für jeden, und dann trägt sie.
+  //
+  // **Eine unbekannte Stufe blendet deshalb NICHTS aus.** Vorher stand hier
+  // `(levelRank ?? 0)`, und das machte aus „noch nicht geladen" ein „Rang 0":
+  // ein Clubmitglied sah die vier Filter erst gar nicht und dann doch, sie
+  // erschienen also nachträglich. Das ist dieselbe Regel, die `MembershipGate`
+  // und `HeaderSearch` schon tragen — ein Ladezustand ist kein Ausschlussgrund,
+  // und eine Aussage erscheint erst, wenn sie stimmt. Ein Filter, der in diesem
+  // Fenster zu viel zeigt, findet höchstens nichts; einer, der zu wenig zeigt,
+  // nimmt einem Berechtigten eine Fähigkeit weg.
+  //
   // Komfort, keine Grenze — die trägt die RPC.
-  const erweiterteFilter = (levelRank ?? 0) >= LEVEL_RANK.discover;
+  const erweiterteFilter = levelRank === null || levelRank >= CLUB_RANK;
   const contacts = useQuery({
     queryKey: contactsQueryKey(uid ?? ""),
     queryFn: () => fetchContactIds(uid!),
@@ -332,8 +342,8 @@ export default function MemberDirectory() {
             Wort, damit eine Umbenennung ein Einzeiler in `config/levels` bleibt. */}
                 {!erweiterteFilter && (
                   <p className="text-sm text-muted @[27rem]:col-span-2 @[41rem]:col-span-3">
-                    Ab {levelLabel("discover")} kommen Filter für Kompetenz, Thema und Angebote
-                    dazu.
+                    Ab {levelLabel(CLUB_LEVEL)} kommen Filter für Kompetenz, Thema und
+                    Angebote dazu.
                   </p>
                 )}
 

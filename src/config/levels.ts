@@ -1,18 +1,32 @@
-/** Das 6-Level-Modell (v4.0, AGE-311).
- *  Spec: docs/superpowers/specs/2026-07-15-fbc-6level-upgrade.md §1 + §3.1.
+/** Die Zugangsleiter V5 (AGE-903).
+ *  Spec: openspec/changes/stufen-v5/specs/membership-tiers/spec.md.
  *
  *  Labels und Preise leben hier, damit eine Label-/Preisänderung ein Einzeiler
- *  bleibt (§3.1) — die Upgrade-Mechanik ist bewusst modell-agnostisch.
+ *  bleibt — die Upgrade-Mechanik ist bewusst modell-agnostisch.
  *
  *  `rank` spiegelt membership_tiers.level_rank aus der DB. Die Duplizierung ist
  *  Absicht und harmlos: Frontend-Gating ist Komfort, die Sicherheitsgrenze bleibt
  *  die RLS-Policy in Supabase (has_level(rank)), unabhängig vom Client.
  *
- *  Die alten Prototyp-Stufen (explore/impuls/active/prime/circle/legacy) sind
- *  ersatzlos weg. ACHTUNG: `discover` existierte vorher mit ANDERER Bedeutung
- *  (0 € statt 150 €) — siehe die Key-Migration in 20260715150000_six_level_model.sql. */
+ *  ── DER CLUB BEGINNT BEI DISCOVER (RANG 4) ─────────────────────────────────
+ *  ACTIVE, BOOST und CONNECT werden nur technisch vorgehalten und tragen keine
+ *  Clubfunktion. Sie tragen deshalb auch 0 €: eine Stufe, die niemand kaufen
+ *  kann, braucht keinen Preis (Donald, 26.09.: „aktuell 0, wird ja später
+ *  kommen"). Die 75 € für BOOST aus der V5-Matrix kommen als eigene Änderung.
+ *
+ *  ── ACHTUNG, ZWEI SCHLÜSSEL HABEN IHRE BEDEUTUNG GEWECHSELT ────────────────
+ *  `connect` stand vor AGE-903 auf Rang 2 und steht jetzt auf Rang 3;
+ *  `discover` stand auf Rang 3 und steht jetzt auf Rang 4 — und kostete dabei
+ *  erst 0 €, dann 150 €, jetzt 300 €. Ein Schlüsselname sagt also nichts
+ *  darüber, welche Rechte oder welchen Preis er trug. Autorität ist der RANG,
+ *  und nur zu einem genannten Zeitpunkt.
+ *
+ *  Die alten Prototyp-Stufen (explore/impuls/prime/circle/legacy) entfielen mit
+ *  AGE-311, `basic` und `exchange` mit AGE-903. `active` ist KEIN Rückfall auf
+ *  den alten Prototyp-Schlüssel gleichen Namens, sondern derselbe Name für den
+ *  neuen Rang 1. */
 
-export type MembershipLevel = "basic" | "connect" | "discover" | "exchange" | "focus" | "impact";
+export type MembershipLevel = "active" | "boost" | "connect" | "discover" | "focus" | "impact";
 
 export interface LevelConfig {
   key: MembershipLevel;
@@ -23,42 +37,43 @@ export interface LevelConfig {
   priceMonth: number;
   /** Spiegelt membership_tiers.level_rank (aufsteigend 1…6). */
   rank: number;
-  /** Was diese Stufe freischaltet — Detlevs Wortlaut aus §2. */
+  /** Was diese Stufe freischaltet. */
   summary: string;
 }
 
 export const LEVELS: Record<MembershipLevel, LevelConfig> = {
-  basic: {
-    key: "basic",
-    label: "Basic",
+  active: {
+    key: "active",
+    label: "Active",
     priceYear: 0,
     priceMonth: 0,
     rank: 1,
-    summary: "Profil anlegen. Kompass starten. Entdecken.",
+    summary: "Profil anlegen. Kompass starten. Öffentliche Events.",
+  },
+  boost: {
+    key: "boost",
+    label: "Boost",
+    priceYear: 0,
+    priceMonth: 0,
+    rank: 2,
+    summary: "Profil vervollständigen. Kompass ausbauen. Öffentliche Events.",
   },
   connect: {
     key: "connect",
     label: "Connect",
     priceYear: 0,
     priceMonth: 0,
-    rank: 2,
-    summary: "Kompass vervollständigen. Erste Matchings. Favoriten.",
+    rank: 3,
+    summary: "Vorstufe zum Club. Profil, Kompass, öffentliche Events.",
   },
   discover: {
     key: "discover",
     label: "Discover",
-    priceYear: 150,
-    priceMonth: 15,
-    rank: 3,
-    summary: "Academy. Vollständiges Mitgliederverzeichnis. Erweiterte Matchings.",
-  },
-  exchange: {
-    key: "exchange",
-    label: "Exchange",
     priceYear: 300,
     priceMonth: 30,
     rank: 4,
-    summary: "Events. Kontaktanfragen. Aktivität.",
+    summary:
+      "Der Club beginnt hier. Mitgliederverzeichnis, Academy, Mitglieder-Events, Kontaktanfragen.",
   },
   focus: {
     key: "focus",
@@ -80,25 +95,30 @@ export const LEVELS: Record<MembershipLevel, LevelConfig> = {
 
 /** Aufsteigende Reihenfolge — die Quelle für Pricing-Karten und Vergleiche. */
 export const LEVEL_ORDER: readonly MembershipLevel[] = [
-  "basic",
+  "active",
+  "boost",
   "connect",
   "discover",
-  "exchange",
   "focus",
   "impact",
 ];
 
 export const LEVEL_RANK: Record<MembershipLevel, number> = {
-  basic: 1,
-  connect: 2,
-  discover: 3,
-  exchange: 4,
+  active: 1,
+  boost: 2,
+  connect: 3,
+  discover: 4,
   focus: 5,
   impact: 6,
 };
 
-/** Stufe, auf der neue Mitglieder starten (§3.4). Spiegelt profiles.tier DEFAULT. */
-export const DEFAULT_LEVEL: MembershipLevel = "basic";
+/** Die unterste Clubstufe. Jede Clubschwelle lautet `has_level(CLUB_RANK)` —
+ *  die Zahl steht in der Datenbank und hier, und nirgends sonst im Frontend. */
+export const CLUB_LEVEL: MembershipLevel = "discover";
+export const CLUB_RANK: number = LEVEL_RANK[CLUB_LEVEL];
+
+/** Stufe, auf der neue Mitglieder starten. Spiegelt profiles.tier DEFAULT. */
+export const DEFAULT_LEVEL: MembershipLevel = "active";
 
 /**
  * Anzeigename einer Stufe. Fällt auf den rohen Key zurück, falls die DB einen

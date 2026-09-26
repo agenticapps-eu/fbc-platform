@@ -29,12 +29,12 @@ describe("MitgliedschaftPage", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockResolvedValue({ data: { url: "https://stripe.test/x" }, error: null });
-    auth = { tier: "discover", levelRank: 3 };
+    auth = { tier: "discover", levelRank: 4 };
   });
 
   it("zeigt alle 6 Stufen als Karten", () => {
     renderPage();
-    for (const key of ["basic", "connect", "discover", "exchange", "focus", "impact"])
+    for (const key of ["active", "boost", "connect", "discover", "focus", "impact"])
       expect(screen.getByTestId(`level-${key}`)).toBeInTheDocument();
   });
 
@@ -53,9 +53,10 @@ describe("MitgliedschaftPage", () => {
   it("markiert die aktuelle Stufe und bietet nur höhere zahlende Stufen zum Upgrade", () => {
     renderPage();
     expect(screen.getByTestId("level-discover")).toHaveAttribute("data-current", "true");
-    // Höher + zahlend → Button
+    // Höher + zahlend → Button. Über `discover` (Rang 4) liegen nur noch FOCUS
+    // und IMPACT; `exchange` gab es bis AGE-903 und stand dazwischen.
     expect(
-      within(screen.getByTestId("level-exchange")).getByRole("button", { name: /upgrade/i }),
+      within(screen.getByTestId("level-focus")).getByRole("button", { name: /upgrade/i }),
     ).toBeEnabled();
     // Aktuell/niedriger → kein Upgrade-Button
     expect(
@@ -66,6 +67,20 @@ describe("MitgliedschaftPage", () => {
     ).toBeNull();
   });
 
+  // AGE-903 — die Stufen ausserhalb des Clubs tragen 0 € und KEINEN Kaufweg.
+  // `PAID` nennt seit AGE-903 nur die drei Clubstufen; ein Kaufknopf an einer
+  // Stufe ohne Funktion wäre ein Angebot ohne Gegenstand. Die Karte bleibt
+  // sichtbar — sie erklärt die Leiter —, nur der Knopf fehlt.
+  it("bietet für die drei Stufen ausserhalb des Clubs keinen Kaufweg", () => {
+    renderPage();
+    for (const key of ["active", "boost", "connect"]) {
+      const karte = screen.getByTestId(`level-${key}`);
+      expect(karte).toBeInTheDocument();
+      expect(within(karte).queryByRole("button", { name: /upgrade/i })).toBeNull();
+      expect(within(karte).queryByRole("link", { name: /upgrade/i })).toBeNull();
+    }
+  });
+
   it("zeigt den Testzahlung-Hinweis", () => {
     renderPage();
     expect(screen.getAllByText(/Testzahlung · Demo/i).length).toBeGreaterThan(0);
@@ -73,9 +88,13 @@ describe("MitgliedschaftPage", () => {
 
   it("schaltet mit dem Jahr/Monat-Toggle die Beträge", () => {
     renderPage();
-    expect(within(screen.getByTestId("level-exchange")).getByText(/300/)).toBeInTheDocument();
+    // 600/60 statt 300/30: gemessen wird an FOCUS, weil der Monatsbetrag von
+    // `discover` (30) eine Teilzeichenfolge seines Jahresbetrags (300) ist —
+    // `getByText(/30/)` träfe dort in BEIDEN Stellungen und die Zusage wäre
+    // grün, ohne den Umschalter je gefragt zu haben.
+    expect(within(screen.getByTestId("level-focus")).getByText(/600/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /monatlich/i }));
-    expect(within(screen.getByTestId("level-exchange")).getByText(/30/)).toBeInTheDocument();
+    expect(within(screen.getByTestId("level-focus")).getByText(/60/)).toBeInTheDocument();
   });
 
   it("ruft create-checkout-session mit level + interval", () => {
@@ -122,7 +141,7 @@ describe("MitgliedschaftPage", () => {
 
     it("sieht keine einzige Preiskarte", () => {
       renderPage();
-      for (const key of ["basic", "connect", "discover", "exchange", "focus", "impact"])
+      for (const key of ["active", "boost", "connect", "discover", "focus", "impact"])
         expect(screen.queryByTestId(`level-${key}`)).not.toBeInTheDocument();
     });
 

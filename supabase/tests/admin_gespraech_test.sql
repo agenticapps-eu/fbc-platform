@@ -98,18 +98,18 @@ insert into public.staff_roles (profile_id, role) values
   ('ad000000-0000-0000-0000-0000000000ad', 'admin'),
   ('ad000000-0000-0000-0000-00000000000d', 'admin');
 
-update public.profiles set tier = 'basic', name = 'Gespraechs-Admin', activated_at = now()
+update public.profiles set tier = 'active', name = 'Gespraechs-Admin', activated_at = now()
  where id = 'ad000000-0000-0000-0000-0000000000ad';
-update public.profiles set tier = 'basic', name = 'Mitglied Eins', activated_at = now()
+update public.profiles set tier = 'active', name = 'Mitglied Eins', activated_at = now()
  where id = 'ad000000-0000-0000-0000-000000000001';
-update public.profiles set tier = 'basic', name = 'Mitglied Zwei', activated_at = now()
+update public.profiles set tier = 'active', name = 'Mitglied Zwei', activated_at = now()
  where id = 'ad000000-0000-0000-0000-000000000002';
-update public.profiles set tier = 'basic', name = 'Mitglied Drei', activated_at = now()
+update public.profiles set tier = 'active', name = 'Mitglied Drei', activated_at = now()
  where id = 'ad000000-0000-0000-0000-000000000003';
 -- Bewusst OHNE activated_at: der Fall aus 4.8. Die Staff-Zeile hat er
 -- trotzdem, und `is_admin()` gibt fuer ihn seit AGE-581 dennoch false zurueck —
 -- die Rolle ueberlebt den Zugangsentzug nicht.
-update public.profiles set tier = 'basic', name = 'Admin ohne Bestaetigung'
+update public.profiles set tier = 'active', name = 'Admin ohne Bestaetigung'
  where id = 'ad000000-0000-0000-0000-00000000000d';
 
 -- Ein FREMDER Faden zwischen Eins und Zwei, ohne Kontaktanfrage und ohne

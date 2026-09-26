@@ -1,6 +1,12 @@
 // deno test --allow-none  (aus supabase/functions/create-checkout-session/)
 import { assertEquals } from "jsr:@std/assert@1";
-import { jwtSub, parseUpgradeRequest, priceEnvKey, resolveReturnBase } from "./checkout.ts";
+import {
+  jwtSub,
+  PAID_LEVELS,
+  parseUpgradeRequest,
+  priceEnvKey,
+  resolveReturnBase,
+} from "./checkout.ts";
 
 // base64url-kodierter JWT-Payload (ohne Signaturprüfung — die macht das Gateway).
 function makeJwt(payload: Record<string, unknown>): string {
@@ -10,25 +16,46 @@ function makeJwt(payload: Record<string, unknown>): string {
 }
 
 Deno.test("gültiges Upgrade wird akzeptiert", () => {
-  const r = parseUpgradeRequest({ level: "exchange", interval: "year" }, 1); // Aufrufer basic(1)
-  assertEquals(r, { ok: true, value: { level: "exchange", interval: "year" } });
+  const r = parseUpgradeRequest({ level: "discover", interval: "year" }, 1); // Aufrufer active(1)
+  assertEquals(r, { ok: true, value: { level: "discover", interval: "year" } });
 });
-Deno.test("freie Stufe ist kein Checkout", () => {
-  assertEquals(parseUpgradeRequest({ level: "connect", interval: "year" }, 1).ok, false);
+// AGE-903: `connect` ist nicht mehr bloss „frei", es liegt ausserhalb des Clubs
+// und steht gar nicht mehr in PAID_LEVELS. Die Ablehnung kommt jetzt aus
+// `invalid_level` und nicht aus `not_an_upgrade` — der Grund gehoert deshalb
+// MIT in die Zusage, sonst waere sie auch von der falschen Ablehnung erfuellt.
+Deno.test("eine Stufe ausserhalb des Clubs ist kein Checkout", () => {
+  assertEquals(parseUpgradeRequest({ level: "connect", interval: "year" }, 1), {
+    ok: false,
+    error: "invalid_level",
+  });
+  assertEquals(parseUpgradeRequest({ level: "boost", interval: "year" }, 1), {
+    ok: false,
+    error: "invalid_level",
+  });
 });
 Deno.test("unbekanntes Level wird abgelehnt", () => {
   assertEquals(parseUpgradeRequest({ level: "gold", interval: "year" }, 1).ok, false);
+  // `exchange` gab es bis AGE-903 und ist jetzt genauso unbekannt wie `gold`.
+  assertEquals(parseUpgradeRequest({ level: "exchange", interval: "year" }, 1).ok, false);
 });
 Deno.test("ungültiges Interval wird abgelehnt", () => {
   assertEquals(parseUpgradeRequest({ level: "focus", interval: "weekly" }, 1).ok, false);
 });
 Deno.test("Downgrade/Gleichstand wird abgelehnt", () => {
-  assertEquals(parseUpgradeRequest({ level: "discover", interval: "year" }, 3).ok, false); // schon discover(3)
-  assertEquals(parseUpgradeRequest({ level: "connect", interval: "year" }, 4).ok, false);
+  // `discover` steht seit AGE-903 auf Rang 4, nicht mehr auf 3.
+  assertEquals(parseUpgradeRequest({ level: "discover", interval: "year" }, 4).ok, false);
+  assertEquals(parseUpgradeRequest({ level: "focus", interval: "year" }, 6).ok, false);
 });
 Deno.test("priceEnvKey mappt Level+Interval", () => {
-  assertEquals(priceEnvKey("exchange", "year"), "STRIPE_PRICE_EXCHANGE_YEAR");
+  assertEquals(priceEnvKey("discover", "year"), "STRIPE_PRICE_DISCOVER_YEAR");
   assertEquals(priceEnvKey("impact", "month"), "STRIPE_PRICE_IMPACT_MONTH");
+});
+// Die Gegenprobe zur Liste selbst. Ohne sie waere jede Zusage oben auch von
+// einer PAID_LEVELS erfuellt, die versehentlich eine vierte Stufe fuehrt — und
+// ein Kaufknopf an einer Stufe ohne Funktion faellt an der Oberflaeche nicht
+// auf, solange Stripe ruht.
+Deno.test("PAID_LEVELS fuehrt genau die drei Clubstufen", () => {
+  assertEquals([...PAID_LEVELS], ["discover", "focus", "impact"]);
 });
 
 Deno.test("jwtSub: liest sub aus einem ES256-Token (base64url mit Padding)", () => {

@@ -263,7 +263,8 @@ export type Kontoergebnis = { stand: "angelegt"; uid: string } | { stand: "fehle
  * 1. Als reine EINFÜGESPALTE (`insert`, nicht `do update set`) kam sie nie an:
  *    `on_auth_user_created` (community_foundation.sql:82) legt bei JEDEM Insert
  *    in `auth.users` schon eine Profilzeile an — auch auf dem Admin-Weg, mit
- *    `tier = 'basic'`. Jedes importierte Konto wäre `basic` geblieben, bei acht
+ *    `tier = 'active'` (bis AGE-903: `'basic'` — derselbe Rang 1, anderer
+ *    Name). Jedes importierte Konto wäre auf Rang 1 geblieben, bei acht
  *    grünen Tests, die den SQL-Text prüften statt der Datenbank.
  *
  * 2. Im `do update set` der Datensatz-Transaktion, gesteuert von einem Merker

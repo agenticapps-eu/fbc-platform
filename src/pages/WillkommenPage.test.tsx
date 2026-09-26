@@ -104,7 +104,7 @@ beforeEach(() => {
 function renderAt(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <AuthFixture value={authAsTier("basic")}>
+    <AuthFixture value={authAsTier("active")}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <MemoryRouter initialEntries={[path]}>

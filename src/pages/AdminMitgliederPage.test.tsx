@@ -1667,7 +1667,9 @@ describe("Der Stufen-Dialog lässt nicht mehr durch als die Datenbank (AGE-707, 
     expect(stufenAufrufe()).toHaveLength(0);
   });
 
-  it("nennt das Mitglied namentlich und stellt alle sechs Stufen zur Wahl", async () => {
+  // AGE-903 — diese Zusage hiess bis hierher „stellt alle sechs Stufen zur Wahl".
+  // Detlev hat am 25.09. entschieden, dass nur die drei CLUBSTUFEN wählbar sind.
+  it("nennt das Mitglied namentlich und stellt nur die drei Clubstufen zur Wahl", async () => {
     rpc.mockResolvedValue({ data: [AKTIV], error: null });
     renderPage();
 
@@ -1675,10 +1677,40 @@ describe("Der Stufen-Dialog lässt nicht mehr durch als die Datenbank (AGE-707, 
 
     expect(within(dialog).getByText(/Carla Aktiv/)).toBeInTheDocument();
     const auswahl = within(dialog).getByLabelText("Neue Stufe") as HTMLSelectElement;
-    expect(auswahl.options).toHaveLength(6);
+    // Nicht bloss die Anzahl: drei Einträge wären auch von einer Liste erfüllt,
+    // die die falschen drei zeigt.
+    expect([...auswahl.options].map((o) => o.value)).toEqual([
+      "discover",
+      "focus",
+      "impact",
+    ]);
     // Und die Folge eines späteren Stripe-Kaufs steht dabei — dieselbe Zusage,
     // die die Karte in der Einzelbearbeitung schon trägt.
     expect(within(dialog).getByText(/Stripe/i)).toBeInTheDocument();
+  });
+
+  // AGE-903 — die Gegenprobe, und sie ist der eigentliche Wert der Regel. Eine
+  // Auswahl, die eine gesetzte Stufe verschweigt, liesse den Admin glauben, das
+  // Konto stehe auf der ersten angebotenen — und ein Bestätigen SETZTE sie dann
+  // wirklich dorthin, ohne dass jemand das gewollt hätte.
+  it("zeigt eine bestehende Stufe ausserhalb des Clubs trotzdem an", async () => {
+    const draussen = member({ name: "Tim Aussen", tier: "active", bestaetigt: true });
+    rpc.mockResolvedValue({ data: [draussen], error: null });
+    renderPage();
+
+    const dialog = await oeffneStufenDialog(draussen);
+    const auswahl = within(dialog).getByLabelText("Neue Stufe") as HTMLSelectElement;
+
+    expect([...auswahl.options].map((o) => o.value)).toEqual([
+      "active",
+      "discover",
+      "focus",
+      "impact",
+    ]);
+    // Vorbelegt bleibt die IST-Stufe. Ohne diese Zeile wäre die Zusage darüber
+    // auch dann grün, wenn die Auswahl `active` zwar listete, aber auf
+    // `discover` stünde.
+    expect(auswahl.value).toBe("active");
   });
 
   it("reicht Ziel-Stufe und Begründung unverändert an die Datenbank", async () => {

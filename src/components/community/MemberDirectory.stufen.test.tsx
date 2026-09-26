@@ -40,7 +40,7 @@ vi.mock("../../lib/directory", async (importOriginal) => ({
    andere Stufe braucht. */
 let auth: { user: { id: string } | null; levelRank: number | null } = {
   user: { id: "00000000-0000-0000-0000-0000000000aa" },
-  levelRank: 3,
+  levelRank: 4,
 };
 vi.mock("../../providers/auth-context", () => ({
   useAuth: () => auth,
@@ -90,9 +90,26 @@ beforeEach(() => {
   vi.mocked(fetchDirectoryBaseline).mockReset();
 });
 
-describe("Verzeichnis: Filter unterhalb der Rang-3-Schwelle (AGE-598, 4.1–4.3)", () => {
-  it("zeigt einem connect-Konto die vier maskierten Filter gar nicht", async () => {
-    renderDirectory(2);
+/**
+ * AGE-903: die Schwelle ist von Rang 3 auf Rang 4 gestiegen, und damit wandern
+ * ALLE Betrachter dieser Datei um einen Rang mit. Der gemessene Fall bleibt
+ * derselbe — „gerade darunter" gegen „gerade darüber" —, und genau deshalb
+ * stehen hier jetzt 3 und 4 statt 2 und 3.
+ *
+ * Der Betrachter darunter steht bewusst auf Rang 3 und nicht auf Rang 1: Rang 3
+ * ist der HÖCHSTE Rang ausserhalb des Clubs. Hielte die Ausblendung bei ihm
+ * nicht, hielte sie nirgends, und eine Zusage über Rang 1 hätte das nicht
+ * gezeigt.
+ *
+ * Erreichbar ist diese Fläche für Rang 3 im Übrigen nur in einem Fenster:
+ * `MembershipGate` sperrt `/mitglieder` seit AGE-903 ab Rang 4, sperrt aber
+ * NICHT, solange die Stufe noch unbekannt ist. Genau dieses Fenster misst die
+ * Datei — deshalb ist sie nach AGE-903 nicht überflüssig geworden, sondern
+ * misst einen schmaleren Fall.
+ */
+describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-903)", () => {
+  it("zeigt einem Konto auf Rang 3 die vier maskierten Filter gar nicht", async () => {
+    renderDirectory(3);
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Die drei Auswahlfelder auf maskierten Spalten …
@@ -105,8 +122,8 @@ describe("Verzeichnis: Filter unterhalb der Rang-3-Schwelle (AGE-598, 4.1–4.3)
     expect(screen.queryByRole("group", { name: "Sucht" })).toBeNull();
   });
 
-  it("sagt einem connect-Konto, ab welcher Stufe es die Filter gibt", async () => {
-    renderDirectory(2);
+  it("sagt einem Konto auf Rang 3, ab welcher Stufe es die Filter gibt", async () => {
+    renderDirectory(3);
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Ausblenden ohne Hinweis wäre ein zweites Verschweigen (4.2). Die Stufe
@@ -115,8 +132,8 @@ describe("Verzeichnis: Filter unterhalb der Rang-3-Schwelle (AGE-598, 4.1–4.3)
     expect(screen.getByText(/ab Discover/i)).toBeInTheDocument();
   });
 
-  it("lässt einem connect-Konto den Branchenfilter — sichtbar und wirksam", async () => {
-    renderDirectory(2);
+  it("lässt einem Konto auf Rang 3 den Branchenfilter — sichtbar und wirksam", async () => {
+    renderDirectory(3);
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Sichtbar: er läuft seit 3c auf einem Basisfeld und findet etwas.
@@ -145,8 +162,8 @@ describe("Verzeichnis: Filter unterhalb der Rang-3-Schwelle (AGE-598, 4.1–4.3)
    * Positivkontrolle. Ohne sie belegte die Datei nur, dass die Filter fehlen —
    * nicht, dass sie jemandem noch angeboten werden.
    */
-  it("zeigt einem discover-Konto weiterhin alle Filter und keinen Hinweis", async () => {
-    renderDirectory(3);
+  it("zeigt einem Konto auf Rang 4 weiterhin alle Filter und keinen Hinweis", async () => {
+    renderDirectory(4);
     await screen.findByLabelText(/Volltextsuche/i);
 
     expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
@@ -155,6 +172,30 @@ describe("Verzeichnis: Filter unterhalb der Rang-3-Schwelle (AGE-598, 4.1–4.3)
     expect(screen.getByRole("group", { name: "Bietet" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Sucht" })).toBeInTheDocument();
 
+    expect(screen.queryByText(/ab Discover/i)).toBeNull();
+  });
+
+  /**
+   * Befund des Diff-Reviews (opencode, AGE-903). Solange die Stufe noch LÄDT,
+   * ist `levelRank` null. Bis hierher rechnete die Fläche das mit `?? 0` in
+   * „Rang 0" um — ein Clubmitglied sah die vier Filter also erst nicht und dann
+   * doch, sie erschienen nachträglich.
+   *
+   * Das widersprach der Begründung, die daneben stehen blieb: ausgeblendet wird,
+   * was SYSTEMATISCH nichts findet. Ein Filter, der in diesem Fenster zu viel
+   * zeigt, findet höchstens nichts; einer, der zu wenig zeigt, nimmt einem
+   * Berechtigten eine Fähigkeit weg. Dieselbe Regel tragen `MembershipGate` und
+   * `HeaderSearch` schon: ein Ladezustand ist kein Ausschlussgrund.
+   */
+  it("blendet nichts aus, solange die Stufe noch nicht feststeht", async () => {
+    renderDirectory(null);
+    await screen.findByLabelText(/Volltextsuche/i);
+
+    expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Thema/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Sucht \/ bietet/i)).toBeInTheDocument();
+    // Und erst recht kein Hinweis, der eine Stufe nennt, die das Konto
+    // vielleicht längst hat.
     expect(screen.queryByText(/ab Discover/i)).toBeNull();
   });
 });

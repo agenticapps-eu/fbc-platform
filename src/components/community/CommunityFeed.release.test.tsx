@@ -252,7 +252,7 @@ describe("6.3 — ohne lesbare Mitteilung keine Karte", () => {
 
 describe("6.4 — kein Stufen-Gate", () => {
   it("zeigt die Karte auch einem Mitglied der untersten Stufe", async () => {
-    renderFeed([releasePost()], authAsTier("basic"));
+    renderFeed([releasePost()], authAsTier("active"));
 
     await screen.findByText("Die Glocke ist da");
     expect(screen.getByText("eff.bee.zee")).toBeInTheDocument();

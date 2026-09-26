@@ -31,8 +31,8 @@ import { navItems } from "../config/nav";
 
 const BASIC = fakeAuthValue({
   user: { id: "u1", email: "bea@demo.local" } as AuthContextValue["user"],
-  tier: "basic",
-  levelRank: LEVEL_RANK.basic,
+  tier: "active",
+  levelRank: LEVEL_RANK.active,
 });
 
 /**
@@ -58,8 +58,8 @@ const ANON = fakeAuthValue({ user: null, tier: null, levelRank: null });
 
 const ADMIN = fakeAuthValue({
   user: { id: "u2", email: "adam@demo.local" } as AuthContextValue["user"],
-  tier: "basic",
-  levelRank: LEVEL_RANK.basic,
+  tier: "active",
+  levelRank: LEVEL_RANK.active,
   staffRole: "admin",
 });
 

@@ -37,7 +37,7 @@ update public.profiles set tier = 'impact', name = 'ST Admin', activated_at = no
  where id = '7c000000-0000-0000-0000-0000000000ad';
 update public.profiles set tier = 'impact', name = 'ST A', activated_at = now()
  where id = '7c000000-0000-0000-0000-00000000000a';
-update public.profiles set tier = 'basic', name = 'ST B', activated_at = now()
+update public.profiles set tier = 'active', name = 'ST B', activated_at = now()
  where id = '7c000000-0000-0000-0000-00000000000b';
 
 insert into public.staff_roles (profile_id, role)
@@ -82,7 +82,7 @@ select is(
   '42501',
   'Ein Nicht-Admin bekommt 42501');
 
-select is(pg_temp.stufe('7c000000-0000-0000-0000-00000000000b'), 'basic',
+select is(pg_temp.stufe('7c000000-0000-0000-0000-00000000000b'), 'active',
   'und die Stufe steht danach unveraendert');
 
 select is(pg_temp.spuren('7c000000-0000-0000-0000-00000000000b'), 0,
@@ -111,7 +111,7 @@ select is(pg_temp.stufe('7c000000-0000-0000-0000-00000000000a'), 'connect',
 -- Die Gegenprobe, die den Zweck dieser Funktion begruendet: derselbe Wunsch
 -- ueber apply_upgrade ist ein No-op.
 select is(
-  (select public.apply_upgrade('7c000000-0000-0000-0000-00000000000b', 'basic')),
+  (select public.apply_upgrade('7c000000-0000-0000-0000-00000000000b', 'active')),
   'focus',
   'apply_upgrade senkt NICHT — sie gibt den unveraenderten Ist-Zustand zurueck');
 

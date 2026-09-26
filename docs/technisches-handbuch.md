@@ -139,8 +139,8 @@ graph LR
 
     subgraph Achse2["Achse 2 — Mitgliedsstufe"]
         direction TB
-        L1["basic · 1"] --> L2["connect · 2"] --> L3["discover · 3"]
-        L3 --> L4["exchange · 4"] --> L5["focus · 5"] --> L6["impact · 6"]
+        L1["active · 1"] --> L2["boost · 2"] --> L3["connect · 3"]
+        L3 --> L4["discover · 4 — Club"] --> L5["focus · 5"] --> L6["impact · 6"]
     end
 
     Achse1 -->|"UND"| Z{{"Zugriff erlaubt"}}

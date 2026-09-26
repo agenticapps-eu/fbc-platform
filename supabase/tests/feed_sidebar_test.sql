@@ -11,8 +11,8 @@
 -- Die Zusage, dass eine Zahl der Sichtbarkeit folgt, kann DESHALB nur gemessen
 -- werden, und zwar von ZWEI Seiten:
 --
---   * derselbe Tag, dieselben fünf Beiträge — der `basic`-Betrachter bekommt 2,
---     der `exchange`-Betrachter 5. Eine Zusage aus nur einer Perspektive wäre
+--   * derselbe Tag, dieselben fünf Beiträge — der `active`-Betrachter bekommt 2,
+--     der `discover`-Betrachter 5. Eine Zusage aus nur einer Perspektive wäre
 --     mit einer kaputten Funktion vereinbar, die immer alles oder immer nur das
 --     Öffentliche zählt.
 --   * ein Tag, dessen Beiträge ALLE unsichtbar sind, fehlt in der Liste ganz.
@@ -38,14 +38,14 @@ select plan(27);
 
 -- ── Fixtures: Betrachter ────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
-  ('a0000000-0000-0000-0000-00000000000b', 'authenticated', 'authenticated', 'sb-basic@test.fbc'),
-  ('a0000000-0000-0000-0000-00000000000e', 'authenticated', 'authenticated', 'sb-exchange@test.fbc');
+  ('a0000000-0000-0000-0000-00000000000b', 'authenticated', 'authenticated', 'sb-active@test.fbc'),
+  ('a0000000-0000-0000-0000-00000000000e', 'authenticated', 'authenticated', 'sb-discover@test.fbc');
 
--- `basic` sieht nur `public`, `exchange` (Rang 4) zusätzlich `members`. Genau
+-- `active` (Rang 1) sieht nur `public`, `discover` (Rang 4) zusätzlich
 -- dieser Unterschied ist der Messwert.
-update public.profiles set tier = 'basic', name = 'Sb Basic', activated_at = now(), is_public = true
+update public.profiles set tier = 'active', name = 'Sb Active', activated_at = now(), is_public = true
  where id = 'a0000000-0000-0000-0000-00000000000b';
-update public.profiles set tier = 'exchange', name = 'Sb Exchange', activated_at = now(), is_public = true
+update public.profiles set tier = 'discover', name = 'Sb Discover', activated_at = now(), is_public = true
  where id = 'a0000000-0000-0000-0000-00000000000e';
 
 -- ── Fixtures: Autoren ───────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ insert into public.posts (author_id, body, visibility, hashtags) values
   ('a1000000-0000-0000-0000-000000000001', 'S4', 'members', array['sbsichtbar']),
   ('a1000000-0000-0000-0000-000000000001', 'S5', 'members', array['sbsichtbar']);
 
--- `sbverdeckt` NUR an einem Beitrag für Mitglieder — für `basic` unsichtbar.
+-- `sbverdeckt` NUR an einem Beitrag für Mitglieder — für `active` unsichtbar.
 insert into public.posts (author_id, body, visibility, hashtags) values
   ('a1000000-0000-0000-0000-000000000002', 'V1', 'members', array['sbverdeckt']);
 
@@ -140,8 +140,8 @@ end $$;
 
 -- ── 1. Der Tag-Zähler folgt der Sichtbarkeit ────────────────────────────────
 -- AGE-601 hat die MESSACHSE dieser Datei verschoben, und das ist hier die
--- wichtigste Aenderung. Bis dahin war der Unterschied `basic` (2) gegen
--- `exchange` (5) der Messwert. Seit `members` jedes AKTIVIERTE Mitglied meint,
+-- wichtigste Aenderung. Bis dahin war der Unterschied `active` (2 Beitraege)
+-- gegen `discover` (5) der Messwert. Seit `members` jedes AKTIVIERTE Mitglied meint,
 -- sehen beide fuenf — zwischen aktivierten Betrachtern gibt es NICHTS mehr zu
 -- verbergen, und eine Zusage darueber waere ab jetzt gegenstandslos.
 --
@@ -166,13 +166,13 @@ select is(
        'Funktion, dieselben Beiträge, ein anderer Aufrufer');
 
 -- Und der Beleg, dass die Stufe dabei KEINE Rolle mehr spielt (AGE-601): ein
--- `basic`-Konto bekommt dieselbe Fuenf wie ein `exchange`-Konto. Ohne diese
+-- `active`-Konto bekommt dieselbe Fuenf wie ein `discover`-Konto. Ohne diese
 -- Zeile bliebe offen, ob die Fuenf oben an der Stufe oder an der Sitzung haengt.
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_tag_counts()
        where tag_key = 'sbsichtbar'$$),
-  '5', 'Auch der basic-Betrachter zählt FÜNF — die Stufe ist keine Schranke mehr');
+  '5', 'Auch der active-Betrachter zählt FÜNF — die Stufe ist keine Schranke mehr');
 
 select is(
   pg_temp.text_as_anon(
@@ -186,7 +186,7 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
     $$select post_count::text from public.feed_tag_counts()
        where tag_key = 'sbverdeckt'$$),
-  '1', 'Für den exchange-Betrachter ist derselbe Tag sehr wohl da — die '
+  '1', 'Für den discover-Betrachter ist derselbe Tag sehr wohl da — die '
        'Gegenprobe zur Zusage darüber');
 
 select is(
@@ -234,13 +234,13 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000001'$$),
-  '5', 'Der Autor steht mit fünf Beiträgen — so viele sieht der exchange-Betrachter');
+  '5', 'Der Autor steht mit fünf Beiträgen — so viele sieht der discover-Betrachter');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000b',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000001'$$),
-  '5', 'Für den basic-Betrachter steht derselbe Autor ebenfalls mit FÜNF '
+  '5', 'Für den active-Betrachter steht derselbe Autor ebenfalls mit FÜNF '
        '(AGE-601) — zwischen aktivierten Betrachtern gibt es hier nichts mehr '
        'zu verbergen. Ausgeloggt ist diese Liste laut Spec gar nicht zu zeigen '
        '(profiles_public haelt fuer anon kein Recht), und ein unbestaetigter '
@@ -336,10 +336,10 @@ select is(
   'Recht, und ein Aufrufweg, den es nicht gibt, entsteht nicht versehentlich');
 
 -- ── 6. Was die Zähler NICHT verraten (Abschnitt 7.7) ────────────────────────
--- Die Zusagen oben messen die zwei Ränge `basic` und `exchange`. Das Prädikat
+-- Die Zusagen oben messen die zwei Ränge `active` (1) und `discover` (4). Das Prädikat
 -- `posts_select_by_visibility` hat aber DREI Zweige, und der dritte ist der
 -- gefährliche: `author_id = auth.uid()`. Ein Verfasser sieht seinen eigenen
--- `members`-Beitrag auch auf `basic` — die Zahl hängt also nicht nur an der
+-- `members`-Beitrag auch auf `active` — die Zahl hängt also nicht nur an der
 -- Stufe, sondern an der Person. Wäre der Zähler eine Abschrift ohne diesen
 -- Zweig, zeigte er dem Verfasser weniger, als er öffnen kann; wäre er eine
 -- Abschrift ohne den Rang, zeigte er jedem alles. Beides wird hier gemessen.
@@ -352,19 +352,19 @@ insert into auth.users (id, aud, role, email) values
   ('a0000000-0000-0000-0000-00000000000c', 'authenticated', 'authenticated', 'sb-basic2@test.fbc'),
   ('a1000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'sb-autor3@test.fbc');
 
-update public.profiles set tier = 'basic', name = 'Sb Basic Zwei', activated_at = now(), is_public = true
+update public.profiles set tier = 'active', name = 'Sb Active Zwei', activated_at = now(), is_public = true
  where id = 'a0000000-0000-0000-0000-00000000000c';
 update public.profiles set tier = 'impact', name = 'Sb Autor Drei', activated_at = now(), is_public = true
  where id = 'a1000000-0000-0000-0000-000000000003';
 
 -- Autor Drei schreibt AUSSCHLIESSLICH für Mitglieder — ohne Tag, damit die
 -- Tagzählung unberührt bleibt. Er ist das Gegenstück zu `sbverdeckt` auf der
--- Autorenseite: für `basic` darf er nicht mit der Zahl null erscheinen.
+-- Autorenseite: für `active` darf er nicht mit der Zahl null erscheinen.
 insert into public.posts (author_id, body, visibility) values
   ('a1000000-0000-0000-0000-000000000003', 'D1', 'members'),
   ('a1000000-0000-0000-0000-000000000003', 'D2', 'members');
 
--- `sbeigen` trägt zwei `members`-Beiträge: einen vom `basic`-Betrachter SELBST,
+-- `sbeigen` trägt zwei `members`-Beiträge: einen vom `active`-Betrachter SELBST,
 -- einen von Autor Eins.
 --
 -- DIESER ABSCHNITT HAT SEINEN MESSWERT AN AGE-601 VERLOREN, und das steht hier
@@ -378,7 +378,7 @@ insert into public.posts (author_id, body, visibility) values
 -- Der Zweig bleibt trotzdem im Praedikat, und das ist kein Versehen: er ist die
 -- Zusage „ein Verfasser sieht seinen eigenen Beitrag IMMER", unabhaengig davon,
 -- was die Sichtbarkeitsregel gerade sagt. Verengt sie sich je wieder, traegt er
--- sofort. Belegt wird er weiterhin in `rls_test.sql` (Abschnitt 8, „Basic sieht
+-- sofort. Belegt wird er weiterhin in `rls_test.sql` (Abschnitt 8, „Active sieht
 -- den EIGENEN members-Beitrag") — dort ueber einen Aufrufer, bei dem der zweite
 -- Zweig nicht greift.
 insert into public.tags (key, label, sort, active) values ('sbeigen', 'SbEigen', 906, true);
@@ -390,7 +390,7 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
     $$select post_count::text from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000003'$$),
-  '2', 'Vorbedingung: der exchange-Betrachter sieht beide verdeckten Beiträge '
+  '2', 'Vorbedingung: der discover-Betrachter sieht beide verdeckten Beiträge '
        'von Autor Drei');
 
 select is(
@@ -399,7 +399,7 @@ select is(
         from public.feed_top_authors(50)
        where profile_id = 'a1000000-0000-0000-0000-000000000003'$$),
   'a1000000-0000-0000-0000-000000000003=2',
-  'Autor Drei steht seit AGE-601 auch fuer den basic-Betrachter mit ZWEI — seine '
+  'Autor Drei steht seit AGE-601 auch fuer den active-Betrachter mit ZWEI — seine '
   'members-Beitraege sind nicht mehr verdeckt. Die Zusage „ein Autor ohne '
   'sichtbaren Beitrag fehlt GANZ statt mit der Zahl null" ist damit nicht '
   'aufgehoben, sondern gegenstandslos geworden: es gibt fuer ein aktiviertes '
@@ -419,7 +419,7 @@ select is(
     $$select coalesce(string_agg(tag_key, ','), '(fehlt)')
         from public.feed_tag_counts() where tag_key = 'sbeigen'$$),
   'sbeigen',
-  'Für einen ANDEREN basic-Betrachter erscheint derselbe Tag jetzt ebenfalls — '
+  'Für einen ANDEREN active-Betrachter erscheint derselbe Tag jetzt ebenfalls — '
   'die Zahl hängt seit AGE-601 weder an der Stufe noch an der Person, solange '
   'der Aufrufer aktiviert ist');
 
@@ -448,7 +448,7 @@ select is(
         cross join lateral (select count(*) from public.posts p
                              where p.hashtags @> array[t.key]) x(c)
        where t.active and t.key like 'sb%' and x.c > 0$$),
-  'basic: jede Zahl der Funktion ist genau die Zahl der Beiträge, die dieser '
+  'active: jede Zahl der Funktion ist genau die Zahl der Beiträge, die dieser '
   'Aufrufer selbst aufzählen kann');
 
 select is(
@@ -461,7 +461,7 @@ select is(
         cross join lateral (select count(*) from public.posts p
                              where p.hashtags @> array[t.key]) x(c)
        where t.active and t.key like 'sb%' and x.c > 0$$),
-  'exchange: dieselbe Gleichheit auf der anderen Stufe — eine Abschrift ohne '
+  'discover: dieselbe Gleichheit auf der anderen Stufe — eine Abschrift ohne '
   'den Rang bestünde die eine oder die andere, nicht beide');
 
 select * from finish();

@@ -174,9 +174,10 @@ describe("schreibauftrag — eine Transaktion je Datensatz", () => {
 
   it("gibt einem frisch angelegten Konto impact — in einer eigenen Anweisung", () => {
     // GEMESSEN, nicht angenommen: `on_auth_user_created` legt beim Anlegen über
-    // die Admin-Schnittstelle bereits `public.profiles` an, mit `tier = 'basic'`
-    // (community_foundation.sql:82, six_level_model.sql:87). Die Stufe muss also
-    // geschrieben werden — aber nicht im Auftrag, sondern hier.
+    // die Admin-Schnittstelle bereits `public.profiles` an, mit `tier = 'active'`
+    // (community_foundation.sql:82, zuletzt 20260926120000_stufen_v5.sql — bis
+    // AGE-903 war es `'basic'`, derselbe Rang 1 unter anderem Namen). Die Stufe
+    // muss also geschrieben werden — aber nicht im Auftrag, sondern hier.
     const anweisung = stufeFuerNeuesKonto({ stand: "angelegt", uid: "uid-1" });
 
     expect(anweisung.sql).toContain("update public.profiles");

@@ -8,7 +8,7 @@ import { AuthFixture, authAsTier } from "../test/auth-fixtures";
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <AuthFixture value={authAsTier("exchange")}>
+    <AuthFixture value={authAsTier("discover")}>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <CompassPage />

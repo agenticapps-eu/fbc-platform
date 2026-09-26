@@ -1,6 +1,7 @@
 -- RLS-Tests der 6-Level-Rechte-Matrix (AGE-311) — `supabase test db`.
 -- Prüft docs/superpowers/specs/2026-07-15-fbc-6level-upgrade.md §2 über
--- basic(1) connect(2) discover(3) exchange(4) focus(5) impact(6).
+-- active(1) boost(2) connect(3) discover(4) focus(5) impact(6) — Leiter V5,
+-- AGE-903. Der Club beginnt bei `discover` (Rang 4).
 --
 -- Ersetzt den P5-Test (AGE-235), der die alte Discover/Prime/Legacy-Matrix
 -- kodierte: er baute u. a. einen `visibility='legacy'`-Post und prüfte rank >= 7 —
@@ -12,15 +13,15 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(441);
+select plan(442);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
 insert into auth.users (id, aud, role, email) values
-  ('11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'basic@test.fbc'),
-  ('22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'connect@test.fbc'),
-  ('33333333-3333-3333-3333-333333333333', 'authenticated', 'authenticated', 'discover@test.fbc'),
-  ('44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated', 'exchange@test.fbc'),
+  ('11111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'active@test.fbc'),
+  ('22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'boost@test.fbc'),
+  ('33333333-3333-3333-3333-333333333333', 'authenticated', 'authenticated', 'connect@test.fbc'),
+  ('44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated', 'discover@test.fbc'),
   ('66666666-6666-6666-6666-666666666666', 'authenticated', 'authenticated', 'impact@test.fbc'),
   ('77777777-7777-7777-7777-777777777777', 'authenticated', 'authenticated', 'neu@test.fbc'),
   ('88888888-8888-8888-8888-888888888888', 'authenticated', 'authenticated', 'optout@test.fbc'),
@@ -32,12 +33,16 @@ insert into auth.users (id, aud, role, email) values
 update public.profiles set tier = 'impact', name = 'Admin'   where id = 'aaaaaaaa-0000-0000-0000-000000000001';
 update public.profiles set tier = 'impact', name = 'Manager' where id = 'bbbbbbbb-0000-0000-0000-000000000002';
 
-update public.profiles set tier = 'basic',    name = 'Basic'    where id = '11111111-1111-1111-1111-111111111111';
-update public.profiles set tier = 'connect',  name = 'Connect'  where id = '22222222-2222-2222-2222-222222222222';
-update public.profiles set tier = 'discover', name = 'Discover' where id = '33333333-3333-3333-3333-333333333333';
-update public.profiles set tier = 'exchange', name = 'Exchange' where id = '44444444-4444-4444-4444-444444444444';
+-- Rangtreu besetzt: jedes Fixture behält den RANG, den es hatte, und bekommt
+-- den Schlüssel, der nach AGE-903 auf diesem Rang sitzt. Die Clubgrenze wandert
+-- damit durch die Fixtures hindurch — Rang 3 lag vorher darüber und liegt jetzt
+-- darunter. Genau diese Zusagen kippen, und sie kippen benannt.
+update public.profiles set tier = 'active',   name = 'Active'   where id = '11111111-1111-1111-1111-111111111111';
+update public.profiles set tier = 'boost',    name = 'Boost'    where id = '22222222-2222-2222-2222-222222222222';
+update public.profiles set tier = 'connect',  name = 'Connect'  where id = '33333333-3333-3333-3333-333333333333';
+update public.profiles set tier = 'discover', name = 'Discover' where id = '44444444-4444-4444-4444-444444444444';
 update public.profiles set tier = 'impact',   name = 'Impact'   where id = '66666666-6666-6666-6666-666666666666';
-update public.profiles set tier = 'connect',  name = 'Neuling'  where id = '77777777-7777-7777-7777-777777777777';
+update public.profiles set tier = 'boost',    name = 'Neuling'  where id = '77777777-7777-7777-7777-777777777777';
 update public.profiles set tier = 'impact',   name = 'OptOut'   where id = '88888888-8888-8888-8888-888888888888';
 -- '9999…' behält bewusst den Default → Beleg für den Signup-Startlevel (§3.4).
 
@@ -51,7 +56,7 @@ update public.profiles set activated_at = now();
 
 -- Das Sondenkonto für das Gate. Bewusst `impact` (höchste Stufe): bei
 -- importierten Mitgliedern liegt hinter dem Gate KEIN Stufen-Gate mehr, das
--- einen Fehler noch auffinge. Ein `basic`-Konto sähe vieles schon wegen der
+-- einen Fehler noch auffinge. Ein `active`-Konto sähe vieles schon wegen der
 -- Stufe nicht und täuschte ein Gate vor, das gar nicht greift.
 insert into auth.users (id, aud, role, email) values
   ('dddddddd-0000-0000-0000-00000000000d', 'authenticated', 'authenticated', 'nichtaktiv@test.fbc');
@@ -85,7 +90,7 @@ update public.profiles set created_at = now() - interval '90 days'
 insert into public.member_settings (profile_id, contactable_by_prime)
   values ('88888888-8888-8888-8888-888888888888', false);
 
--- Match Exchange<->Neuling: der einzige erlaubte Weg an ein neues Mitglied.
+-- Match Discover<->Neuling: der einzige erlaubte Weg an ein neues Mitglied.
 insert into public.matches (id, a_profile_id, b_profile_id, score) values
   ('cccccccc-cccc-cccc-cccc-cccccccccccc',
    '44444444-4444-4444-4444-444444444444', '77777777-7777-7777-7777-777777777777', 80);
@@ -107,11 +112,11 @@ insert into public.profile_contacts (profile_id, email) values
   ('66666666-6666-6666-6666-666666666666', 'impact-contact@test.fbc');
 
 -- Beiträge: der 'members'-Post gehört Impact, damit die author-Klausel den
--- exchange-Gate-Test nicht überdeckt. Der 'public'-Post prüft die untere Grenze.
+-- Rang-4-Gate-Test nicht überdeckt. Der 'public'-Post prüft die untere Grenze.
 insert into public.posts (id, author_id, body, visibility) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '66666666-6666-6666-6666-666666666666', 'Members-only', 'members'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '66666666-6666-6666-6666-666666666666', 'Öffentlich',   'public'),
-  -- Eigener 'members'-Post eines Basic: prüft die author-Klausel unabhängig vom Rang.
+  -- Eigener 'members'-Post eines Active: prüft die author-Klausel unabhängig vom Rang.
   ('dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'Mein Beitrag', 'members');
 insert into public.comments (post_id, author_id, body) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '66666666-6666-6666-6666-666666666666', 'interner Kommentar');
@@ -119,11 +124,11 @@ insert into public.comments (post_id, author_id, body) values
 insert into public.events (id, title, host_id, visibility, starts_at) values
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Sommerfest', '66666666-6666-6666-6666-666666666666',
    'members', now() + interval '7 days'),
-  -- AGE-448: öffentliches Event — jeder Eingeloggte (auch basic) darf sich anmelden.
+  -- AGE-448: öffentliches Event — jeder Eingeloggte (auch Rang 1) darf sich anmelden.
   ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Tag der offenen Tür', '66666666-6666-6666-6666-666666666666',
    'public', now() + interval '7 days');
 
--- Thread Basic<->Connect OHNE Kontaktanfrage: der Gegenbeleg für §8 — ein
+-- Thread Active<->Boost OHNE Kontaktanfrage: der Gegenbeleg für §8 — ein
 -- bestehender Thread allein berechtigt nicht zum Schreiben.
 insert into public.message_threads (a_profile_id, b_profile_id) values
   ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
@@ -193,87 +198,113 @@ select is(
   (select count(*)::int from public.membership_tiers),
   6, 'Es gibt genau 6 Stufen');
 
+-- ACHTUNG, Namenskollision: `active` stand bis AGE-903 in DIESER Liste — als
+-- entfallener Prototyp-Schlüssel. Es ist jetzt der LEBENDE Schlüssel für Rang 1
+-- und gehört deshalb heraus. Wer die Liste mechanisch fortschreibt, baut sich
+-- eine Zusage, die den Erfolg der Migration als ihren Fehlschlag meldet.
+-- Dazugekommen sind `basic` und `exchange`.
 select is(
   (select count(*)::int from public.membership_tiers
-    where key in ('explore', 'impuls', 'active', 'prime', 'circle', 'legacy')),
-  0, 'Kein alter Key hat die Migration überlebt');
+    where key in ('explore', 'impuls', 'prime', 'circle', 'legacy',
+                  'basic', 'exchange')),
+  0, 'Kein entfallener Key hat die Migration überlebt — `active` gehört NICHT '
+     'mehr dazu, es ist seit AGE-903 der Schlüssel für Rang 1');
 
 select is(
   (select string_agg(key, ',' order by level_rank) from public.membership_tiers),
-  'basic,connect,discover,exchange,focus,impact',
-  'Die Ränge steigen basic=1 … impact=6');
+  'active,boost,connect,discover,focus,impact',
+  'Die Ränge steigen active=1 … impact=6 (AGE-903)');
 
+-- `discover` hat seinen Preis mit AGE-903 zum ZWEITEN Mal gewechselt, ohne den
+-- Namen zu wechseln: 0 € (Prototyp) → 150 € (Rang 3) → 300 € (Rang 4). Der
+-- Schlüssel allein sagt über den Preis so wenig wie über die Rechte.
 select is(
   (select price_year from public.membership_tiers where key = 'discover'),
-  150, 'Der neue `discover` kostet 150 € (Namens-Kollision aufgelöst — alt war 0 €)');
+  300, 'Der neue `discover` kostet 300 € und steht auf Rang 4 (vorher 150 € auf Rang 3)');
 
 select is(
   (select tier from public.profiles where id = '99999999-9999-9999-9999-999999999999'),
-  'basic', 'Ein frischer Signup startet auf `basic` (§3.4)');
+  'active', 'Ein frischer Signup startet auf `active` — Rang 1, ausserhalb des Clubs');
 
--- ── 2. profiles — volles Verzeichnis ab `discover` (rank 3) ──────────────────
+-- ── 2. profiles — volles Verzeichnis ab `discover` (Rang 4) ─────────────────
+-- Die Schwelle ist mit AGE-903 von Rang 3 auf Rang 4 gestiegen. Jede Zusage
+-- hier fährt deshalb DREI Ränge: 2 und 3 draussen, 4 drinnen. Rang 3 ist der
+-- teuerste Fall — der höchste Rang ausserhalb des Clubs. Hielte die Schwelle
+-- dort nicht, wäre sie nirgends gehalten, und die Zusage über Rang 2 allein
+-- hätte das nicht gezeigt.
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.profiles_public where id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Basic sieht Impact im öffentlichen Verzeichnis (profiles_public)');
+  1, 'Active sieht Impact im öffentlichen Verzeichnis (profiles_public trägt keine Stufenschwelle)');
 
 select is(
   pg_temp.count_as('22222222-2222-2222-2222-222222222222',
     'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
-  0, 'Connect liest KEINE fremde Vollzeile (erweiterte Felder)');
+  0, 'Boost (Rang 2) liest KEINE fremde Vollzeile');
 
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Discover liest die fremde Vollzeile — „vollständiges Verzeichnis" ab 150 €');
+  0, 'Connect (Rang 3) liest KEINE fremde Vollzeile — der höchste Rang '
+     'ausserhalb des Clubs, und mit AGE-903 gekippt');
+
+select is(
+  pg_temp.count_as('44444444-4444-4444-4444-444444444444',
+    'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Discover (Rang 4) liest die fremde Vollzeile — „vollständiges Verzeichnis" ab 300 €');
 
 -- Die Neben-Tabellen der erweiterten Profildaten müssen dieselbe Schwelle tragen.
 select is(
-  pg_temp.count_as('22222222-2222-2222-2222-222222222222',
-    'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  0, 'Connect sieht fremde Interessen nicht (Neben-Tabelle folgt profiles)');
-
-select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Discover sieht fremde Interessen');
+  0, 'Connect (Rang 3) sieht fremde Interessen nicht (Neben-Tabelle folgt profiles)');
 
--- ── 3. offers — ab `discover` (rank 3) ───────────────────────────────────────
 select is(
-  pg_temp.count_as('22222222-2222-2222-2222-222222222222',
-    'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  0, 'Connect sieht keine fremden Angebote');
+  pg_temp.count_as('44444444-4444-4444-4444-444444444444',
+    'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Discover (Rang 4) sieht fremde Interessen');
 
+-- ── 3. offers — ab `discover` (Rang 4) ──────────────────────────────────────
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Discover sieht fremde Angebote');
+  0, 'Connect (Rang 3) sieht keine fremden Angebote');
+
+select is(
+  pg_temp.count_as('44444444-4444-4444-4444-444444444444',
+    'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Discover (Rang 4) sieht fremde Angebote');
 
 -- open_contact steuert, ob Level-Gate + Welpenschutz gelten (AGE-455). Die Gate-Tests
 -- in Abschnitt 4–6 prüfen den GESCHLOSSENEN Modus (§2-Default); der Migrations-Seed
 -- steht auf true (Sommerfest), daher hier explizit aus.
 update public.platform_settings set open_contact = false;
 
--- ── 4. Kontaktanfragen — gestaffelt (AGE-598) ────────────────────────────────
--- Bis zum 02.09. lautete Klausel 320 `is_contact_open() or has_level(4)`, und
--- hier stand die Zusage, dass `discover` im geschlossenen Modus NICHT senden
--- kann. Sie ist mit der Staffelung gekippt, und das ist die Absicht: das
--- Prädikat `darf_kontaktanfrage_senden` erlaubt ab Rang 3 jeden Empfänger.
+-- ── 4. Kontaktanfragen — allein nach der Absenderstufe (AGE-903) ────────────
+-- Die Geschichte dieser Klausel in drei Schritten, weil sie zweimal gekippt ist
+-- und ein stillschweigender Dreh hier wie ein Versehen aussähe:
 --
--- Das ist eine ERWEITERUNG und wird als solche zugesagt — der Change ist sonst
--- durchweg eine Einschränkung, und eine stillschweigend gedrehte Zusage sähe
--- hier aus wie ein Versehen. Die Staffelung selbst (sechs Absenderstufen gegen
--- zwei Zielstufen) steht in `kontaktanfrage_staffelung_test.sql`; hier steht
--- nur, dass die alte Rang-4-Grenze weg ist.
-select is(
+--   bis 02.09.  `is_contact_open() or has_level(4)` — `discover` (damals Rang 3)
+--               durfte im geschlossenen Modus NICHT senden
+--   ab AGE-598  gestaffelt: ab Rang 3 an jeden, Rang 2 nur an genau `connect`
+--   ab AGE-903  allein die Absenderstufe: ab Rang 4 an jeden, darunter nicht
+--
+-- Für Rang 3 heisst das: er durfte, und darf wieder nicht. Die Staffelung ist
+-- ersatzlos entfallen, weil sie eine Aussage über eine Stufe war, die es in
+-- dieser Bedeutung nicht mehr gibt.
+--
+-- Die volle Matrix (sechs Absenderstufen gegen zwei Zielstufen) steht in
+-- `kontaktanfrage_stufe_test.sql`; hier steht nur, wo die Grenze liegt.
+select alike(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'insert into public.contact_requests (from_id, to_id) values (''33333333-3333-3333-3333-333333333333'', ''66666666-6666-6666-6666-666666666666'')'),
-  'OK', 'Discover kann jetzt eine Kontaktanfrage senden (Staffelung ab rank 3)');
+  'DENIED:%',
+  'Connect (Rang 3) kann KEINE Kontaktanfrage senden — der Club beginnt bei 4');
 
 select is(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'insert into public.contact_requests (from_id, to_id) values (''44444444-4444-4444-4444-444444444444'', ''66666666-6666-6666-6666-666666666666'')'),
-  'OK', 'Exchange kann eine Kontaktanfrage senden');
+  'OK', 'Discover (Rang 4) kann eine Kontaktanfrage senden — die Positivkontrolle');
 
 -- ── 5. Welpenschutz — ERSATZLOS GESTRICHEN (AGE-598, 02.09.) ─────────────────
 -- Hier standen zwei Zusagen. Beide sind mit
@@ -288,7 +319,7 @@ select is(
 --
 --   * „Über ein Match ist dasselbe neue Mitglied erreichbar" hätte man behalten
 --     können; sie wäre grün geblieben. Aber nicht mehr aus ihrem Grund:
---     `exchange` darf nach dem Streichen ohnehin senden, das `match_id` belegt
+--     Rang 4 darf nach dem Streichen ohnehin senden, das `match_id` belegt
 --     nichts mehr. Eine Zusage, die aus dem falschen Grund hält, ist schlimmer
 --     als eine rote — sie sagt weiterhin etwas zu, das niemand mehr misst.
 --     Was das `match_id` WIRKLICH noch trägt, ist die Paarbindung, und die
@@ -310,13 +341,14 @@ select alike(
 -- eines. Das Empfänger-Opt-out bleibt in JEDEM Modus erzwungen.
 update public.platform_settings set open_contact = true;
 
--- Basic (rank 1) an ein FRISCHES Mitglied (7777) OHNE Match: geschlossen von der
--- Staffelung verboten (`basic` darf an niemanden), offen erlaubt → belegt, dass
+-- Active (Rang 1) an ein FRISCHES Mitglied (7777) OHNE Match: geschlossen von
+-- der Stufenschwelle verboten (unter Rang 4 darf niemand senden), offen
+-- erlaubt → belegt, dass
 -- das Flag vor der Staffelung steht.
 select is(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'insert into public.contact_requests (from_id, to_id) values (''11111111-1111-1111-1111-111111111111'', ''77777777-7777-7777-7777-777777777777'')'),
-  'OK', 'open_contact: Basic darf ein neues Mitglied kalt anschreiben (Staffelung offen)');
+  'OK', 'open_contact: Rang 1 darf ein neues Mitglied kalt anschreiben (Schalter offen)');
 
 -- Das Opt-out (8888) bleibt auch im offenen Modus geschützt.
 select alike(
@@ -348,12 +380,12 @@ select is(
 
 -- ── 7. Nachrichten — nur an bereits akzeptierte Kontakte (§2) ────────────────
 -- Diese Policies hängen an KEINER Stufe: sie verlangen eine angenommene
--- Kontaktanfrage, sonst nichts. Genau das meint §2 mit „Nachrichten auf basic nur
+-- Kontaktanfrage, sonst nichts. Genau das meint §2 mit „Nachrichten auf Rang 1 nur
 -- an bereits akzeptierte Kontakte" — nicht der Rang öffnet den Chat, sondern das
 -- Einverständnis des Gegenübers. Deshalb steht der Abschnitt hier und nicht bei
 -- den Rang-Gates: er prüft die Zustimmung, und die ist die Grenze.
 --
--- Ausgangspunkt ist die Anfrage Exchange→Impact aus Abschnitt 4, die noch auf
+-- Ausgangspunkt ist die Anfrage Discover→Impact aus Abschnitt 4, die noch auf
 -- 'pending' liegt.
 
 select alike(
@@ -369,13 +401,13 @@ select is(
 -- Den Thread legt der Client nicht an: handle_contact_request_change() öffnet ihn
 -- beim Annehmen (normalisiert über least/greatest, on conflict do nothing). Ein
 -- manuelles Insert könnte hier nur den Unique-Constraint treffen — geprüft wird
--- deshalb, was gelten muss: der Thread existiert und Exchange sieht ihn.
+-- deshalb, was gelten muss: der Thread existiert und Discover sieht ihn.
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
     'select count(*)::int from public.message_threads where a_profile_id = ''44444444-4444-4444-4444-444444444444'' and b_profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Das Annehmen öffnet einen Thread, den Exchange sieht');
+  1, 'Das Annehmen öffnet einen Thread, den Discover sieht');
 
--- Gegenbeleg am Fixture-Thread Basic<->Connect: er existiert, aber ohne Anfrage.
+-- Gegenbeleg am Fixture-Thread Active<->Boost: er existiert, aber ohne Anfrage.
 select alike(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'insert into public.messages (thread_id, sender_id, body) select id, ''11111111-1111-1111-1111-111111111111'', ''hallo'' from public.message_threads where a_profile_id = ''11111111-1111-1111-1111-111111111111'' and b_profile_id = ''22222222-2222-2222-2222-222222222222'''),
@@ -390,10 +422,14 @@ select is(
 -- Bis AGE-601 verlangte der `members`-Zweig zusätzlich `has_level(4)`. In PROD
 -- trägt jeder Beitrag `members` und keiner `public` — unter Rang 4 war der Feed
 -- also nicht dünner, sondern LEER. Die Hürde ist jetzt allein `is_activated()`.
+--
+-- Diese Zusagen sind von AGE-903 UNBERÜHRT, und das ist der Punkt: sie fahren
+-- ein Konto auf Rang 3, das nach AGE-903 ausserhalb des Clubs liegt und den
+-- Beitrag trotzdem sieht. Der Feed hängt nicht an der Clubgrenze.
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  1, 'Discover sieht den members-Beitrag (AGE-601: keine Stufenschwelle mehr)');
+  1, 'Connect (Rang 3) sieht den members-Beitrag — der Feed trägt keine Stufenschwelle (AGE-601)');
 
 -- Die Gegenrichtung, ohne die die Ausweitung nur belegt, dass etwas offener wurde:
 -- ein BESTÄTIGTES, aber nicht aktiviertes Konto bekommt weiterhin nichts.
@@ -409,17 +445,17 @@ select is(
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  1, 'Exchange sieht die Aktivität — der „Wow"-Moment nach dem Upgrade');
+  1, 'Discover sieht die Aktivität — der „Wow"-Moment nach dem Upgrade');
 
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.posts where id = ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'''),
-  1, 'Basic sieht öffentliche Beiträge');
+  1, 'Active sieht öffentliche Beiträge');
 
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.posts where id = ''dddddddd-dddd-dddd-dddd-dddddddddddd'''),
-  1, 'Basic sieht den EIGENEN members-Beitrag. ACHTUNG, KEINE Abdeckung der '
+  1, 'Active sieht den EIGENEN members-Beitrag. ACHTUNG, KEINE Abdeckung der '
      'Autoren-Klausel mehr (Befund codex, LOW): seit AGE-601 traegt ihn schon '
      'der members-Zweig, diese Zusage bliebe also auch ohne `author_id = '
      'auth.uid()` gruen. Der Zweig ist fuer aktivierte Aufrufer NICHT MEHR '
@@ -429,7 +465,7 @@ select is(
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.posts where id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  1, 'Basic sieht auch einen FREMDEN members-Beitrag (AGE-601) — das ist die '
+  1, 'Active sieht auch einen FREMDEN members-Beitrag (AGE-601) — das ist die '
      'eigentliche Ausweitung, die Autoren-Klausel darüber ist es nicht');
 
 -- DIE ZAEHLER-ABSCHRIFT, eigens zugesichert. `post_engagement_counts` ist
@@ -457,41 +493,44 @@ select is(
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  1, 'Kommentar folgt seinem Post — nach AGE-601 sieht Discover beide');
+  1, 'Kommentar folgt seinem Post — nach AGE-601 sieht auch Rang 3 beide');
 
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
     'select count(*)::int from public.comments where post_id = ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'''),
-  1, 'Exchange sieht den Kommentar');
+  1, 'Discover (Rang 4) sieht den Kommentar');
 
 -- ── 10. Events — sichtbar für alle; Teilnahme sichtbarkeitsabhängig (AGE-448) ─
--- public: jeder Eingeloggte (auch basic). members: ab `discover` (rank 3) oder Host.
+-- public: jeder Eingeloggte (auch Rang 1). members: ab Rang 4 oder Host (AGE-903;
+-- bis dahin ab Rang 3).
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
     'select count(*)::int from public.events where id = ''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'''),
-  1, 'Basic SIEHT das Event (bewusst anders als die Aktivität)');
+  1, 'Active (Rang 1) SIEHT das Event (bewusst anders als die Aktivität)');
 
--- members-Event: connect (rank 2) bleibt draußen, discover (rank 3) kommt rein.
+-- members-Event: Rang 2 und Rang 3 bleiben draussen, Rang 4 kommt rein. Rang 3
+-- ist mit AGE-903 gekippt — er durfte sich bis dahin anmelden.
 select alike(
   pg_temp.try_as('22222222-2222-2222-2222-222222222222',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
-  'DENIED:%', 'Connect kann sich NICHT zum Mitglieder-Event anmelden (unter discover)');
+  'DENIED:%', 'Boost (Rang 2) kann sich NICHT zum Mitglieder-Event anmelden');
 
-select is(
+select alike(
   pg_temp.try_as('33333333-3333-3333-3333-333333333333',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
-  'OK', 'Discover kann sich zum Mitglieder-Event anmelden (ab rank 3)');
+  'DENIED:%',
+  'Connect (Rang 3) kann sich NICHT zum Mitglieder-Event anmelden — mit AGE-903 gekippt');
 
 select is(
   pg_temp.try_as('44444444-4444-4444-4444-444444444444',
     'select public.register_for_event(''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'')'),
-  'OK', 'Exchange kann sich anmelden');
+  'OK', 'Discover (Rang 4) kann sich anmelden — die Positivkontrolle');
 
--- public-Event: basic (rank 1) darf sich anmelden — das ist der Sommerfest-Fall.
+-- public-Event: Rang 1 darf sich anmelden — das ist der Sommerfest-Fall.
 select is(
   pg_temp.try_as('11111111-1111-1111-1111-111111111111',
     'select public.register_for_event(''ffffffff-ffff-ffff-ffff-ffffffffffff'')'),
-  'OK', 'Basic kann sich zum öffentlichen Event anmelden (Gäste-Fall)');
+  'OK', 'Active kann sich zum öffentlichen Event anmelden (Gäste-Fall)');
 
 -- ── 11. feedback — plattformweites QM (§3.5, AGE-300) ────────────────────────
 -- `admin` liest alles (feedback_admin_read), alle anderen nur ihr eigenes
@@ -543,7 +582,7 @@ select is(
 -- SECURITY DEFINER: joint feedback+profiles an der profiles-RLS vorbei, damit der
 -- Admin den Autor-Namen auch bei nicht-öffentlichen Profilen sieht. Gibt aber nur
 -- Zeilen zurück, wenn public.is_admin() — ein Nicht-Admin (auch matching_manager)
--- bekommt leer. Die feedback-Fixtures oben stammen von '1111…' (Basic) und
+-- bekommt leer. Die feedback-Fixtures oben stammen von '1111…' (Active) und
 -- '6666…' (Impact); genau deren Namen müssen im author_name auftauchen.
 select is(
   pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
@@ -554,7 +593,7 @@ select is(
 
 select is(
   pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
-    'select count(*)::int from public.admin_list_feedback() where author_name in (''Basic'', ''Impact'')'),
+    'select count(*)::int from public.admin_list_feedback() where author_name in (''Active'', ''Impact'')'),
   2, 'Der Autor-Name ist aufgelöst — der Join greift hinter der profiles-RLS');
 
 select is(
@@ -578,7 +617,7 @@ select is(
 -- ── apply_upgrade: nur-Upgrade, idempotent, service-role-only (§3.3/§3.4) ─────
 -- Läuft am Ende, weil es Fixture-Tiers mutiert; frühere Assertions sind durch.
 select is(public.apply_upgrade('11111111-1111-1111-1111-111111111111', 'discover'),
-  'discover', 'apply_upgrade Basic→Discover gibt den neuen Tier zurück');
+  'discover', 'apply_upgrade Active→Discover gibt den neuen Tier zurück');
 select is((select tier from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
   'discover', 'profiles.tier steht danach auf discover');
 select is(public.apply_upgrade('11111111-1111-1111-1111-111111111111', 'discover'),
@@ -1991,7 +2030,7 @@ update public.profiles set tier = 'impact', activated_at = now(),
  where id = 'c7c7c7c7-0000-0000-0000-0000000000a1';
 -- Rang 1: unter der Schwelle 4, an der `members` aufgeht. Der Fall, den die
 -- Autoren-Klausel sonst überdeckt.
-update public.profiles set tier = 'basic', activated_at = now(),
+update public.profiles set tier = 'active', activated_at = now(),
        created_at = now() - interval '90 days'
  where id = 'c7c7c7c7-0000-0000-0000-0000000000a2';
 update public.profiles set tier = 'impact', activated_at = null,
@@ -2955,7 +2994,7 @@ update public.profiles set tier = 'impact', activated_at = now()
  where id::text like 'c9c9c9c9-0000-0000-0000-0000000000b%';
 -- Rang 1: sieht `members`-EVENTS, aber keine `members`-POSTS. Genau die
 -- Asymmetrie, die 22.16 festhält.
-update public.profiles set tier = 'basic'
+update public.profiles set tier = 'active'
  where id = 'c9c9c9c9-0000-0000-0000-0000000000b3';
 -- Bestätigt-Flag weg, Stufe bewusst `impact`: dahinter steht kein Stufen-Gate
 -- mehr, das einen Fehler noch auffinge (wie in §13/§20).
@@ -3264,7 +3303,7 @@ select is(
 select is(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
   $q$insert into public.profile_contacts
        (profile_id, email, phone, street, postal_code, city, state, country)
-     values ('33333333-3333-3333-3333-333333333333', 'discover@test.fbc', '+49 711 1',
+     values ('33333333-3333-3333-3333-333333333333', 'connect@test.fbc', '+49 711 1',
              'Hauptstr. 1', '70173', 'Stuttgart', 'Baden-Württemberg', 'DE')
      on conflict (profile_id) do update set
        street = excluded.street, postal_code = excluded.postal_code,
@@ -3287,7 +3326,7 @@ select is((select street from public.profile_contacts
 select is(pg_temp.try_as('33333333-3333-3333-3333-333333333333',
   $q$insert into public.profile_contacts
        (profile_id, email, phone, street, postal_code, city, state, country)
-     values ('33333333-3333-3333-3333-333333333333', 'discover@test.fbc', '+49 711 1',
+     values ('33333333-3333-3333-3333-333333333333', 'connect@test.fbc', '+49 711 1',
              'Hauptstr. 1', '71634', 'Ludwigsburg', 'Baden-Württemberg', 'DE')
      on conflict (profile_id) do update set
        street = excluded.street, postal_code = excluded.postal_code,

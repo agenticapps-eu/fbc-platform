@@ -1,4 +1,4 @@
-import { LEVELS, LEVEL_ORDER, isMembershipLevel } from "../../config/levels";
+import { DEFAULT_LEVEL, LEVELS, LEVEL_ORDER, isMembershipLevel } from "../../config/levels";
 import { Card } from "../ui/Card";
 
 /**
@@ -16,7 +16,10 @@ import { Card } from "../ui/Card";
  * schreiben — vier Zeilen, und sie stehen in der Historie dieses Commits.
  */
 export function MembershipSummary({ current }: { current: string | null }) {
-  const cur = current && isMembershipLevel(current) ? LEVELS[current] : LEVELS.basic;
+  // Rückfall über `DEFAULT_LEVEL` statt über einen Schlüssel: der Name der
+  // untersten Stufe hat mit AGE-903 gewechselt (`basic` → `active`), und ein
+  // fest geschriebener Schlüssel wäre beim nächsten Wechsel wieder falsch.
+  const cur = current && isMembershipLevel(current) ? LEVELS[current] : LEVELS[DEFAULT_LEVEL];
   const nextKey = LEVEL_ORDER.find((k) => LEVELS[k].rank === cur.rank + 1);
   return (
     <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

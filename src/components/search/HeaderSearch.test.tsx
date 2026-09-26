@@ -18,9 +18,14 @@ vi.mock("../../lib/supabase", () => ({
   supabase: { rpc: (...args: unknown[]) => rpc(...args) },
 }));
 
+// AGE-903: der „durchgelassene" Betrachter steht auf Rang 4, nicht mehr auf 3.
+// Die Absicht ist unveraendert — „ein Konto, das das Verzeichnis sehen darf" —,
+// nur ist das seit AGE-903 Rang 4. Ein Fortschreiben der 3 haette die ganze
+// Datei stillschweigend unter die Schwelle gesetzt, und die Zustaende „Treffer"
+// und „Nulltreffer" waeren beide zum Wandzustand geworden.
 let auth: { user: { id: string } | null; levelRank: number | null; tierLoading: boolean } = {
   user: { id: "u-discover" },
-  levelRank: 3,
+  levelRank: 4,
   tierLoading: false,
 };
 vi.mock("../../providers/auth-context", () => ({
@@ -120,7 +125,7 @@ function suchbegriffe(): unknown[] {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  auth = { user: { id: "u-discover" }, levelRank: 3, tierLoading: false };
+  auth = { user: { id: "u-discover" }, levelRank: 4, tierLoading: false };
   rpc.mockReset();
   rpc.mockResolvedValue({ data: [member("Anna Beispiel")], error: null });
 });

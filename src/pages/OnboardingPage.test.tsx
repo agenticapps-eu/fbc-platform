@@ -12,7 +12,7 @@ afterEach(() => localStorage.clear());
 function renderOnboarding() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <AuthFixture value={authAsTier("basic")}>
+    <AuthFixture value={authAsTier("active")}>
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/onboarding"]}>
           <OnboardingPage />

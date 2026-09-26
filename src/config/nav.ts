@@ -88,6 +88,18 @@ export const navItems: NavItem[] = [
     Component: AcademyPage,
     section: "entdecken",
     requiresAuth: true,
+    // AGE-903: eine NEUE Zusage, keine Anhebung. Bis hierher trug die Academy
+    // gar keine Stufenprüfung — gemessen, nicht angenommen: dieser Eintrag
+    // hatte ausschliesslich `requiresAuth: true`. Dass sie jedem aktivierten
+    // Konto offenstand, war nie beschlossen, sondern nie gebaut.
+    //
+    // Sie liegt hier und NICHT in der Datenbank, weil es keine Academy-Tabelle
+    // mit RLS gibt: die Lektionen sind kuratierte Inhalte. Ein Datenbank-Gate
+    // hätte nichts, woran es hängen könnte. Daraus folgt ausdrücklich, dass
+    // dies Komfort ist und keine Sicherheitsgrenze — dort, wo die Academy
+    // Mitgliederdaten anfasst (die Namensauflösung über `profiles_public`),
+    // gilt unverändert, was dort gilt.
+    minTier: "discover",
   },
   { path: "/events", label: "Events", Component: EventsPage, section: "entdecken" },
   {
@@ -95,19 +107,21 @@ export const navItems: NavItem[] = [
     label: "Mitglieder",
     Component: MitgliederPage,
     section: "entdecken",
-    // AGE-598: eine Stufe tiefer. Die LISTE beginnt seit 20260902150000 bei
-    // `connect` (Rang 2); die erweiterten Felder — Kompetenzen, Biete/Suche —
-    // bleiben unverändert bei `discover` (Rang 3), maskiert in derselben RPC.
+    // AGE-903: Liste UND erweiterte Felder tragen jetzt DIESELBE Schwelle,
+    // `discover` (Rang 4) — die unterste Clubstufe. Die zweistufige Trennung aus
+    // AGE-598 (Liste ab Rang 2, erweiterte Felder ab Rang 3) ist entfallen:
+    // unterhalb des Clubs gibt es kein Verzeichnis mehr, auch keins mit
+    // maskierten Spalten.
     //
     // Die Schranke folgt der Datenbank, sie führt sie nicht: die Zusage trägt
     // `search_directory`, hier steht nur Komfort. Sie wird trotzdem mitgezogen,
     // weil eine Fläche, die die RLS freigibt und die Navigation verbirgt,
     // schlechter ist als beides zu.
     //
-    // (Stand bis AGE-598 auf `discover`, mit der Begründung aus §2:
-    // „vollständiges Mitgliederverzeichnis" ab `discover`. Das VOLLSTÄNDIGE
-    // Verzeichnis fängt weiterhin dort an — nur die Liste nicht mehr.)
-    minTier: "connect",
+    // (Der Wert stand bis AGE-598 auf `discover`, dann auf `connect`, jetzt
+    // wieder auf `discover` — und das ist NICHT dieselbe Stufe wie beim ersten
+    // Mal: `discover` hiess damals Rang 3 und heisst jetzt Rang 4.)
+    minTier: "discover",
   },
   { path: "/aktivitaet", label: "Aktivität", Component: AktivitaetPage, section: "entdecken" },
 

@@ -44,8 +44,14 @@ describe("MembershipGate für Entdecken-Routen", () => {
 
     // Kein Redirect auf /login; stattdessen die „Mitglied werden"-Wand.
     expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
+    // AGE-903: die Route trägt jetzt ein `minTier`, und die Wand nennt deshalb
+    // die STUFE statt „Mitgliedern vorbehalten". Der Fall selbst ist unverändert
+    // — anon wird gemauert und nicht weggeleitet, und genau das prüft die Zeile
+    // darüber. Dass sich der Wandtext mit der Route ändert, ist eine Aussage
+    // ÜBER die Route: /academy ist seit AGE-903 stufen-gegatet und nicht mehr
+    // bloss auth-gegatet.
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist Mitgliedern vorbehalten" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Mitglied werden" })).toHaveAttribute(
       "href",
@@ -59,8 +65,12 @@ describe("MembershipGate für Entdecken-Routen", () => {
     expect(screen.queryByRole("tab", { name: "Alle" })).not.toBeInTheDocument();
   });
 
-  it("lässt ein eingeloggtes Mitglied das auth-gegatete Format sehen", async () => {
-    renderAt("/academy", authAsTier("basic"));
+  // AGE-903: die Academy verlangt jetzt die Clubstufe. Bis dahin trug ihr
+  // Eintrag ausschliesslich `requiresAuth: true` — gemessen, nicht angenommen —,
+  // und JEDES aktivierte Konto kam hinein. Das war nie beschlossen, sondern nie
+  // gebaut. Der Betrachter dieser Zusage steht deshalb jetzt auf `discover`.
+  it("lässt ein Clubmitglied die Academy sehen", async () => {
+    renderAt("/academy", authAsTier("discover"));
 
     // AGE-642: Die Seite kommt asynchron nach. Die Verneinung bleibt hinter der
     // positiven Zusage — vor dem Auflösen des Chunks fehlt die Wand ohnehin,
@@ -79,13 +89,15 @@ describe("MembershipGate für Entdecken-Routen", () => {
   // AGE-450: /meine-chancen ist keine gegatete Route mehr (leitet auf /). Diese
   // beiden Fälle — „Zur Startseite" statt „Mitglied werden", und der Upgrade-Weg —
   // prüfen wir jetzt an /mitglieder, der verbleibenden stufen-gegateten Route.
-  // Seit AGE-598 steht die Schranke dort auf `connect` statt `discover`; `basic`
-  // liegt weiterhin darunter, der Fall bleibt also derselbe.
+  // Die Schranke stand bis AGE-598 auf `discover`, dann auf `connect`, und seit
+  // AGE-903 wieder auf `discover` — bei gewandertem Rang (3 → 4). `active` liegt
+  // in jeder dieser Fassungen darunter, der Fall bleibt also derselbe; nur die
+  // Stufe im Wandtext wechselt mit.
   it("zeigt einer zu niedrigen Stufe die Stufen-Wand mit „Zur Startseite“ statt CTA", () => {
-    renderAt("/mitglieder", authAsTier("basic"));
+    renderAt("/mitglieder", authAsTier("active"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Connect verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
     ).toBeInTheDocument();
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
     // Seit AGE-616 ist der CTA ein Link — beide Rollen prüfen, sonst ginge eine
@@ -98,10 +110,11 @@ describe("MembershipGate für Entdecken-Routen", () => {
   // AGE-907: Diese Zusage ist umgedreht worden. Bis zum 25.09. hieß sie „bietet
   // eingeloggten Nutzern mit zu niedriger Stufe einen Upgrade-Weg zu
   // /mitgliedschaft" und klickte sich bis zur Preistabelle durch. Genau dieser
-  // Weg ist der 3.1.1-Befund — und er traf das Prüferkonto (`connect`) bei jedem
-  // `discover`-Bereich.
+  // Weg ist der 3.1.1-Befund — und er traf jedes Konto unterhalb der Clubstufe.
+  // (Das Prüferkonto der Store-Prüfung entsteht seit AGE-903 direkt auf
+  // `discover` und läuft nicht mehr in diese Wand.)
   it("bietet keinen Kaufweg, sondern nennt, wer die Stufe freischaltet", () => {
-    renderAt("/mitglieder", authAsTier("basic"));
+    renderAt("/mitglieder", authAsTier("active"));
 
     // Beide Rollen, wie beim CTA darüber: käme der Weg als Link zurück statt als
     // Knopf, ginge er hier sonst unbemerkt durch.
@@ -120,25 +133,34 @@ describe("MembershipGate für Entdecken-Routen", () => {
  * /verzeichnis und leitete zu niedrige Stufen weg. Als Top-Level-Eintrag „Mitglieder"
  * mauert es stattdessen (Spec §1) — die Zusage ist dieselbe, nur die Einlösung ist neu.
  */
-describe("Stufen-Gating für /mitglieder (min Connect)", () => {
-  it("zeigt Basic die Wand statt Mitgliederdaten", () => {
-    renderAt("/mitglieder", authAsTier("basic"));
+describe("Stufen-Gating für /mitglieder (min Discover)", () => {
+  it("zeigt Active die Wand statt Mitgliederdaten", () => {
+    renderAt("/mitglieder", authAsTier("active"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Connect verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 
-  // AGE-598. Diese Zusage konnte es vorher nicht geben: `connect` stand unter
-  // der Schranke und sah dieselbe Wand wie `basic`. Sie ist der Grund des
-  // Changes, an der Fläche gemessen — und die Wache darüber, dass die Schranke
-  // nicht später stillschweigend zurückwandert.
-  it("lässt Connect das Verzeichnis sehen — die neue Schwelle", async () => {
+  // AGE-903 — DIESE ZUSAGE IST UMGEDREHT, und sie ist die wichtigste der Datei.
+  //
+  // Sie hiess bis hierher „lässt Connect das Verzeichnis sehen — die neue
+  // Schwelle" und war mit AGE-598 entstanden. Jetzt sagt sie das Gegenteil zu,
+  // und zwar nicht, weil AGE-598 falsch war, sondern weil `connect` inzwischen
+  // ein anderer RANG ist: damals 2 und unter der Schranke, seit AGE-903 Rang 3
+  // und weiterhin unter ihr — nur liegt die Schranke jetzt bei 4 statt bei 2.
+  //
+  // Rang 3 ist damit der teuerste Fall der Datei: der höchste Rang ausserhalb
+  // des Clubs. Hielte die Wand bei ihm nicht, hielte sie nirgends, und die
+  // Zusage über `active` allein hätte das nicht gezeigt.
+  it("zeigt Connect die Wand — Rang 3 ist der höchste Rang ausserhalb des Clubs", () => {
     renderAt("/mitglieder", authAsTier("connect"));
 
-    await screen.findByRole("heading", { name: "Verzeichnis" });
-    expect(screen.getByRole("heading", { name: "Verzeichnis" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 
   it("lässt Discover das Verzeichnis sehen", async () => {
