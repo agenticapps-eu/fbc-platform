@@ -181,7 +181,13 @@ describe("Der Upload zu Google Play", () => {
     // `internal` ist Donalds Entscheidung vom 25.09., keine Vermutung — und
     // deshalb darf sie hier stehen. Sie zahlt NICHT auf die 12/14-Testpflicht
     // ein; der Wechsel auf den geschlossenen Kanal aendert diese Zeile.
-    expect(rein).toContain("track: internal");
+    //
+    // `tracks` im PLURAL: Der erste echte Lauf hat `track` als veraltet
+    // gemeldet. Die Verneinung darunter haelt die Einzahl fern — sonst
+    // koennte sie stillschweigend zurueckkehren, denn die Action nimmt
+    // beide noch an.
+    expect(rein).toContain("tracks: internal");
+    expect(rein).not.toMatch(/^\s*track:\s/m);
     expect(rein).toContain("packageName: com.effbeezee.app");
   });
 });
