@@ -6,20 +6,30 @@
 
 > ## ⚠ ZUERST
 >
-> **PR #436 ist gemergt** (`4002637`), AGE-903 steht auf Done. **Der Deploy
-> steht still, und das ist gewollt:** `drift-gate` hat den Lauf
-> [36255511834](https://github.com/agenticapps-eu/fbc-platform/actions/runs/36255511834)
-> abgebrochen — „DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260926120000".
-> Genau eine Migration, meine.
+> **PR #436 und #437 sind gemergt**, AGE-903 steht auf Done. **Der Deploy
+> steht still, und das ist gewollt:** `drift-gate` bricht ab mit „DRIFT — lokal
+> vorhanden, auf dem Ziel fehlend: 20260926120000". Genau eine Migration, meine.
 >
 > **Die nächsten zwei Handgriffe brauchen Donalds AUSDRÜCKLICHE Freigabe** und
 > sind von der stehenden Merge-Freigabe NICHT gedeckt:
 >
 > 1. `gh workflow run migrate-prod` (PROD-Schreibzugriff)
-> 2. `gh run rerun --failed 36255511834` (gibt Deploy und Functions frei)
+> 2. den blockierten Deploy wiederholen — gibt Deploy und Functions frei
 >
-> `migrate-dev` ist im selben Lauf **durchgelaufen** — DEV trägt die Leiter V5
-> bereits.
+> **Die Lauf-ID hier NICHT abschreiben.** Jeder weitere Merge auf `main` erzeugt
+> einen neuen blockierten Lauf, und `gh run rerun` baut den Commit *jenes*
+> Laufs, nicht den aktuellen `main` — ein Re-Run auf einem alten Lauf rollt das
+> Frontend zurück (achte Deploy-Falle, 27.08.). Den jüngsten holen:
+>
+> ```
+> gh run list --branch main --workflow Deploy --limit 1 --json databaseId,headSha
+> gh run rerun --failed <diese ID>
+> ```
+>
+> Beim Verlassen war das `36256499264` auf `93730e4`.
+>
+> `migrate-dev` ist in jedem dieser Läufe **durchgelaufen** — DEV trägt die
+> Leiter V5 bereits.
 
 ## Accomplished
 
