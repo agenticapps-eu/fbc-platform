@@ -3,12 +3,22 @@
 AGE-903.
 
 Detlev hat am 23.09. eine neue Zugangsleiter vorgelegt (V5-Funktionsmatrix),
-am 25.09. telefonisch nachgeschärft. Sechs Stufen bleiben, aber sie heissen
-anders und sie **rutschen**: `basic` wird ACTIVE, `connect` wird BOOST,
-`discover` wird CONNECT, `exchange` wird DISCOVER, `focus` und `impact`
-behalten ihre Plätze als FOCUS und IMPACT. Der entscheidende Satz dahinter:
-**der FBC beginnt erst bei DISCOVER.** ACTIVE, BOOST und CONNECT liegen
-ausserhalb und werden nur technisch vorgehalten.
+am 25.09. telefonisch nachgeschärft. Sechs Stufen bleiben, aber die **Rechte
+rutschen um einen Rang nach oben**, und die Stufen heissen neu.
+
+Drei Dinge werden hier leicht verwechselt, deshalb getrennt:
+
+- **Die Leiter danach**, von unten nach oben: ACTIVE (1) · BOOST (2) ·
+  CONNECT (3) · DISCOVER (4) · FOCUS (5) · IMPACT (6).
+- **Die Rechte wandern**: was heute ein `basic`-Konto darf, darf danach
+  ACTIVE; was `connect` darf, danach BOOST; was `discover` darf, danach
+  CONNECT; was `exchange` darf, danach DISCOVER. FOCUS und IMPACT bleiben.
+- **Die Konten wandern NICHT genauso** — das ist eine eigene Entscheidung und
+  steht unten unter „Bestandsmitglieder ziehen nicht rangtreu um". Ein Konto
+  auf altem `discover` bekommt nicht CONNECT, sondern DISCOVER.
+
+Der entscheidende Satz dahinter: **der FBC beginnt erst bei DISCOVER.** ACTIVE,
+BOOST und CONNECT liegen ausserhalb und werden nur technisch vorgehalten.
 
 Damit ist die offene Namensfrage BOOST/Basic aus Lastenheft C.1 entschieden.
 

@@ -77,6 +77,18 @@ Clubzugang, weil der neue Rang 3 CONNECT heisst und ausserhalb liegt. Die
 Zuordnung ist deshalb bewusst nicht rangerhaltend: sie hält die
 **Mitgliedschaft** konstant, nicht die Zahl.
 
+**Für altes `connect` ist das eine Anhebung, und die ist ausdrücklich
+gewollt.** Rangtreu wäre `connect` → CONNECT, denn ein Konto auf altem Rang 2
+zahlte nichts und trug keine Clubfunktion im heutigen Sinn. Es trug aber die
+Verzeichnisliste — `search_directory` lässt es seit AGE-598 ab Rang 2 ein —,
+und diese Liste geht in der neuen Leiter in die Clubstufe DISCOVER auf
+(„Liste und erweiterte Spalten tragen dieselbe Schwelle"). Ein Konto, das die
+Liste heute sieht, verlöre sie beim rangtreuen Umzug. Die Zuordnung folgt damit
+derselben Regel wie überall sonst: **niemand verliert, was er heute hat.** Auf
+PROD ist die Kohorte leer (0 Konten, gelesen am 25.09.), die Entscheidung
+wirkt also nur auf Umgebungen mit Testdaten — festgeschrieben wird sie
+trotzdem, weil eine Regel, die nur zufällig niemanden trifft, keine Regel ist.
+
 Die Zuordnung SHALL vollständig sein — nach der Migration SHALL kein Profil auf
 einem Schlüssel stehen, den `membership_tiers` nicht mehr führt.
 

@@ -56,12 +56,39 @@ Umschreiben der Release-Chronik.
 
 ## Decisions
 
-### 1. Zwischenränge 101…106 statt Lockerung der Unique-Bedingung
+### 1. Zwei Zwischenränge statt Lockerung der Unique-Bedingung
 
 `membership_tiers.level_rank` trägt eine Unique-Bedingung, und die Zielränge
-überlappen mit den bestehenden. Die neuen Zeilen entstehen deshalb zuerst auf
-temporären Rängen 101…106 und bekommen ihre echten Ränge zum Schluss — exakt
-das Verfahren von `20260715150000`.
+überlappen mit den bestehenden. Das Verfahren ist das von `20260715150000` —
+aber es braucht hier **zwei** temporäre Ränge, nicht sechs. Nachgerechnet:
+
+| Schlüssel | heute | danach | Art |
+|---|---|---|---|
+| `active` | — | 1 | **neu** |
+| `boost` | — | 2 | **neu** |
+| `connect` | 2 | 3 | bleibt, Rang steigt |
+| `discover` | 3 | 4 | bleibt, Rang steigt |
+| `focus` | 5 | 5 | unverändert |
+| `impact` | 6 | 6 | unverändert |
+| `basic` | 1 | — | entfällt |
+| `exchange` | 4 | — | entfällt |
+
+Nur `active` und `boost` sind neue Zeilen, und nur sie kollidieren beim Anlegen
+(Rang 1 hält noch `basic`, Rang 2 noch `connect`). Sie entstehen deshalb auf
+101 und 102. Die gewählte Reihenfolge, ausdrücklich benannt, weil beide
+denkbaren Wege funktionieren und ein ungenannter Weg den Migrationsschritt
+rätselhaft macht:
+
+1. `active` (101) und `boost` (102) anlegen — sie müssen existieren, bevor ein
+   Profil auf sie zeigen darf (`profiles_tier_fkey`).
+2. Profile umhängen: `basic` → `active`, `exchange` → `discover`,
+   `connect` → `discover`.
+3. `basic` und `exchange` löschen — jetzt sind die Ränge 1 und 4 frei.
+4. `discover` 3 → 4, danach `connect` 2 → 3. Diese Reihenfolge ist erzwungen:
+   umgekehrt liefe `connect` in den noch belegten Rang 3.
+5. `active` 101 → 1, `boost` 102 → 2.
+
+`focus` und `impact` werden in keinem Schritt angefasst.
 
 *Verworfen: die Unique-Bedingung für die Dauer der Migration fallen lassen.*
 Kürzer, und genau deshalb falsch: die Bedingung ist das Einzige, was verhindert,
@@ -146,6 +173,36 @@ aufzuschreiben. Die Delta-Spec sagt deshalb ausdrücklich, dass die Schwelle der
 **Rückfallwert** ist und dass jede Aussage über Kontaktanfrage-Rechte zuerst
 `platform_settings` lesen muss.
 
+### 8. Die Katalog-Kommentare werden in derselben Migration richtiggestellt
+
+Sechs Objekte tragen heute einen Kommentar, der die alte Leiter als Wahrheit
+ausgibt — gemessen am 26.09. aus `pg_description`:
+
+| Objekt | Kommentar sagt heute |
+|---|---|
+| `has_level(int)` | „Ränge: basic=1 connect=2 discover=3 exchange=4 focus=5 impact=6" |
+| `membership_tiers` | „level_rank steigt basic=1 … impact=6" |
+| `darf_kontaktanfrage_senden` | „basic nein, connect nur an genau connect, ab discover an alle" |
+| `register_for_event` | „members ab `discover` (rank 3) … war exchange" |
+| `search_directory` | „ab `connect` (Rang 2) … UNVERÄNDERTEN Rang-3-Policy" |
+| `profiles_select_self_or_discover` | trägt **gar keinen** — die Vorbild-Migration setzt einen (Zeile 182), ein späterer Ersatz der Policy hat ihn verloren |
+
+`apply_upgrade` und `profiles_public` bleiben richtig: die eine rechnet rein mit
+Rängen, die andere beschreibt `branche`, das unverändert bleibt.
+
+Der Kommentar auf `has_level` ist der teuerste von ihnen. Er ist die einzige
+Stelle im Katalog, an der die Rangtabelle ausgeschrieben steht, und genau die
+Tabelle ändert sich. Eine Sitzung, die den Katalog befragt statt die
+Migrationen zu lesen — was dieser Change selbst als den richtigen Weg
+beschreibt —, bekäme danach die alte Leiter als Antwort.
+
+*Verworfen: die Kommentare in einer Folge-Migration nachziehen.* Zwischen
+beiden Läufen stünde ein Katalog, der sich selbst widerspricht, und der zweite
+Lauf wäre das Erste, was unter Zeitdruck entfällt. `20260715150000` schreibt
+Kommentare auf **jedes** angefasste Objekt (Zeilen 74, 111, 141, 165, 182, 252,
+276, 297, 313, 431, 438, 444); dieser Change beansprucht, ihrem Muster zu
+folgen.
+
 ## Risks / Trade-offs
 
 **Eine halb angewendete Migration lässt Konten auf einem Schlüssel mit falscher
@@ -171,9 +228,12 @@ ist am 25.09. nachweislich über zwei Stationen gewandert.
 Rang. Die Schwelle wird deshalb ausschliesslich in pgTAP mit
 `open_contact = false` geprüft, nie an der Oberfläche.
 
-**~160 Literale in pgTAP-Tests und im Demo-Seed brechen** → Das ist der
+**62 Literale in pgTAP-Tests und im Demo-Seed brechen** → Das ist der
 gewünschte Ausgang: sie werden in CI rot, bevor sie jemanden erreichen. Sie
-gehören in denselben PR, sonst ist `main` rot.
+gehören in denselben PR, sonst ist `main` rot. Gemessen am 26.09.: 62
+Vorkommen der entfallenden Schlüssel in 14 Dateien, davon drei in
+Kommentaren — Schwerpunkte `rls_test.sql` (15), `demo_personas.sql` (14),
+`admin_set_tier_test.sql` (6).
 
 **`drift-gate` blockt nach dem Merge jeden Deploy** → bis `migrate-prod`
 dispatcht und der Lauf mit `gh run rerun --failed` wiederholt ist. Gehört in den
@@ -223,3 +283,14 @@ Rückweg ist deshalb eine eigene Migration, keine Umkehrung dieser.
   Suche, eigene Events) später.
 - **Die Adresse des Prüferkontos** entscheidet Donald. Kennung und Kennwort
   gehören nach Infisical, nicht ins Repo.
+- **Trägt CONNECT wirklich 150 €?** Die Anforderung „Six-level tier ladder"
+  begründet ausdrücklich, warum BOOST 0 € trägt — „ein Preis, den niemand
+  zahlen kann, wäre eine Zusage ohne Gegenstand" —, setzt CONNECT aber auf
+  150 €. CONNECT liegt nach derselben Spec ebenso ausserhalb des Clubs und ist
+  ebenso nicht kaufbar. Im Frontend ist `PAID` (`MitgliedschaftPage.tsx:13`)
+  die Liste der Stufen **mit Kaufknopf**; CONNECT landete dort und böte einen
+  Kauf für eine Stufe ohne Funktion. Ob die 150 € aus Detlevs V5-Matrix
+  stammen oder aus der alten Rang-3-Zeile mitgeschleift sind, ist nicht
+  prüfbar, solange die Matrix nicht lesbar ist. Bis zu Donalds Entscheidung
+  bleibt der Wert wie im Delta; die Alternative wäre CONNECT 0 € und
+  `PAID = ["discover", "focus", "impact"]`.
