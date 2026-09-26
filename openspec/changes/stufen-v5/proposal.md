@@ -35,11 +35,13 @@ sechs RLS-Policies, eine WITH-CHECK-Bedingung, drei RPC-Rümpfe und eine
 - **Die Academy verlangt künftig DISCOVER.** Bisher stand sie jedem aktivierten
   Konto offen, ohne jede Stufenprüfung — das war so nie beschlossen, sondern
   nie gebaut.
-- **Wer sich anmelden darf, darf auch absagen.** Heute darf ein Konto auf Rang 3
-  sich zu einem Mitglieder-Event anmelden, seine Anmeldung danach aber nicht
-  mehr ändern; bei einem öffentlichen Event kann sich jedes aktivierte Konto
-  anmelden und **nie** absagen. Anmelden und Absagen tragen künftig dieselbe
-  Bedingung.
+- **Ab DISCOVER kann sich jedes Mitglied anmelden und wieder absagen.** Heute
+  gilt das nicht: ein Konto auf Rang 3 darf sich zu einem Mitglieder-Event
+  anmelden, seine Anmeldung danach aber nicht mehr ändern, und bei einem
+  öffentlichen Event kann sich jedes aktivierte Konto anmelden und **nie**
+  absagen. Anmelden und Absagen tragen künftig dieselbe Bedingung — unterhalb
+  DISCOVER gelten beide zugleich oder keines von beiden. Öffentliche Events
+  bleiben dabei „wie bisher" offen, dann aber für beide Handlungen.
 - **Im Admin stehen beim Stufe-Setzen nur noch DISCOVER, FOCUS und IMPACT zur
   Wahl.** Ein Bestandskonto auf einer der drei unteren Stufen wird weiter
   angezeigt, aber nicht mehr dorthin gesetzt.

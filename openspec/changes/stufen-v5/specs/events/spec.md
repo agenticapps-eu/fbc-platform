@@ -83,11 +83,22 @@ Fehlermeldung nach dem Klick — den rohen englischen Text der Datenbank
 
 ### Requirement: Wer sich anmelden darf, darf auch absagen
 
-Das System SHALL die Bedingung, unter der ein Mitglied seine eigene Anmeldung
-ändern darf, **gleich** der Bedingung halten, unter der es sich anmelden darf.
-Die `WITH CHECK`-Klausel von `regs_write_own` SHALL dieselbe
+**Ab DISCOVER (Rang 4) SHALL ein Mitglied sich anmelden und absagen dürfen** —
+beides, zu jedem Event, ohne weitere Bedingung ausser den unveränderten
+(Aktivierung, Kapazität, eigene Zeile). Das ist die Regel; alles Folgende sagt
+nur, wie sie durchgesetzt wird und was unterhalb gilt.
+
+Das System SHALL dazu die Bedingung, unter der ein Mitglied seine eigene
+Anmeldung ändern darf, **gleich** der Bedingung halten, unter der es sich
+anmelden darf. Die `WITH CHECK`-Klausel von `regs_write_own` SHALL dieselbe
 sichtbarkeitsabhängige Prüfung tragen wie `register_for_event`: bei einem
 `public`-Event keine Rangprüfung, bei einem `members`-Event Rang 4 oder Host.
+
+**Unterhalb Rang 4 SHALL beides zugleich gelten oder keines von beiden.** Bei
+einem `members`-Event ist es keines: wer sich nicht anmelden darf, hat nichts
+abzusagen. Bei einem `public`-Event sind es beide: das Issue hält öffentliche
+Events unterhalb DISCOVER ausdrücklich „wie bisher" offen, und „anmelden ja,
+absagen nein" wäre keine Schwelle, sondern eine Falle.
 
 **Das behebt einen Widerspruch, der schon vor AGE-903 bestand.** Gemessen am
 25.09. verlangte `register_for_event` Rang 3 für ein `members`-Event, während
@@ -118,6 +129,13 @@ nicht diese Bedingung.
   angemeldet ist
 - **WHEN** es seine Anmeldung ändert
 - **THEN** gelingt das UPDATE
+
+#### Scenario: Ab DISCOVER gelingen beide Handlungen am selben Event
+
+- **GIVEN** ein aktiviertes Mitglied auf Rang 4, 5 oder 6 und ein
+  `members`-Event, das es nicht ausrichtet
+- **WHEN** es sich anmeldet und anschliessend wieder absagt
+- **THEN** gelingen **beide** Schritte — das ist die Zusage in einem Satz
 
 #### Scenario: Unterhalb der Schwelle entsteht gar keine Anmeldung, die hängen bliebe
 
