@@ -158,6 +158,77 @@ zum Verzeichnis. Er wird nicht von Hand nachgezogen; das behauptete eine
 Bindung, die es nie gab.
 
 
+## Diff-Review (Schritt 4) — 26.09., auf den Diff statt auf den Plan
+
+Zwei Anbieter auf `a0493a0..HEAD`, eingeschränkt auf den sicherheitsrelevanten
+Teil (Migration, Edge Function, `src/config`, `src/lib`, `src/components`,
+`PublicProfilePage`, `AdminMitgliederPage`) — 1944 Diffzeilen. Beide
+`REQUEST-CHANGES`.
+
+| Arm | Modell | Befunde |
+|---|---|---|
+| opencode | `hf:moonshotai/Kimi-K3` | 4 (1 HOCH, 2 MITTEL, 1 NIEDRIG) |
+| gemini | `gemini-1.5-pro-001` | 2 (1 HOCH, 1 NIEDRIG) |
+
+### Übernommen
+
+**A · Die `it.each`-Liste deckte fünf Stufen ab und behauptete sechs**
+(opencode HOCH, gemini NIEDRIG — der einzige Befund, den beide fanden).
+`AppShell.identity.test.tsx:99` las
+`["active"], ["connect"], ["discover"], ["discover"], ["focus"], ["impact"]` —
+`boost` fehlte, `discover` stand doppelt. Ursache ist meine mechanische
+Umbenennung `"exchange"` → `"discover"`: an dieser Stelle stand `discover`
+bereits, und der Ersatz hat es verdoppelt. Der Kommentar darüber sagt
+ausdrücklich „über ALLE sechs Stufen".
+
+**Und die Suche danach fand eine ZWEITE Kollision, die kein Reviewer hatte:**
+`MitgliedschaftPage.test.tsx:144`, dieselbe Liste, derselbe Fehler. Beide
+behoben. Das ist der eigentliche Ertrag dieses Befunds — ein mechanischer
+Ersatz kollidiert dort, wo das Ziel schon vorkam, und eine solche Stelle sieht
+nach dem Ersatz vollkommen plausibel aus.
+
+**B · Die Filterspalte blendete während des Ladens auch für Clubmitglieder aus**
+(opencode NIEDRIG, berechtigt). `erweiterteFilter` rechnete mit
+`(levelRank ?? 0)` und machte damit aus „noch nicht geladen" ein „Rang 0" — ein
+Konto ab Rang 4 sah die vier Filter erst nicht und dann doch. Das widersprach
+der Begründung, die daneben stehen blieb: ausgeblendet wird, was
+*systematisch* nichts findet.
+
+Behoben als `levelRank === null || levelRank >= CLUB_RANK` — dieselbe Regel, die
+`MembershipGate` und `HeaderSearch` schon tragen: ein Ladezustand ist kein
+Ausschlussgrund. Mit Zusage in `MemberDirectory.stufen.test.tsx`, und die ist
+**RED gefahren**: mit dem alten Ausdruck fällt sie durch.
+
+**C · Die Schlussprüfung hing an einer Textdarstellung** (opencode MITTEL — in
+der Sache gegenstandslos, in der Form berechtigt). Der Einwand lautete, ein
+`numeric`-Spaltentyp rendere `300.00` und liesse den Wächter bei korrekter
+Leiter brechen. Gemessen: `price_year` ist `integer`
+(`format_type` über `pg_attribute`), und der Typ steht zum Zeitpunkt dieser
+Migration durch die Migrationen davor fest — die sind unveränderlich. Der
+Befund kann also nicht eintreten.
+
+Der Cast `::int` ist trotzdem eingebaut: er kostet nichts, und ohne ihn hängt
+eine Zusage an einer Messung, die ein späterer Leser erst nachschlagen müsste.
+Beide Richtungen des Wächters sind danach gefahren — er schweigt bei der
+richtigen Leiter und bricht bei `discover = 299 €` mit Nennung des
+Ist-Zustands ab.
+
+### Nicht übernommen, mit Messung
+
+**D · gemini HOCH: „Die Migration aktualisiert die Preise für `focus` und
+`impact` nicht."** — **Gegenstandslos, und mit verkehrter Ausfallrichtung.**
+Beide trugen ihre Preise schon vorher und tragen sie unverändert; gemessen nach
+dem Lauf: `focus` 5/600, `impact` 6/1200. Der Schluss-Wächter der Migration
+vergleicht genau diese Preise und ist durchgelaufen. Es gibt nichts zu
+aktualisieren.
+
+**E · opencode MITTEL: „Der Diff belegt nicht, dass es keine weiteren Aufrufer
+von `darfKontaktanfrageSenden` gibt."** — Der Einwand ist methodisch richtig
+und die Messung nachgereicht: `grep -rn` über `src` findet die Definition, den
+Import und **einen** Aufruf (`PublicProfilePage.tsx:99`), alle drei im Diff.
+`npx tsc --noEmit` ist sauber — eine zweistellige Restsignatur wäre dort ein
+Fehler.
+
 <!-- openspec-review-trailer v1
 implementing-host: claude
 digest: sha256:390f1a5aabc5f8d3758b2e56d1de16a46890368eb72e955ddafcb8c01048f347

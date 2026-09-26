@@ -476,11 +476,15 @@ comment on table public.membership_tiers is
 -- Preis: beides sind gültige Werte in gültigen Zeilen. Genau dafür ist diese
 -- Prüfung da. Gegenprobe ebenfalls gefahren: mit `boost` auf Rang 9 bricht sie
 -- ab und schreibt die vorgefundene Leiter in die Meldung.
+-- Die Zahlen werden vor der Verkettung ausdruecklich auf `int` gecastet. Sie
+-- SIND `integer` (gemessen), der Vergleich stimmt also auch ohne — aber dann
+-- haengt eine Zusage an einer Textdarstellung, und ein spaeterer Leser muesste
+-- den Spaltentyp nachschlagen, um ihr zu trauen.
 do $$
 declare
   v_leiter text;
 begin
-  select string_agg(key || '=' || level_rank || '/' || price_year || '€', ' '
+  select string_agg(key || '=' || level_rank::int || '/' || price_year::int || '€', ' '
                     order by level_rank)
     into v_leiter from public.membership_tiers;
   if v_leiter is distinct from

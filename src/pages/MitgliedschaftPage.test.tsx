@@ -141,7 +141,7 @@ describe("MitgliedschaftPage", () => {
 
     it("sieht keine einzige Preiskarte", () => {
       renderPage();
-      for (const key of ["active", "connect", "discover", "discover", "focus", "impact"])
+      for (const key of ["active", "boost", "connect", "discover", "focus", "impact"])
         expect(screen.queryByTestId(`level-${key}`)).not.toBeInTheDocument();
     });
 

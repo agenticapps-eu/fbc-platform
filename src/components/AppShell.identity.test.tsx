@@ -89,14 +89,14 @@ describe("Identität im Rahmen (AGE-494)", () => {
    * Stufe weiterhin". Genau diese Unterscheidung war das 3.1.1-Problem: sie
    * verbarg den Weg zum Kaufen vor dem Import-Kreis und zeigte ihn dem
    * Prüferkonto, das auf `connect` steht (`docs/pruefer-zugang.md`), und jedem
-   * selbstregistrierten Mitglied auf `basic`.
+   * selbstregistrierten Mitglied auf `active` (Rang 1).
    *
    * Der Kaufweg ruht, also gibt es keine Stufe mehr, die ihn sieht. Die erste
    * Zusage allein stehen zu lassen wäre wertlos geworden: sie ist jetzt für jede
    * Stufe wahr und würde nicht mehr bemerken, wenn der Eintrag für die anderen
    * zurückkäme. Deshalb wird über ALLE sechs Stufen gemessen.
    */
-  it.each([["active"], ["connect"], ["discover"], ["discover"], ["focus"], ["impact"]] as const)(
+  it.each([["active"], ["boost"], ["connect"], ["discover"], ["focus"], ["impact"]] as const)(
     "zeigt „Mitgliedschaft\" im Profilmenü auf keiner Stufe — hier %s",
     (stufe) => {
       renderApp(

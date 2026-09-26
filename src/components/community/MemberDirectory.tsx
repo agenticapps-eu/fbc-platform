@@ -135,8 +135,17 @@ export default function MemberDirectory() {
   // sperrt NICHT, solange die Stufe noch unbekannt ist (MembershipGate.tsx) —
   // in diesem Fenster rendert die Fläche für jeden, und dann trägt sie.
   //
+  // **Eine unbekannte Stufe blendet deshalb NICHTS aus.** Vorher stand hier
+  // `(levelRank ?? 0)`, und das machte aus „noch nicht geladen" ein „Rang 0":
+  // ein Clubmitglied sah die vier Filter erst gar nicht und dann doch, sie
+  // erschienen also nachträglich. Das ist dieselbe Regel, die `MembershipGate`
+  // und `HeaderSearch` schon tragen — ein Ladezustand ist kein Ausschlussgrund,
+  // und eine Aussage erscheint erst, wenn sie stimmt. Ein Filter, der in diesem
+  // Fenster zu viel zeigt, findet höchstens nichts; einer, der zu wenig zeigt,
+  // nimmt einem Berechtigten eine Fähigkeit weg.
+  //
   // Komfort, keine Grenze — die trägt die RPC.
-  const erweiterteFilter = (levelRank ?? 0) >= CLUB_RANK;
+  const erweiterteFilter = levelRank === null || levelRank >= CLUB_RANK;
   const contacts = useQuery({
     queryKey: contactsQueryKey(uid ?? ""),
     queryFn: () => fetchContactIds(uid!),

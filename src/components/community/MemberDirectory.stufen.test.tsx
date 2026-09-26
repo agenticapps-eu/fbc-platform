@@ -174,4 +174,28 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
 
     expect(screen.queryByText(/ab Discover/i)).toBeNull();
   });
+
+  /**
+   * Befund des Diff-Reviews (opencode, AGE-903). Solange die Stufe noch LÄDT,
+   * ist `levelRank` null. Bis hierher rechnete die Fläche das mit `?? 0` in
+   * „Rang 0" um — ein Clubmitglied sah die vier Filter also erst nicht und dann
+   * doch, sie erschienen nachträglich.
+   *
+   * Das widersprach der Begründung, die daneben stehen blieb: ausgeblendet wird,
+   * was SYSTEMATISCH nichts findet. Ein Filter, der in diesem Fenster zu viel
+   * zeigt, findet höchstens nichts; einer, der zu wenig zeigt, nimmt einem
+   * Berechtigten eine Fähigkeit weg. Dieselbe Regel tragen `MembershipGate` und
+   * `HeaderSearch` schon: ein Ladezustand ist kein Ausschlussgrund.
+   */
+  it("blendet nichts aus, solange die Stufe noch nicht feststeht", async () => {
+    renderDirectory(null);
+    await screen.findByLabelText(/Volltextsuche/i);
+
+    expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Thema/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Sucht \/ bietet/i)).toBeInTheDocument();
+    // Und erst recht kein Hinweis, der eine Stufe nennt, die das Konto
+    // vielleicht längst hat.
+    expect(screen.queryByText(/ab Discover/i)).toBeNull();
+  });
 });
