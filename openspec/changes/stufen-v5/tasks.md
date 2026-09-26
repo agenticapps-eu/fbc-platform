@@ -173,17 +173,55 @@ grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
 - [x] Release-Geschichten **nicht** angefasst; nach `pnpm build` wurde
       `src/content/release-entries.generated.ts` zurückgesetzt
 
-## 6 · Abnahme
+## 6 · Abnahme — erledigt
 
-- [ ] `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `openspec validate --all`
-- [ ] Nach jedem `pnpm build`, vor jedem `git add`:
-      `git checkout -- src/content/release-entries.generated.ts`
-- [ ] Sichtprobe am lokalen Stack: je ein Konto auf Rang 1, 3 und 4 —
-      Verzeichnis, Academy, Event, Kontaktanfrage
-- [ ] Verteilung vor/nach der Migration dokumentiert, als Zahl ohne Namen
-- [ ] Oberfläche nennt nur DISCOVER · FOCUS · IMPACT — kein „Basic", kein
+- [x] `pnpm test` (2928 Zusagen), `npx tsc --noEmit` (sauber), `pnpm lint`
+      (0 Fehler), `openspec validate --all` (36/0), Deno (15 Zusagen),
+      pgTAP über `supabase test db` (40 Dateien, 1391 Zusagen)
+- [x] Nach `pnpm build` wurde `src/content/release-entries.generated.ts`
+      zurückgesetzt
+- [x] **Sichtprobe am lokalen Stack**, je ein Konto auf Rang 1, 3 und 4. Zuerst
+      auf der DATENEBENE, jeweils unter der eigenen Identität und über den
+      ANON-Schlüssel — also auf dem Weg der Oberfläche:
+
+      | Rang | `profiles` | `offers` | `interests` | `search_directory` | Anfrage |
+      |---|---|---|---|---|---|
+      | 1 `active` | 1 (die eigene) | 0 | 0 | 1 | nein |
+      | 3 `connect` | 1 (die eigene) | 0 | 0 | 1 | nein |
+      | 4 `discover` | 31 | 44 | 18 | 31 | ja |
+
+      Dann an der Oberfläche, alle vier Flächen:
+
+      * `/mitglieder` — Rang 3 sieht „Dieser Bereich ist ab Discover verfügbar",
+        Rang 4 das Verzeichnis mit **31 Profillinks** und allen vier sonst
+        ausgeblendeten Filtern
+      * `/academy` — Rang 3 dieselbe Wand und eine **leere Reiterzeile** (der
+        Inhalt ist wirklich weg, nicht nur die Überschrift getauscht), Rang 4
+        die drei Reiter
+      * Mitglieder-Event — Rang 3: Anmeldeknopf **gesperrt**, Grund vor dem
+        Klick („Dieses Event ist Mitgliedern ab Stufe ‚Discover' vorbehalten");
+        Rang 4: bedienbar
+      * Kontaktanfrage — **hier greift die dokumentierte Falle:** bei
+        `open_contact = true` sieht auch Rang 3 den Knopf, und das ist richtig,
+        der Schalter steht vor der Schwelle. Erst mit `open_contact = false`
+        wird die Schwelle sichtbar: Rang 3 kein Knopf und **ein** Satz
+        („ab der Mitgliedsstufe Discover … an jedes Mitglied"), Rang 4 Knopf.
+        Der Schalter wurde danach auf seinen vorgefundenen Wert zurückgesetzt
+- [x] **Belegt, dass die App wirklich lokal hängt** statt es anzunehmen:
+      `performance.getEntriesByType('resource')` zeigt 16 API-Anfragen, alle an
+      `127.0.0.1:54321`. Die Oberfläche sähe sonst identisch zu PROD aus
+- [x] Verteilung vor/nach dokumentiert, als Zahl ohne Namen — lokal 28 Profile
+      vorher wie nachher, PROD 78
+- [x] Aufgeräumt: `.env.local` gelöscht, vite beendet, die drei Konten entfernt,
+      `open_contact` zurück auf `true`, Browser freigegeben. **Dabei ein Rest
+      aufgefallen:** `delete from auth.users` räumt die Profilzeile NICHT mit
+      weg (die Kaskade ist seit AGE-708 bewusst entfernt) — drei Waisen blieben
+      stehen, und die Kontenzahl meldete trotzdem „0". Aufgefallen nur, weil die
+      Verteilung vorher und nachher gezählt wurde: 31 statt 28. Nachgetragen in
+      der Memory-Notiz zur Kontolöschung
+- [x] Oberfläche nennt nur DISCOVER · FOCUS · IMPACT — kein „Basic", kein
       „Exchange"
-- [ ] Code-Review auf den **Diff**
+- [x] Code-Review auf den **Diff** (zwei Anbieter, in `REVIEWS.md` aufgelöst)
 - [ ] PR-Text nennt `migrate-prod` und `gh run rerun --failed`
 
 ## 7 · Nach dem Merge (ausdrückliche Freigabe nötig)
