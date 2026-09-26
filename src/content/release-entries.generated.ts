@@ -5,6 +5,21 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-26-stufen-v5",
+    "datum": "2026-09-26",
+    "titel": "Die Mitgliedsstufen heissen neu — der Club beginnt bei DISCOVER",
+    "linear": "AGE-903",
+    "aenderungen": [
+      "**Die sechs Stufen heissen neu** — ACTIVE · BOOST · CONNECT · DISCOVER · FOCUS · IMPACT, in dieser Reihenfolge von Rang 1 bis 6. „Basic\" und „Exchange\" verschwinden aus der Oberfläche.",
+      "**Der Club beginnt bei DISCOVER.** Alles, was heute ab Rang 2 oder Rang 3 freigeschaltet ist, gilt künftig ab Rang 4: das Mitgliederverzeichnis mit Liste und Suche, die erweiterten Profilfelder (Kompetenzen, Interessen, Kompass-Themen, Suchen/Bieten), die Anmeldung zu Mitglieder-Events und die Kontaktanfragen.",
+      "**Die Academy verlangt künftig DISCOVER.** Bisher stand sie jedem aktivierten Konto offen, ohne jede Stufenprüfung — das war so nie beschlossen, sondern nie gebaut.",
+      "**Ab DISCOVER kann sich jedes Mitglied anmelden und wieder absagen.** Heute gilt das nicht: ein Konto auf Rang 3 darf sich zu einem Mitglieder-Event anmelden, seine Anmeldung danach aber nicht mehr ändern, und bei einem öffentlichen Event kann sich jedes aktivierte Konto anmelden und **nie** absagen. Anmelden und Absagen tragen künftig dieselbe Bedingung — unterhalb DISCOVER gelten beide zugleich oder keines von beiden. Öffentliche Events bleiben dabei „wie bisher\" offen, dann aber für beide Handlungen.",
+      "**Im Admin stehen beim Stufe-Setzen nur noch DISCOVER, FOCUS und IMPACT zur Wahl.** Ein Bestandskonto auf einer der drei unteren Stufen wird weiter angezeigt, aber nicht mehr dorthin gesetzt.",
+      "**Bestandsmitglieder ziehen nicht rangtreu um.** Wer heute Impact ist, bleibt IMPACT; Focus bleibt FOCUS; Connect, Discover und Exchange werden alle DISCOVER; Basic wird ACTIVE. Rangtreu umgezogen verlöre ein heutiges Discover-Konto seinen Clubzugang.",
+      "Neue Konten starten auf **ACTIVE** statt auf „Basic\" — derselbe Platz auf der Leiter, neuer Name."
+    ]
+  },
+  {
     "slug": "2026-09-25-testflight-upload",
     "datum": "2026-09-25",
     "titel": "testflight-upload",

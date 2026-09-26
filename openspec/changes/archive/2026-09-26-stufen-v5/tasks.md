@@ -222,7 +222,7 @@ grün**, `tsc --noEmit` sauber, `pnpm lint` ohne Fehler.
 - [x] Oberfläche nennt nur DISCOVER · FOCUS · IMPACT — kein „Basic", kein
       „Exchange"
 - [x] Code-Review auf den **Diff** (zwei Anbieter, in `REVIEWS.md` aufgelöst)
-- [ ] PR-Text nennt `migrate-prod` und `gh run rerun --failed`
+- [x] PR-Text nennt `migrate-prod` und `gh run rerun --failed`
 
 ## 7 · Nach dem Merge (ausdrückliche Freigabe nötig)
 

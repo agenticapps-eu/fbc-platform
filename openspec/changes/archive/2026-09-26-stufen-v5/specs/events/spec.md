@@ -79,6 +79,22 @@ Fehlermeldung nach dem Klick — den rohen englischen Text der Datenbank
 - **WHEN** ein Mitglied ab Rang 4 dasselbe Event ansieht
 - **THEN** ist der Anmeldeknopf bedienbar
 
+#### Scenario: Ein öffentliches Event sperrt nicht
+
+- **WHEN** ein Mitglied auf Rang 1 ein `public`-Event ansieht
+- **THEN** ist der Anmeldeknopf bedienbar
+
+#### Scenario: Der Host darf zu seinem eigenen Mitglieder-Event
+
+- **WHEN** ein Mitglied auf Rang 1 ein `members`-Event ansieht, dessen Host es
+  selbst ist
+- **THEN** ist der Anmeldeknopf bedienbar
+
+#### Scenario: Der rohe Datenbanktext erscheint nicht
+
+- **WHEN** die Sperre greift
+- **THEN** erscheint der Text „membership level too low to register" nirgends
+
 ## ADDED Requirements
 
 ### Requirement: Wer sich anmelden darf, darf auch absagen

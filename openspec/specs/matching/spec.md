@@ -10,9 +10,7 @@ and the routing queue is enforced by RLS. Reconstructed from the code as of the
 OpenSpec migration. Matching v2 provisioning and the paid contact gate are only
 partially in place: the tier-based contact gate exists (Prime+ may send requests), but
 the DKRI deal workflow beyond queue visibility is deferred to a later level.
-
 ## Requirements
-
 ### Requirement: Members author offers and needs
 
 The system SHALL let a member create, edit and delete their own `offers` ("Ich biete")
@@ -209,29 +207,38 @@ reject.
 ### Requirement: Offers and needs visibility is RLS-gated
 
 The system SHALL restrict reading of `offers` and `needs` to the owning member or a
-member whose level rank clears `discover` (rank 3), enforced in the database
-independently of the client by the `offers_select` / `needs_select` policies using
-`has_level(3)`.
+member whose level rank clears the club entry at **rank 4** (`discover` in the
+ladder introduced by AGE-903), enforced in the database independently of the
+client by the `offers_select` / `needs_select` policies using `has_level(4)`.
 
 This requirement previously named `is_prime_plus()`. That predicate was replaced for
 these two tables by the six-level migration and the spec text had not followed;
-the gate is `has_level(3)`. Own rows stay visible at every level, because
-maintaining one's own "Ich suche / Ich biete" is available from `basic` — only
-browsing **other** members' offers and needs sits behind the rank.
+the gate is `has_level(4)`. Own rows stay visible at every level, because
+maintaining one's own "Ich suche / Ich biete" is available from the lowest tier —
+only browsing **other** members' offers and needs sits behind the rank.
+
+**Die Zahl wanderte mit AGE-903 von 3 auf 4.** Sie bezeichnete nie eine
+Rangzahl um ihrer selbst willen, sondern die unterste Clubstufe; die trug
+vorher die 3 und trägt jetzt die 4. Eine Stufe, die nur die eigene Zeile sieht,
+hiess vorher `basic`/`connect` und heisst jetzt `active`/`boost`/`connect` —
+dieselbe Zusage, ein Rang mehr darunter.
 
 #### Scenario: Discover-and-above member sees others' offers for matching
 
-- **WHEN** a member with `level_rank >= 3` selects `offers`/`needs`
+- **WHEN** a member with `level_rank >= 4` selects `offers`/`needs`
 - **THEN** the `offers_select`/`needs_select` policy returns rows of other members
 
 #### Scenario: Below-Discover member sees only their own
 
-- **WHEN** a member with `level_rank < 3` selects `offers`/`needs`
+- **WHEN** a member with `level_rank < 4` selects `offers`/`needs`
 - **THEN** only rows where `profile_id` equals their own id are returned
 
 #### Scenario: A member below the rank can still maintain their own
 
-- **WHEN** a `basic` member writes their own offer or need
+<!-- Titel zeichengleich; der Rumpf nennt `active` statt `basic`, denselben
+     Rang 1 nach AGE-903. -->
+
+- **WHEN** an `active` member writes their own offer or need
 - **THEN** the write succeeds and the row is readable to them
 
 ### Requirement: Matches are created server-side only
@@ -342,3 +349,4 @@ and SHALL be kept off the anon API surface.
 - **WHEN** a member edits their `profiles.roles` chips
 - **THEN** `is_matching_manager()` is unaffected because it reads only `staff_roles`,
   which has no client write grant
+

@@ -1,6 +1,8 @@
-## Why
+# Die Mitgliedsstufen heissen neu — der Club beginnt bei DISCOVER
 
-AGE-903.
+Linear: **AGE-903**
+
+## Why
 
 Detlev hat am 23.09. eine neue Zugangsleiter vorgelegt (V5-Funktionsmatrix),
 am 25.09. telefonisch nachgeschärft. Sechs Stufen bleiben, aber die **Rechte
@@ -55,10 +57,10 @@ sechs RLS-Policies, eine WITH-CHECK-Bedingung, drei RPC-Rümpfe und eine
 - **Im Admin stehen beim Stufe-Setzen nur noch DISCOVER, FOCUS und IMPACT zur
   Wahl.** Ein Bestandskonto auf einer der drei unteren Stufen wird weiter
   angezeigt, aber nicht mehr dorthin gesetzt.
-- **Bestandsmitglieder ziehen nicht rangtreu um.** Wer heute `impact` ist,
-  bleibt IMPACT; `focus` bleibt FOCUS; alles zwischen `connect` und `exchange`
-  wird DISCOVER; `basic` wird ACTIVE. Rangtreu umgezogen verlöre ein
-  `discover`-Konto seinen Clubzugang.
+- **Bestandsmitglieder ziehen nicht rangtreu um.** Wer heute Impact ist,
+  bleibt IMPACT; Focus bleibt FOCUS; Connect, Discover und Exchange werden
+  alle DISCOVER; Basic wird ACTIVE. Rangtreu umgezogen verlöre ein heutiges
+  Discover-Konto seinen Clubzugang.
 - Neue Konten starten auf **ACTIVE** statt auf „Basic" — derselbe Platz auf der
   Leiter, neuer Name.
 
@@ -69,7 +71,7 @@ Migration führt deshalb Zwischenschlüssel, nach dem Vorbild von
 Repos liest und Schlüssel mit Rechten gleichsetzt, liegt nach der Migration
 falsch.
 
-### Ausdrücklich nicht in diesem Change
+## Ausdrücklich nicht in diesem Change
 
 - **Kein Stripe.** Der Kaufweg bleibt ruhend; `STRIPE_PRICE_*`-Namen werden nur
   so weit nachgezogen, dass nichts bricht. Kaufknöpfe entstehen keine.
