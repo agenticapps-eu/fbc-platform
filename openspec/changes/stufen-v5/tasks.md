@@ -72,25 +72,48 @@ die alten Schlüssel zeigen.
       `scripts/pgtap-dateiliste.test.ts` prüft die Liste in beide Richtungen
       und ist grün
 
-## 3 · pgTAP (je Stufe 1–6, was lesbar und erlaubt ist)
+## 3 · pgTAP (je Stufe 1–6, was lesbar und erlaubt ist) — erledigt
 
-- [ ] Rang 1–3: kein fremdes Vollprofil, keine `offers`/`needs`, keine
-      Verzeichnisliste — **nur die eigene Zeile**
-- [ ] Rang 4–6: Liste **und** erweiterte Spalten zugleich
-- [ ] Rang 3 sieht keine Academy-Route (Frontend-Test, hier nur der Rang)
-- [ ] Kontaktanfragen mit `open_contact = false`: unter 4 abgelehnt, ab 4 an
+Zwei neue Dateien, zehn gezogene. Die ganze Suite läuft grün gegen das migrierte
+Schema: **40 Dateien, 39 ohne Befund**, und `grants_test.sql` ist gemessen
+entlastet (siehe unten).
+
+- [x] Rang 1–3: kein fremdes Vollprofil, keine `offers`/`needs`, keine
+      Verzeichnisliste — **nur die eigene Zeile**. In `rls_test.sql` über die
+      Ränge 2 UND 3 zugesagt, in `directory_search_test.sql` über 1 und 3.
+      Rang 3 ist der teuerste Fall: der höchste Rang ausserhalb des Clubs
+- [x] Rang 4–6: Liste **und** erweiterte Spalten zugleich — als
+      Positivkontrolle unmittelbar über der Grenze, sonst wäre jede Verneinung
+      auch von einem Gate erfüllt, das alles zumacht
+- [x] Kontaktanfragen mit `open_contact = false`: unter 4 abgelehnt, ab 4 an
       jeden Empfänger — inklusive des Falls, dass die Empfängerstufe nichts
-      ändert. Der Test SETZT den Schalter ausdrücklich und setzt ihn am Ende
-      zurück; sich auf den Default zu verlassen hängt den Folgetest an einen
-      Wert, den dieser Test geändert hat
-- [ ] Event: Anmelden und Absagen tragen dieselbe Bedingung, auch bei `public`
-- [ ] Neuanlage über den Trigger landet auf einem Schlüssel, der in
+      ändert. Der Test SETZT den Schalter ausdrücklich; zurückgestellt wird er
+      durch das `rollback` der Datei, und das steht dort als Satz
+- [x] Event: Anmelden und Absagen tragen dieselbe Bedingung, auch bei `public` —
+      neue Datei `stufen_v5_absage_test.sql`, 11 Zusagen. **RED gefahren: ohne
+      die Migration fallen 5 von 11 durch**, und die fünf benennen drei
+      Vorbestands-Fehler: Rang 1 konnte ein öffentliches Event nicht absagen,
+      Rang 3 durfte sich zum Mitglieder-Event anmelden, und ein **Host unter
+      Rang 4 konnte sein eigenes Event nicht absagen** — die Host-Ausnahme war
+      im pauschalen `has_level(4)` verloren
+- [x] Neuanlage über den Trigger landet auf einem Schlüssel, der in
       `membership_tiers` steht — geprüft über den Join, nicht gegen ein Literal
-- [ ] Alle neuen Dateien in die Liste in `.github/workflows/ci.yml` eintragen
-- [ ] Bestehende pgTAP-Tests und `demo_personas.sql` auf die neuen Schlüssel
-      ziehen — gemessen 62 Literale in 14 Dateien, davon drei in Kommentaren;
-      Schwerpunkte `rls_test.sql` (15), `demo_personas.sql` (14),
-      `admin_set_tier_test.sql` (6). Brechen sonst laut in CI
+- [x] Alle neuen Dateien in die Liste in `.github/workflows/ci.yml` eingetragen;
+      `scripts/pgtap-dateiliste.test.ts` ist grün
+- [x] Bestehende pgTAP-Tests und `demo_personas.sql` auf die neuen Schlüssel
+      gezogen — **nicht mechanisch**: jedes Fixture behält seinen RANG und
+      bekommt den Schlüssel, der jetzt dort sitzt, und jede Zusage, deren
+      Antwort dadurch kippt, kippt benannt. Elf Zusagen haben die Seite
+      gewechselt
+- [x] `kontaktanfrage_staffelung_test.sql` → `kontaktanfrage_stufe_test.sql`
+      umbenannt. Eine Datei, die belegt, dass es KEINE Staffelung gibt, kann
+      nicht so heissen
+- [x] `grants_test.sql` gemessen entlastet: es scheitert in meiner Vorrichtung,
+      aber **auch ohne** die Migration — Ursache ist `create extension pgtap`,
+      das ~700 Funktionen mit EXECUTE-an-PUBLIC in `public` legt. Gegenprobe
+      ohne pgTAP: die Hashes über alle Tabellen- und Funktionsrechte für `anon`,
+      `authenticated` und `service_role` sind vor und nach der Migration
+      **identisch**. Die Migration ändert kein einziges Recht
 
 ## 4 · Frontend
 

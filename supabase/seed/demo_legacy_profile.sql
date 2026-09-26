@@ -12,7 +12,8 @@
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 
 -- 1. Demo auth user. The handle_new_user trigger auto-creates the profiles row
---    (name from metadata, tier 'basic'); we enrich it below. pgcrypto lives in
+--    (name from metadata, tier 'active' since AGE-903); we enrich it below.
+--    pgcrypto lives in
 --    the `extensions` schema on Supabase — qualify so search_path is irrelevant.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,

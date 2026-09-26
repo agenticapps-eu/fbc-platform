@@ -26,7 +26,7 @@
 --
 -- Das entschärft den Befund nicht, es verschiebt ihn nur: der Angriff trifft
 -- jeden Beitrag, den der Angreifer SEHEN kann — für ein Mitglied ab `exchange`
--- also den ganzen Club, für ein `basic`-Konto jeden öffentlichen Beitrag. Das
+-- also den ganzen Club, für ein `active`-Konto jeden öffentlichen Beitrag. Das
 -- Fixture unten nimmt deshalb bewusst den ungünstigsten Angreifer, der noch
 -- funktioniert: die NIEDRIGSTE Stufe auf einem öffentlichen fremden Beitrag.
 --
@@ -48,9 +48,9 @@ insert into auth.users (id, aud, role, email) values
   ('c1000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'bl-autor@test.fbc'),
   ('c1000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated', 'bl-zweiter@test.fbc');
 
--- Der Angreifer steht auf `basic` — der niedrigsten Stufe. Wenn der Weg SCHON
+-- Der Angreifer steht auf `active` — der niedrigsten Stufe. Wenn der Weg SCHON
 -- von dort offen ist, ist er von jeder höheren erst recht offen.
-update public.profiles set tier = 'basic', name = 'Bl Angreifer', activated_at = now()
+update public.profiles set tier = 'active', name = 'Bl Angreifer', activated_at = now()
  where id = 'c1000000-0000-0000-0000-000000000001';
 update public.profiles set tier = 'impact', name = 'Bl Autor', activated_at = now()
  where id = 'c1000000-0000-0000-0000-000000000002';

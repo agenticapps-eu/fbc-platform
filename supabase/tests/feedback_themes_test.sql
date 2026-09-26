@@ -70,7 +70,7 @@ end $$;
 insert into auth.users (id, aud, role, email) values
   ('fe000000-0000-0000-0000-00000000000a', 'authenticated', 'authenticated', 'thema-leser@test.fbc');
 
-update public.profiles set tier = 'basic', name = 'Thema Leser', activated_at = now()
+update public.profiles set tier = 'active', name = 'Thema Leser', activated_at = now()
  where id = 'fe000000-0000-0000-0000-00000000000a';
 
 -- ── 1. Die Tabelle und ihre Gestalt ─────────────────────────────────────────

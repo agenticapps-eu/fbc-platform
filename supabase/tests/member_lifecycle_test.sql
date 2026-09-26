@@ -312,20 +312,20 @@ select throws_ok(
 -- wurde. Nimmt sie Beitrags-IDs, löst sie den Urheber SELBST auf und wendet
 -- dabei dasselbe Sichtbarkeitsprädikat an, das für den Beitrag gilt.
 --
--- Genau das prüfen die beiden Zusagen mit `Lz Basic`: sie ist bestätigt und
+-- Genau das prüfen die beiden Zusagen mit `Lz Active`: sie ist bestätigt und
 -- darf `public` lesen, aber nicht `members` (`has_level(4)`). Über einen
 -- Beitrag, den sie nicht sehen darf, bekommt sie keine Auskunft — und die
 -- Wächter-Zusage daneben belegt, dass sie überhaupt Auskünfte bekommt.
 -- ════════════════════════════════════════════════════════════════════════════
 
 insert into auth.users (id, aud, role, email) values
-  ('d0000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'lz-basic@test.fbc'),
+  ('d0000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'lz-active@test.fbc'),
   ('d0000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'lz-privat@test.fbc'),
   ('d0000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'lz-nie-bestaetigt@test.fbc');
 
--- Bestätigt, aber auf `basic`: sie sieht `public` und nicht `members`.
+-- Bestätigt, aber auf `active`: sie sieht `public` und nicht `members`.
 update public.profiles
-   set name = 'Lz Basic', activated_at = now(), is_public = true, tier = 'basic'
+   set name = 'Lz Active', activated_at = now(), is_public = true, tier = 'active'
  where id = 'd0000000-0000-0000-0000-000000000005';
 -- Da, aber zurückgezogen. Im Feed heisst sie seit AGE-530 „Ein Mitglied" —
 -- ein anderer Sachverhalt als „entfernt", und beide dürfen nicht auf denselben
@@ -414,15 +414,15 @@ select is(
   'false', 'Ein nie bestätigtes Konto wurde nicht entfernt — es ist nur nie angekommen');
 
 -- 7.7/7.8 Die Sichtbarkeit ist eine Eigenschaft der Funktion, keine Bitte.
--- Erst der Wächter: `Lz Basic` bekommt über einen ÖFFENTLICHEN Beitrag Auskunft.
+-- Erst der Wächter: `Lz Active` bekommt über einen ÖFFENTLICHEN Beitrag Auskunft.
 select is(
   pg_temp.text_as('d0000000-0000-0000-0000-000000000005',
     $q$select former::text from public.former_member_entries(
          array['bb000000-0000-4000-8000-000000000003']::uuid[])$q$),
-  'true', 'Wächter: auch ein basic-Konto bekommt über einen öffentlichen Beitrag Auskunft');
+  'true', 'Wächter: auch ein active-Konto bekommt über einen öffentlichen Beitrag Auskunft');
 
 -- AGE-601 hat die untere Haelfte dieses Paars verschoben, nicht abgeschafft.
--- Bis dahin war `Lz Basic` der Ausgesperrte: `members` verlangte Rang 4. Jetzt
+-- Bis dahin war `Lz Active` der Ausgesperrte: `members` verlangte Rang 4. Jetzt
 -- meint `members` jedes AKTIVIERTE Mitglied, also bekommt sie auch hier Auskunft
 -- — und die Sperre, die es weiterhin zu pruefen gilt, ist die AKTIVIERUNG.
 -- Deshalb steht die Gegenprobe jetzt auf `Lz Nie Bestaetigt` (activated_at null).

@@ -28,8 +28,8 @@ insert into auth.users (id, aud, role, email) values
   ('d1000000-0000-0000-0000-000000000004', 'authenticated', 'authenticated', 'dora@dir.test.fbc'),
   ('d1000000-0000-0000-0000-000000000005', 'authenticated', 'authenticated', 'egon@dir.test.fbc'),
   -- Frida und Gero kamen mit AGE-598 dazu: die Datei kannte bis dahin keine
-  -- Stufe ZWISCHEN `basic` und `impact`, und genau dort liegt die Grenze, die
-  -- der Change verschiebt.
+  -- Stufe ZWISCHEN der untersten und `impact`, und genau dort liegt die Grenze,
+  -- die AGE-903 auf Rang 4 hebt.
   ('d1000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'frida@dir.test.fbc'),
   ('d1000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'gero@dir.test.fbc');
 
@@ -43,16 +43,23 @@ update public.profiles set tier = 'impact', name = 'Cem', is_public = false
 -- Dora trägt ein Angebot OHNE Kategorie: has_offers ja, offer_categories leer.
 update public.profiles set tier = 'impact', name = 'Dora', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000004';
--- Egon steht unter `discover` (rank 3) — er ist der Sichtbarkeits-Gegenbeweis.
-update public.profiles set tier = 'basic', name = 'Egon', is_public = true
+-- Die drei Betrachter umschliessen die Grenze, und nach AGE-903 liegt sie
+-- zwischen Rang 3 und Rang 4:
+--
+--   Egon  `active`   (Rang 1) — der unterste Rang, ausserhalb
+--   Gero  `connect`  (Rang 3) — der HÖCHSTE Rang ausserhalb des Clubs, und
+--                              damit der interessanteste Fall der Datei
+--   Frida `discover` (Rang 4) — GENAU die unterste Clubstufe
+--
+-- Frida trug bis AGE-903 `discover` auf Rang 3, Gero `connect` auf Rang 2. Beide
+-- behalten ihre ROLLE (die eine gerade drinnen, der andere gerade draussen) und
+-- wechseln dafür den Rang — die Grenze ist gewandert, nicht die Fragestellung.
+-- Anna (impact, Rang 6) belegt Fridas Fall NICHT: sie liegt zwei Ränge darüber,
+-- und eine Zusage, die bei Rang 6 hält, sagt über Rang 4 nichts.
+update public.profiles set tier = 'active', name = 'Egon', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000005';
--- Frida steht GENAU auf `discover` (rank 3) — die Stufe, an der die erweiterten
--- Felder heute aufgehen. Anna (impact) belegt das nicht: sie liegt drei Ränge
--- darüber, und eine Zusage, die bei rank 6 hält, sagt über rank 3 nichts.
 update public.profiles set tier = 'discover', name = 'Frida', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000006';
--- Gero steht auf `connect` (rank 2) — die Stufe, die AGE-598 in die Liste holt.
--- Bis dahin ist er der Beleg für den Ist-Zustand, nicht für den Fortschritt.
 update public.profiles set tier = 'connect', name = 'Gero', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000007';
 
@@ -392,85 +399,90 @@ select isnt(
   null,
   'search_directory traegt nach dem drop/create wieder einen Kommentar');
 
--- ── 9. Positivkontrollen zur Rang-3-Grenze (AGE-598, Aufgaben 2.2/2.3) ──────
--- Diese beiden Zusagen sind KEIN Fortschritt und sollen es nicht sein. Sie sind
--- die Grundlinie: sie halten den Ist-Zustand fest, BEVOR AGE-598 die
--- Verzeichnisschwelle von Rang 3 auf Rang 2 senkt.
+-- ── 9. Positivkontrolle an der untersten Clubstufe ──────────────────────────
+-- Die Wache über die Grenze, von INNEN. Sie war schon vor AGE-903 da und stand
+-- damals auf Rang 3; sie steht jetzt auf Rang 4 und fragt dasselbe.
 --
--- Warum das nötig ist: die Senkung lässt mehr Zeilen durch. „Mehr Zeilen kommen
--- an" ist aber auch genau das Bild, das ein versehentlich mitgenommenes
--- Rang-3-Gate erzeugt. Ohne 9.1 sähe der teuerste denkbare Fehler dieses
--- Changes wie sein Erfolg aus.
+-- Warum sie nötig ist: AGE-903 hebt die Schwelle, lässt also WENIGER Zeilen
+-- durch. „Weniger Zeilen kommen an" ist aber auch genau das Bild, das ein
+-- versehentlich zu hoch gesetztes Gate erzeugt. Ohne 9.1 sähe der teuerste
+-- denkbare Fehler dieses Changes wie sein Erfolg aus.
 --
--- Die Datei sagt oben „RED vor GREEN". Diese zwei sind die Ausnahme und dürfen
--- es sein: sie sind Gegenproben und müssen HEUTE grün stehen. Eine Gegenprobe,
--- die erst rot ist, misst nichts.
+-- Die Datei sagt oben „RED vor GREEN". Diese ist die Ausnahme und darf es sein:
+-- sie ist eine Gegenprobe und muss grün stehen. Eine Gegenprobe, die erst rot
+-- ist, misst nichts.
 
--- 9.1 (Aufgabe 2.2) Frida steht auf `discover` und bekommt Annas Kompetenzen
--- GEFÜLLT. Nach AGE-598 muss diese Zusage unverändert halten — sie ist die
--- Wache über die Grenze, die der Change NICHT anfassen darf.
+-- 9.1 Frida steht auf `discover` (Rang 4) und bekommt Annas Kompetenzen
+-- GEFÜLLT — die unterste Clubstufe sieht das Verzeichnis vollständig.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
     select array_to_string(competencies, ',') from public.search_directory()
      where name = 'Anna'
   $q$),
   'Bilanzanalyse',
-  'discover bekommt die fremden competencies gefüllt — die Rang-3-Grenze, '
-  'gegen die sich AGE-598 später messen lässt');
+  'Rang 4 bekommt die fremden competencies gefüllt — die unterste Clubstufe '
+  'sieht das Verzeichnis vollstaendig');
 
--- 9.2 (Aufgabe 2.3) HAT IHRE AUFGABE ERFÜLLT UND IST DESHALB FORT.
+-- 9.2 HAT IHRE AUFGABE ERFÜLLT UND IST DESHALB FORT.
 --
 -- Sie sagte zu: „Gero steht auf `connect` und sieht HEUTE nur sich selbst" —
--- der Ist-Zustand, den AGE-598 umdreht. Sie stand grün, bis die Migration
+-- der Ist-Zustand, den AGE-598 umdrehte. Sie stand grün, bis die Migration
 -- 20260902150000 kam, und ist mit ihr rot geworden:
 --
 --     have: Anna,Bea,Dora,Egon,Frida,Gero
 --     want: Gero
 --
 -- Genau dafür war sie da. Ohne sie wäre die Umkehrung ein stiller Nebeneffekt
--- gewesen; mit ihr ist sie ein Ereignis mit einer Zeile Beleg. Ihre Nachfolge
--- tritt Zusage 27 an, die dieselbe Abfrage stellt und das neue Ergebnis
--- verlangt — sie hier zusätzlich zu behalten hiesse, dieselbe Frage zweimal zu
--- stellen. Der Beleg für den Ist-Zustand liegt in der Historie (Commit
--- „Positivkontrollen zur Rang-3-Grenze, gesondiert") und in Aufgabe 2.3.
-
--- ── 10. Verzeichnisliste ab `connect` (AGE-598, Aufgaben 3.1-3.3) ───────────
--- ROT gegen das heutige Schema, und das ist der Zweck. `search_directory` liest
--- `public.profiles` unter `profiles_select_self_or_discover` (`has_level(3)`);
--- Gero steht auf `connect` und bekommt deshalb heute nur sich selbst.
+-- gewesen; mit ihr ist sie ein Ereignis mit einer Zeile Beleg.
 --
--- Grün werden sie mit der Migration aus Aufgabe 3.4: Basisfelder aus
--- `profiles_public`, erweiterte Spalten weiterhin aus `public.profiles` unter
--- der UNVERÄNDERTEN Rang-3-Policy.
+-- **AGE-903 dreht sie zurück**, und das ist keine Ironie, sondern die Sache:
+-- die Verzeichnisliste hatte von AGE-598 bis AGE-903 eine eigene, niedrigere
+-- Schwelle als ihre erweiterten Spalten. Diese Zweistufigkeit entfällt. Ihre
+-- Nachfolge tritt 10.1 an — dieselbe Abfrage, und wieder „nur sich selbst".
 
--- 10.1 (Aufgabe 3.1) Die Zeilen. Cem fehlt und muss fehlen — `is_public = false`
--- ist keine Stufenfrage und wird von der neuen Schwelle nicht berührt.
+-- ── 10. Liste und erweiterte Spalten tragen DIESELBE Schwelle (AGE-903) ─────
+-- Das ist die Aufhebung der Zweistufigkeit aus AGE-598. Vorher gab es einen
+-- Mittelzustand: in der Liste, aber mit maskierten Spalten. Den gibt es nicht
+-- mehr — unterhalb Rang 4 bekommt ein Aufrufer die EIGENE Zeile und sonst
+-- nichts.
+--
+-- Gero ist hier der wichtigste Betrachter der ganzen Datei: Rang 3 ist der
+-- HÖCHSTE Rang ausserhalb des Clubs. Hielte die Schwelle bei ihm nicht, wäre
+-- sie nirgends gehalten.
+
+-- 10.1 Gero (Rang 3) bekommt GENAU die eigene Zeile. Cem fehlt ohnehin
+-- (`is_public = false`) — das ist keine Stufenfrage und war es nie.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
     select string_agg(name, ',' order by name) from public.search_directory()
      where name = any(pg_temp.fixtures())
   $q$),
-  'Anna,Bea,Dora,Egon,Frida,Gero',
-  'connect bekommt die Basisfelder ALLER öffentlichen Profile aktivierter '
-  'Eigentümer — Cem bleibt draussen, er ist nicht öffentlich');
+  'Gero',
+  'Rang 3 bekommt genau die eigene Zeile — der höchste Rang ausserhalb des '
+  'Clubs sieht kein fremdes Profil');
 
--- 10.2 (Aufgabe 3.2) Die Maskierung an einer FREMDEN Zeile. Fünf erweiterte
--- Felder in einer Zusage, weil sie eine einzige Frage stellen: kommt hier etwas
--- an, das die Rang-3-Grenze nicht hergeben darf? Leere Arrays und false, nicht
--- NULL — NULL wäre ein anderer Wert und die Oberfläche unterscheidet ihn.
+-- 10.2 Die Positivkontrolle unmittelbar darüber: EIN Rang höher steht die
+-- ganze Liste offen. Ohne sie wäre 10.1 auch von einem Gate erfüllt, das das
+-- Verzeichnis für ALLE zumacht — und das wäre derselbe grüne Befund bei
+-- entgegengesetztem Schaden.
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
-    select competencies::text || ' | ' || has_offers::text || ' | '
-        || offer_categories::text || ' | ' || has_needs::text || ' | '
-        || need_categories::text
-      from public.search_directory() where name = 'Anna'
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
   $q$),
-  '{} | false | {} | false | {}',
-  'connect bekommt für FREMDE Zeilen leere erweiterte Felder, keine NULLs');
+  'Anna,Bea,Dora,Egon,Frida,Gero',
+  '… und Rang 4 bekommt die ganze Liste — die Grenze liegt zwischen 3 und 4 '
+  'und nicht irgendwo darunter');
 
--- 10.3 (Aufgabe 3.2) Die Gegenprobe an der EIGENEN Zeile. Ohne sie wäre 10.2
--- auch von einer Funktion erfüllt, die die Spalten für jeden leert — und die
--- hätte die Rang-3-Grenze nicht gewahrt, sondern abgeschafft.
+-- 10.3 Die eigene Zeile behält ihre erweiterten Felder. Das ist der Selbst-Zweig
+-- der `profiles`-Policy, und er trägt keine Rangzahl.
+--
+-- Nebenbefund, der benannt sein will: damit ist die Maskierung im Rumpf von
+-- `search_directory` (`coalesce(p.competencies, '{}')`) nach AGE-903
+-- UNERREICHBAR. Jede Zeile, die ein Aufrufer bekommt, ist entweder seine eigene
+-- — dann gefüllt — oder er steht ab Rang 4, und dann sieht er alles. Sie bleibt
+-- trotzdem stehen: sie ist die Grenze, das Eintrittstor ist nur die Tür davor.
+-- Sinkt das Tor je wieder, trägt sie sofort.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
     select competencies::text || ' | ' || has_offers::text || ' | '
@@ -478,19 +490,18 @@ select is(
       from public.search_directory() where name = 'Gero'
   $q$),
   '{Eigenkompetenz} | true | {weiterbildung}',
-  '… und für die EIGENE Zeile weiterhin gefüllt');
+  'die EIGENE Zeile bleibt auch unterhalb der Schwelle vollstaendig');
 
--- 10.4 (Aufgabe 3.3) `basic` bekommt GENAU die eigene Zeile — nicht null Zeilen.
+-- 10.4 `active` (Rang 1) bekommt GENAU die eigene Zeile — nicht null Zeilen.
 --
--- Die Aufgabe sagte „höchstens die eigene Zeile", und das liesse beides zu. Es
--- ist aber entschieden, und zwar anderswo: `HeaderSearch.tsx` (AGE-540, Punkt 2
+-- Es ist entschieden, und zwar anderswo: `HeaderSearch.tsx` (AGE-540, Punkt 2
 -- im Kopf) verlässt sich ausdrücklich darauf, dass „die Policy einem Konto
--- unterhalb `discover` die EIGENE Zeile zurückgibt, und die ist ein gültiger
--- Treffer". Ein blosses `has_level(2)` als Eintrittstor gäbe null Zeilen und
--- bräche diese Zusage STILL — die Kopfzeilen-Suche eines `basic`-Kontos fände
--- danach nicht einmal mehr das eigene Profil.
+-- unterhalb der Clubstufe die EIGENE Zeile zurückgibt, und die ist ein gültiger
+-- Treffer". Ein blosses `has_level(4)` als Eintrittstor gäbe null Zeilen und
+-- bräche diese Zusage STILL — die Kopfzeilen-Suche eines Kontos ausserhalb des
+-- Clubs fände danach nicht einmal mehr das eigene Profil.
 --
--- Das Tor muss deshalb `has_level(2) or p.id = auth.uid()` lauten. Die Rangzahl
+-- Das Tor muss deshalb `has_level(4) or p.id = auth.uid()` lauten. Die Rangzahl
 -- steht weiterhin an genau einer Stelle; der Selbst-Zweig trägt keine.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000005', $q$
@@ -498,24 +509,27 @@ select is(
      where name = any(pg_temp.fixtures())
   $q$),
   'Egon',
-  'basic bekommt genau die eigene Zeile — der Selbst-Zweig aus AGE-540 bleibt');
+  'Rang 1 bekommt genau die eigene Zeile — der Selbst-Zweig aus AGE-540 bleibt');
 
--- ── 11. Der Volltext gibt nicht preis, was die Ausgabe maskiert (3b.1-3b.3) ─
--- Befund opencode HIGH-1. Ohne diese Gruppe macht Abschnitt 10 aus der
--- Maskierung eine Kulisse: `competencies` wäre in der Ausgabe leer und über das
--- Suchfeld erfragbar. `search_doc` enthält competencies UND interests.
+-- ── 11. Der Volltext gibt nicht preis, was die Ausgabe maskiert ─────────────
+-- Befund opencode HIGH-1 aus AGE-598. Die Gruppe verhinderte, dass die
+-- Maskierung eine Kulisse wird: `competencies` wäre in der Ausgabe leer und
+-- über das Suchfeld erfragbar gewesen. `search_doc` enthält competencies UND
+-- interests.
 --
--- Die drei Zusagen sind bewusst ungleich verteilt, und das ist der Kern:
---   * 11.1 ist ein WÄCHTER und steht durchgehend grün. Heute, weil Gero nur
---     sich selbst sieht; nach Abschnitt 10, weil `p.search_doc` für ihn NULL
---     ist. Grün beweist hier von sich aus nichts.
---   * 11.2 ist die Zusage, die WIRKLICH rot wird — und sie fängt genau den
---     Fehlermodus, den 11.1 nicht sieht: eine Suche, die für `connect` gar
---     nichts mehr findet. Maskiert wäre sie dann auch, aber tot.
---   * 11.3 ist die Positivkontrolle nach oben: die Bindung darf die Suche für
---     Berechtigte nicht verengen.
+-- **Nach AGE-903 ist die Frage anders gestellt, und zwar strenger.** Vorher
+-- lautete sie „maskiert, aber nicht tot": ein Konto in der Liste durfte über
+-- Basisfelder suchen, aber nicht über erweiterte. Jetzt sieht ein Konto
+-- unterhalb Rang 4 überhaupt keine fremde Zeile — die Suche ist dort mit
+-- Absicht tot, und die Unterscheidung „maskiert gegen tot" hat unterhalb der
+-- Schwelle keinen Gegenstand mehr.
+--
+-- Was bleibt, ist die Frage nach OBEN: die Bindung darf die Suche für
+-- Berechtigte nicht verengen. Das ist 11.3, und sie ist jetzt die Hauptzusage
+-- der Gruppe.
 
--- 11.1 Der Begriff steht NUR in Annas competencies.
+-- 11.1 Unterhalb der Schwelle findet die Suche kein fremdes Profil — nicht über
+-- ein erweitertes Feld …
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
@@ -523,21 +537,29 @@ select is(
      where name = any(pg_temp.fixtures())
   $q$),
   '(leer)',
-  'connect findet ein Profil NICHT über einen Begriff, der nur in seinen '
-  'competencies steht');
+  'Rang 3 findet Anna nicht über einen Begriff aus ihren competencies');
 
--- 11.2 Derselbe Aufrufer, ein BASISFELD. Diese Zusage trennt „maskiert" von
--- „tot" — und nur sie.
+-- 11.2 … und auch nicht über ein BASISFELD. Das ist die Zusage, die sich mit
+-- AGE-903 umgedreht hat: bis hierher stand hier `Anna`, weil ein Konto auf Rang
+-- 2 in der Liste war und über den Firmennamen suchen durfte. Die Zweistufigkeit
+-- ist weg, also ist auch dieser Weg zu.
+--
+-- Sie bleibt trotzdem stehen, und zwar als die schärfste Fassung von 10.1: eine
+-- Suche ist ein zweiter Weg an dieselben Daten, und ein Gate, das nur die
+-- Listenabfrage bewacht und die Suche offen lässt, wäre in 10.1 grün.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
       from public.search_directory(p_query => 'Nordlicht')
      where name = any(pg_temp.fixtures())
   $q$),
-  'Anna',
-  '… findet dasselbe Profil über den Firmennamen aber sehr wohl');
+  '(leer)',
+  '… und auch nicht über den Firmennamen — die Suche ist kein zweiter Weg an '
+  'die Liste');
 
--- 11.3 Ab Rang 3 bleibt der reiche Volltext.
+-- 11.3 Ab Rang 4 bleibt der reiche Volltext. Die Positivkontrolle nach oben,
+-- und nach AGE-903 die Hauptzusage dieser Gruppe: ohne sie wären 11.1 und 11.2
+-- auch von einer Suche erfüllt, die für NIEMANDEN mehr etwas findet.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
@@ -545,24 +567,34 @@ select is(
      where name = any(pg_temp.fixtures())
   $q$),
   'Anna',
-  'discover findet den Kompetenz-Begriff weiterhin — die Bindung verengt die '
+  'Rang 4 findet den Kompetenz-Begriff weiterhin — die Bindung verengt die '
   'Suche für Berechtigte nicht');
 
--- ── 12. `branche` ist ein Basisfeld (3c.1, Befund opencode HIGH-2) ──────────
--- Ohne diese Gruppe fiele die Spalte für `connect` still auf NULL und der
--- Branchenfilter liefe wortlos leer — ein sichtbarer Filter, der nie etwas
--- findet.
+-- ── 12. `branche` ist ein Basisfeld ─────────────────────────────────────────
+-- Befund opencode HIGH-2 aus AGE-598. Die Spalte darf nicht still auf NULL
+-- fallen, sonst läuft der Branchenfilter wortlos leer — ein sichtbarer Filter,
+-- der nie etwas findet.
+--
+-- **Der Messpunkt musste mit AGE-903 wandern.** Vorher war die Zusage an einem
+-- Konto UNTERHALB der Schwelle zu messen: nur dort trennte sich Basisfeld von
+-- erweitertem Feld. Diese Trennung ist durch die Ausgabe von
+-- `search_directory` nicht mehr beobachtbar (siehe 10.3) — gemessen wird
+-- deshalb an Rang 4, und was die Zusage jetzt hält, ist die Herkunft der Spalte
+-- aus `profiles_public`, nicht mehr ihre Sichtbarkeit unterhalb einer Schwelle.
+--
+-- Dass `profiles_public` bewusst KEINE Stufenschwelle trägt, steht als eigene
+-- Anforderung in der Spec und wird in `rls_test.sql` belegt, nicht hier.
 
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
     select coalesce(branche, '(null)') from public.search_directory()
      where name = 'Anna'
   $q$),
   'Beratung',
-  'connect bekommt branche GEFÜLLT — es ist ein Basisfeld, kein erweitertes');
+  'branche kommt GEFÜLLT an — sie ist ein Basisfeld aus profiles_public');
 
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
       from public.search_directory(p_branche => 'Beratung')
      where name = any(pg_temp.fixtures())
@@ -574,9 +606,9 @@ select is(
 --
 -- Der Basis-Vektor MUSS eine Teilmenge von `search_doc` sein. `region` steht in
 -- `profiles_public`, aber NICHT in `search_doc` — nähme man es in den
--- Basis-Vektor auf, könnte ein `connect`-Konto nach der Region suchen und ein
--- `discover`-Konto nicht. Die niedrigere Stufe bekäme eine Fähigkeit, die der
--- höheren fehlt, und das widerspräche 11.3.
+-- Basis-Vektor auf, könnte ein Konto am Selbst-Zweig nach der Region suchen und
+-- ein Konto ab Rang 4 nicht. Die niedrigere Stufe bekäme eine Fähigkeit, die
+-- der höheren fehlt, und das widerspräche 11.3.
 --
 -- Anna trägt `region = 'Hamburg'`. Beide Stufen müssen daran scheitern — nicht
 -- weil Suche nach Region falsch wäre, sondern weil sie es für BEIDE zugleich
