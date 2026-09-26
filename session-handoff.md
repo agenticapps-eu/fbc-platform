@@ -6,19 +6,24 @@
 
 > ## ⚠ ZUERST
 >
-> **PR #436 ist offen, CI lief beim Verlassen noch.** Nichts ist gemergt, nichts
-> auf PROD migriert. Erste Handlung der nächsten Sitzung:
-> `gh pr checks 436`.
+> **PR #436 ist gemergt** (`4002637`), AGE-903 steht auf Done. **Der Deploy
+> steht still, und das ist gewollt:** `drift-gate` hat den Lauf
+> [36255511834](https://github.com/agenticapps-eu/fbc-platform/actions/runs/36255511834)
+> abgebrochen — „DRIFT — lokal vorhanden, auf dem Ziel fehlend: 20260926120000".
+> Genau eine Migration, meine.
 >
-> **Aber EIN PROD-Schreibzugriff ist bereits passiert und war freigegeben:** das
-> Store-Prüferkonto (siehe unten). Es ist kein offener Punkt, es ist erledigt —
-> aber es steht auf PROD, und das muss man wissen, bevor man Zahlen vergleicht.
+> **Die nächsten zwei Handgriffe brauchen Donalds AUSDRÜCKLICHE Freigabe** und
+> sind von der stehenden Merge-Freigabe NICHT gedeckt:
+>
+> 1. `gh workflow run migrate-prod` (PROD-Schreibzugriff)
+> 2. `gh run rerun --failed 36255511834` (gibt Deploy und Functions frei)
+>
+> `migrate-dev` ist im selben Lauf **durchgelaufen** — DEV trägt die Leiter V5
+> bereits.
 
 ## Accomplished
 
-Der Change `stufen-v5` ist vollständig gebaut. Neun Commits auf dem Branch
-`stufen-v5` (bewusst **ohne** Kürzel — Linear schliesst jedes Issue, dessen
-Kürzel im Branchnamen ODER im PR-Titel steht; AGE-903 steht nur im PR-Titel).
+Der Change `stufen-v5` ist gebaut, gemergt und archiviert.
 
 Die Leiter danach: `active`(1, 0 €) · `boost`(2, 0 €) · `connect`(3, 0 €) ·
 **`discover`(4, 300 € — der Club beginnt hier)** · `focus`(5, 600 €) ·
@@ -31,38 +36,31 @@ Die Leiter danach: `active`(1, 0 €) · `boost`(2, 0 €) · `connect`(3, 0 €
 | `tsc --noEmit` | sauber |
 | `pnpm lint` | 0 Fehler |
 | Deno (Kaufweg) | 15 Zusagen |
-| `openspec validate --all` | 36/0 |
+| `openspec validate --all` | **35/0** (nach dem Falten) |
+| CI auf `main` (`36255511837`) | success |
 
 Zwei Reviewer-Runden (Plan und Diff, je gemini und opencode, alle vier
 REQUEST-CHANGES), zehn Befunde, jeder nachgemessen und in
-`openspec/changes/stufen-v5/REVIEWS.md` aufgelöst.
+`openspec/changes/archive/2026-09-26-stufen-v5/REVIEWS.md` aufgelöst.
 
 ## Decisions
 
 **CONNECT trägt 0 €, nicht 150 €** (Donald, 26.09.: „aktuell 0, wird ja später
-kommen"). Damit tragen alle drei Stufen ausserhalb des Clubs 0 €, und `PAID`
-sind genau die drei Clubstufen. *Warum:* ein Preis ohne Kaufweg ist eine Zusage
-ohne Gegenstand — dieselbe Begründung, die schon für BOOST galt.
+kommen"). *Warum:* ein Preis ohne Kaufweg ist eine Zusage ohne Gegenstand.
 
 **Der Bestand zieht NICHT rangtreu um.** `connect`·`discover`·`exchange` →
 DISCOVER, `basic` → ACTIVE. *Warum:* rangtreu verlöre ein Konto auf altem
-`discover` seinen Clubzugang. Die Regel lautet „niemand verliert, was er heute
-hat", nicht „die Zahl bleibt".
+`discover` seinen Clubzugang. „Niemand verliert, was er heute hat."
 
-**`regs_write_own` SPIEGELT `register_for_event`, statt eine eigene Zahl zu
-tragen.** *Warum:* beide Zahlen auf 4 zu heben hätte nur die halbe Lücke
-geschlossen — der `public`-Zweig hat in einer pauschalen Rangprüfung keine
+**`regs_write_own` SPIEGELT `register_for_event`**, statt eine eigene Zahl zu
+tragen. *Warum:* der `public`-Zweig hat in einer pauschalen Rangprüfung keine
 Entsprechung.
 
 **Die Admin-Beschränkung liegt in der Oberfläche, nicht in `admin_set_tier()`.**
-*Warum:* eine Korrektur nach unten muss möglich bleiben, und eine
-Anzeigeentscheidung in einer SECURITY-DEFINER-Funktion wäre eine Rechtegrenze,
-die nur eine Migration noch ändern kann.
+*Warum:* eine Korrektur nach unten muss möglich bleiben.
 
-**Nur ZWEI Zwischenränge (101, 102), nicht sechs.** *Warum:* neu sind allein
-`active` und `boost`; die anderen vier bestehen weiter.
-
-**Das Prüferkonto wurde vorgezogen** (siehe unten). *Warum:* ein Mensch wartete.
+**Nur ZWEI Zwischenränge (101, 102).** *Warum:* neu sind allein `active` und
+`boost`.
 
 ## Das Store-Prüferkonto — erledigt, steht auf PROD
 
@@ -70,18 +68,12 @@ Angelegt am 26.09. auf **ausdrückliche Freigabe Donalds**, weil die externe
 TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
 
 * Stufe **`exchange` (Rang 4)** — die unterste Clubstufe der HEUTIGEN Leiter.
-  Es wandert mit der Key-Migration **ohne Sonderregel** nach `discover`.
+  Es wandert mit `migrate-prod` **ohne Sonderregel** nach `discover`.
 * Zugangsdaten: Infisical `prod`, `STORE_REVIEW_LOGIN` / `STORE_REVIEW_PASSWORD`.
-  Nichts davon im Repo.
-* `is_public = false`, `activated_at` gesetzt.
-* Weg: `email_confirm: true` und **kein Kennwort im Rumpf**, danach
-  `PUT /auth/v1/admin/users/{id}`. Das weicht begründet vom Aktivierungslink ab:
-  der setzt einen Menschen voraus, der ihn einlöst — hier muss das Kennwort
-  bekannt sein, weil es in eine Prüfmaske gehört.
-* Abgenommen mit einer **echten Anmeldung**, nicht mit dem 200 des Setzens: 28
-  Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge.
+* `is_public = false`, `activated_at` gesetzt, abgenommen mit einer **echten
+  Anmeldung**: 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge.
 
-**PROD-Verteilung danach:** `basic` 3 · `discover` 1 · `exchange` 1 ·
+**PROD-Verteilung vor `migrate-prod`:** `basic` 3 · `discover` 1 · `exchange` 1 ·
 `impact` 73 = 78 Profile.
 
 ## Files modified
@@ -91,28 +83,25 @@ TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
   Schluss-Wächter über Rang UND Preis.
 * `supabase/tests/stufen_v5_leiter_test.sql`, `…_absage_test.sql` — neu.
 * `supabase/tests/kontaktanfrage_staffelung_test.sql` → `…_stufe_test.sql`.
-* Zehn Bestands-pgTAP-Dateien und `demo_personas.sql` — rangtreu gezogen.
 * `src/config/levels.ts` — neu `CLUB_LEVEL` / `CLUB_RANK`; die Zahl 4 steht im
   Frontend an EINER Stelle.
-* `src/config/nav.ts` — `/mitglieder` auf `discover`, `/academy` **neu** mit
-  `minTier`.
-* `src/lib/contact-requests.ts` — der Staffelungs-Parameter ist WEG, nicht bloss
-  ungenutzt.
-* `AGENTS.md` + `CLAUDE.md` (der Gate hält sie byte-identisch), `docs/lastenheft.md`,
-  `docs/pruefer-zugang.md`, `docs/technisches-handbuch.md`, `docs/demo-*.md`,
-  `supabase/functions/create-checkout-session/*`.
+* `src/lib/contact-requests.ts` — der Staffelungs-Parameter ist WEG.
+* Neun `openspec/specs/*` — das Delta ist gefaltet, plus
+  `src/content/release-entries.generated.ts` (89 Einträge).
 
 ## Next session: start here
 
-`cd /Users/donald/worktrees/fbc-platform/stufen-v5 && gh pr checks 436`. Ist CI
-grün, mergen (Donalds stehende Freigabe bei grünem CI deckt das). **Danach
-blockt `drift-gate` jeden Deploy**, bis `migrate-prod` dispatcht und der
-blockierte Lauf mit `gh run rerun --failed` wiederholt ist — **beides sind
-PROD-Schreibzugriffe und brauchen Donalds ausdrückliche Freigabe, die stehende
-Merge-Freigabe deckt sie NICHT.** Danach die Verteilung auf PROD zählen, und
-eine Gegenprobe, ob das Prüferkonto auf `discover`/Rang 4 gelandet ist (die
-Abfrage steht in `docs/pruefer-zugang.md` und prüft am RANG, nicht am Namen).
-Dann `openspec archive stufen-v5` und `wt remove`.
+`cd /Users/donald/worktrees/fbc-platform/stufen-v5`. Der Arbeitsbaum steht auf
+Branch `donald/age-903-archiv`; der Branch `stufen-v5` ist gemergt und kann weg.
+
+**Fragen, nicht tun:** Donald um die Freigabe für `migrate-prod` bitten. Danach
+`gh run rerun --failed 36255511834`, dann die Verteilung auf PROD zählen und
+gegen die 78 oben halten, und die Gegenprobe, ob das Prüferkonto auf Rang 4
+gelandet ist — die Abfrage steht in `docs/pruefer-zugang.md` und prüft am RANG,
+nicht am Namen. Erst danach `wt remove`.
+
+Aus dem Fünf-Punkte-Auftrag stehen dann noch AGE-927, AGE-928 und AGE-930 aus
+(AGE-930 legt auch `open_contact` um).
 
 ## Zustand der Umgebung
 
@@ -121,22 +110,14 @@ Dann `openspec archive stufen-v5` und `wt remove`.
   `open_contact` steht auf `true`, wie vorgefunden.
 * Der Stack hat **136 von 137** Migrationen plus meiner.
   `20260925120000_release_backfill.sql` (AGE-905) fehlt und bricht lokal an
-  „Profile vorhanden, aber kein Admin in `staff_roles`" — das ist die geliehene
-  und korrekt zurückgenommene Adminzeile. In CI läuft sie gegen eine leere DB in
-  ihren `notice`-Zweig. **Nicht anfassen**, aber einrechnen: `db push --local`
-  scheitert daran, nicht an AGE-903.
-* Aufgeräumt: `.env.local` gelöscht, vite beendet, Sichtprobe-Konten entfernt.
-  Nachgeprüft und sauber: keine verwaisten `profiles`, `member_settings`,
-  `auth.identities` oder `storage.objects`.
+  „Profile vorhanden, aber kein Admin in `staff_roles`". **Nicht anfassen**,
+  aber einrechnen: `db push --local` scheitert daran, nicht an AGE-903.
 * **EIN Rest bleibt, harmlos und benannt:** im geteilten chrome-devtools-Chrome
-  steht eine Seite auf `http://localhost:5217` — ein eigener Rest aus AGE-929
-  von heute Vormittag, nicht der einer Nachbarsitzung (von `fbc-platform-61`
-  ausdrücklich bestätigt). Der Server dort ist tot (`curl` → 000), die Seite
-  zeigt also ins Leere. Ich konnte sie nicht mehr schliessen: die
-  MCP-Schnittstelle antwortete dreimal leer. Den Chrome habe ich **nicht** blind
-  abgeschossen — das ist die Hausregel, und sie gilt auch für den eigenen Rest,
-  solange ein MCP ihn hält. Wegräumen, wenn die Schnittstelle wieder antwortet:
-  Seite auf `about:blank` stellen und ihr `localStorage` leeren (dort steht ein
+  steht eine Seite auf `http://localhost:5217` — ein eigener Rest aus AGE-929,
+  nicht der einer Nachbarsitzung (von `fbc-platform-61` bestätigt). Der Server
+  dort ist tot (`curl` → 000). Die MCP-Schnittstelle antwortete dreimal leer;
+  den Chrome habe ich **nicht** blind abgeschossen. Wegräumen, wenn sie wieder
+  antwortet: Seite auf `about:blank`, `localStorage` leeren (dort steht ein
   `sb-127-auth-token` eines gelöschten Kontos).
 
 ## Open questions
@@ -144,22 +125,23 @@ Dann `openspec archive stufen-v5` und `wt remove`.
 * **FOCUS und IMPACT schalten im Gating nichts frei, was DISCOVER nicht hat** —
   jede Clubschwelle lautet `has_level(4)`. Standard aus dem Issue, Rückfrage an
   Detlev offen. Steht so im Lastenheft.
-* **Detlevs V5-Funktionsmatrix ist weiterhin nicht lesbar** (`~/Documents`, macOS
-  TCC, `EPERM`). Donalds Vorgabe zu Kontaktanfragen gilt ungeprüft gegen das
-  Original.
+* **Detlevs V5-Funktionsmatrix ist weiterhin nicht lesbar** (`~/Documents`,
+  macOS TCC, `EPERM`).
 * **Preise für BOOST (75 €) und CONNECT** — später, eigene Änderung.
 * Sichtbarer Fokusring auf den Seitenleisten-`NavLink`s (Befund aus AGE-929,
   eigenes Issue, bewusst in keinem Diff).
 
-## Zwei Notizen ins Gedächtnis geschrieben
+## Drei Notizen ins Gedächtnis geschrieben
 
-* **`delete from auth.users` räumt die Profilzeile NICHT mit weg** — die Kaskade
-  ist seit AGE-708 bewusst entfernt. Die Kontenzahl meldet trotzdem „0". Das ist
-  jetzt die **dritte** unabhängige Entdeckung (AGE-907, AGE-903); nachgetragen in
-  `kontoloeschung-was-wo-haengt`, mit der Sonde, die es findet: nicht die
-  Kontenzahl prüfen, sondern die Verteilung vorher und nachher.
+* **`delete from auth.users` räumt die Profilzeile NICHT mit weg** — dritte
+  unabhängige Entdeckung. Sonde: die Verteilung vorher/nachher, nicht die
+  Kontenzahl. In `kontoloeschung-was-wo-haengt`.
 * **Prozess- und Port-Zuordnung zwischen Sitzungen: messen, nicht erinnern.**
-  Heute dreimal falsch zugeordnet, jedes Mal von einem Befehl geklärt. Und eine
-  Frage mit eingebauter Vermutung („ist 5217 deiner?") bekommt eine Antwort auf
-  die Vermutung — richtig ist „welche Ports hast du offen?". Nachgetragen in
+  Dazu die Unterscheidung von `fbc-platform-61`: die *fragende* Seite muss die
+  Frageform reparieren („wem gehört der?"), die *antwortende* Seite muss vor der
+  Antwort messen — gerade wenn es um einen selbst geht. In
   `chrome-devtools-profil-ist-einplaetzig`.
+* **Die Vorab-Sonde vor `openspec archive` hat wieder etwas gefunden** — drei
+  Fallen auf einmal (kein H1, keine `Linear:`-Zeile, `###` beendet
+  `## What Changes` nicht, also fünf Ausschlüsse als das Ausgelieferte). In
+  `archivieren-zieht-neuigkeiten-nach`.
