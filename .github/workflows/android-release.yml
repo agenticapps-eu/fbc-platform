@@ -93,7 +93,20 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+      # ⚠ NICHT AUF v4.0.1 ZURUECKPINNEN (26.09., AGE-907).
+      # Die Vorgabe von v4.0.1 war `packages: 'tools platform-tools'`. Google
+      # hat das Paket `tools` aus dem SDK-Repository ENTFERNT, seither bricht
+      # der Schritt fuer jeden, der die alte Fassung faehrt:
+      #
+      #   Warning: Failed to find package 'tools'
+      #   Error: The process '…/cmdline-tools/20.0/bin/sdkmanager' failed with exit code 1
+      #
+      # Die Ursache liegt AUSSERHALB dieses Repos, und der Lauf davor war gruen
+      # — es hat sich nichts bei uns geaendert. v4.0.2 traegt dafuer die
+      # Release-Notiz „Fix for removed tools package."; v4.0.4 setzt die
+      # Vorgabe auf `platform-tools` und hebt cmdline-tools auf 22.0.
+      # `tools` brauchen wir nicht: gebaut wird mit Gradle und AGP.
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
 
       # Gleiche Installation wie in `deploy.yml`. Ein Checksum-Pin ist nicht zu
       # haben — Infisical verteilt die CLI ueber sein eigenes Repository
