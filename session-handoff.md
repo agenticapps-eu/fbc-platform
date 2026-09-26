@@ -125,8 +125,19 @@ Dann `openspec archive stufen-v5` und `wt remove`.
   und korrekt zurückgenommene Adminzeile. In CI läuft sie gegen eine leere DB in
   ihren `notice`-Zweig. **Nicht anfassen**, aber einrechnen: `db push --local`
   scheitert daran, nicht an AGE-903.
-* Aufgeräumt: `.env.local` gelöscht, vite beendet, Sichtprobe-Konten entfernt,
-  Browser freigegeben.
+* Aufgeräumt: `.env.local` gelöscht, vite beendet, Sichtprobe-Konten entfernt.
+  Nachgeprüft und sauber: keine verwaisten `profiles`, `member_settings`,
+  `auth.identities` oder `storage.objects`.
+* **EIN Rest bleibt, harmlos und benannt:** im geteilten chrome-devtools-Chrome
+  steht eine Seite auf `http://localhost:5217` — ein eigener Rest aus AGE-929
+  von heute Vormittag, nicht der einer Nachbarsitzung (von `fbc-platform-61`
+  ausdrücklich bestätigt). Der Server dort ist tot (`curl` → 000), die Seite
+  zeigt also ins Leere. Ich konnte sie nicht mehr schliessen: die
+  MCP-Schnittstelle antwortete dreimal leer. Den Chrome habe ich **nicht** blind
+  abgeschossen — das ist die Hausregel, und sie gilt auch für den eigenen Rest,
+  solange ein MCP ihn hält. Wegräumen, wenn die Schnittstelle wieder antwortet:
+  Seite auf `about:blank` stellen und ihr `localStorage` leeren (dort steht ein
+  `sb-127-auth-token` eines gelöschten Kontos).
 
 ## Open questions
 
@@ -139,3 +150,16 @@ Dann `openspec archive stufen-v5` und `wt remove`.
 * **Preise für BOOST (75 €) und CONNECT** — später, eigene Änderung.
 * Sichtbarer Fokusring auf den Seitenleisten-`NavLink`s (Befund aus AGE-929,
   eigenes Issue, bewusst in keinem Diff).
+
+## Zwei Notizen ins Gedächtnis geschrieben
+
+* **`delete from auth.users` räumt die Profilzeile NICHT mit weg** — die Kaskade
+  ist seit AGE-708 bewusst entfernt. Die Kontenzahl meldet trotzdem „0". Das ist
+  jetzt die **dritte** unabhängige Entdeckung (AGE-907, AGE-903); nachgetragen in
+  `kontoloeschung-was-wo-haengt`, mit der Sonde, die es findet: nicht die
+  Kontenzahl prüfen, sondern die Verteilung vorher und nachher.
+* **Prozess- und Port-Zuordnung zwischen Sitzungen: messen, nicht erinnern.**
+  Heute dreimal falsch zugeordnet, jedes Mal von einem Befehl geklärt. Und eine
+  Frage mit eingebauter Vermutung („ist 5217 deiner?") bekommt eine Antwort auf
+  die Vermutung — richtig ist „welche Ports hast du offen?". Nachgetragen in
+  `chrome-devtools-profil-ist-einplaetzig`.
