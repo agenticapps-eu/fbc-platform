@@ -1,0 +1,113 @@
+# Aufgaben — stufen-v5 (AGE-903)
+
+Reihenfolge ist nicht frei: die Migration muss vor den pgTAP-Tests stehen, die
+sie prüfen, und der Fremdschlüssel `profiles_tier_fkey` erzwingt die Reihenfolge
+*innerhalb* der Migration.
+
+## 0 · Vor der ersten Codezeile (erledigt)
+
+- [x] Schwellen-Tabelle alt→neu aus der jüngsten Definition jeder Funktion und
+      Policy, gelesen aus dem Katalog statt aus 21 Migrationsdateien
+- [x] Verteilung je Stufe auf PROD, nur lesend, ohne Namen
+- [x] `platform_settings.open_contact` auf PROD gelesen (`true`), **nicht geändert**
+- [x] Frontend-Stellen mit hart kodierten Stufennamen und Preisen erhoben
+- [x] Katalog-Scan über Funktionsrümpfe, Spalten-Defaults und Check-Constraints
+      nach hart geschriebenen Schlüsseln ohne Rangschwelle
+- [x] Auftragstext ins Repo geholt (`auftrag.md`)
+- [x] Zuständigkeit für das Prüferkonto mit der Parallelsitzung abgestimmt
+
+## 1 · Plan-Review (Gate, vor jeder Codezeile)
+
+- [ ] `openspec-change-review` mit **zwei** Modellen anderer Anbieter auf die
+      neun Delta-Specs; `REVIEWS.md` mit signiertem Trailer
+- [ ] Fremdreviewer für Migration und RLS (Regel 26.08.: Schema, Rechte,
+      Sicherheit) — dies ist kein reiner Oberflächen-Change
+
+## 2 · Migration (eine Datei, forward-only)
+
+- [ ] RED: pgTAP-Test, der die sechs Zielschlüssel mit ihren Rängen und Preisen
+      erwartet — muss gegen den heutigen Stand rot sein
+- [ ] Neue Keys auf temporären Rängen 101…106 anlegen
+- [ ] Profile umhängen: `impact`→IMPACT, `focus`→FOCUS,
+      `connect`·`discover`·`exchange`→DISCOVER, `basic`→ACTIVE
+- [ ] Alte Keys löschen, echte Ränge 1…6 setzen
+- [ ] `profiles.tier` DEFAULT `'basic'` → `'active'`
+- [ ] `handle_new_user()` neu deklarieren — schreibt `'active'` statt `'basic'`
+- [ ] Sechs SELECT-Policies auf `has_level(4)`
+- [ ] `search_directory()` Eintrittstor auf `has_level(4)`
+- [ ] `register_for_event()` auf `has_level(4)` im `members`-Zweig
+- [ ] `darf_kontaktanfrage_senden()` auf `has_level(4)`, Rang-2-Zweig ersatzlos
+- [ ] `regs_write_own` WITH CHECK spiegelt die Bedingung aus
+      `register_for_event` (öffentlich ohne Rang, `members` ab 4, Host frei)
+- [ ] Schlussprüfung in derselben Migration: kein Profil auf einem entfallenen
+      Schlüssel, sonst `raise`
+- [ ] Migrationskopf trägt die Entscheidungen und die Zwischenrang-Begründung
+
+## 3 · pgTAP (je Stufe 1–6, was lesbar und erlaubt ist)
+
+- [ ] Rang 1–3: kein fremdes Vollprofil, keine `offers`/`needs`, keine
+      Verzeichnisliste — **nur die eigene Zeile**
+- [ ] Rang 4–6: Liste **und** erweiterte Spalten zugleich
+- [ ] Rang 3 sieht keine Academy-Route (Frontend-Test, hier nur der Rang)
+- [ ] Kontaktanfragen mit `open_contact = false`: unter 4 abgelehnt, ab 4 an
+      jeden Empfänger — inklusive des Falls, dass die Empfängerstufe nichts ändert
+- [ ] Event: Anmelden und Absagen tragen dieselbe Bedingung, auch bei `public`
+- [ ] Neuanlage über den Trigger landet auf einem Schlüssel, der in
+      `membership_tiers` steht — geprüft über den Join, nicht gegen ein Literal
+- [ ] Alle neuen Dateien in die Liste in `.github/workflows/ci.yml` eintragen
+- [ ] Bestehende pgTAP-Tests und `demo_personas.sql` auf die neuen Schlüssel
+      ziehen (~160 Literale, brechen sonst laut in CI)
+
+## 4 · Frontend
+
+- [ ] `src/config/levels.ts`: Schlüssel, Labels, Preise, Ränge, `DEFAULT_LEVEL`
+- [ ] `src/config/nav.ts`: `minTier` auf `/mitglieder` → neuer `discover`;
+      **neu** `minTier` auf `/academy`
+- [ ] `src/pages/MitgliedschaftPage.tsx`: `PAID`, `RECOMMENDED`, `zeigtPreise`
+- [ ] `src/components/ui/TierBadge.tsx`: `LEVEL_WEIGHT` auf die neuen Schlüssel
+- [ ] `src/lib/contact-requests.ts`: Staffelungs-Spiegel entfernen
+- [ ] Stufentexte in `HeaderSearch`, `MemberDirectory`, `HomePage`
+- [ ] `AdminMitgliederPage`: Auswahl nur DISCOVER · FOCUS · IMPACT, bestehende
+      tiefere Stufe trotzdem anzeigen
+- [ ] `membershipVisuals.ts` **nicht** anfassen — rechnet nur mit `rank`
+- [ ] Vitest für jede geänderte Schwelle, RED vor GREEN
+
+## 5 · Kaufweg und Doku
+
+- [ ] `create-checkout-session`: `PAID_LEVELS` und README auf die neuen
+      Schlüssel; Stripe bleibt ruhend, keine Kaufknöpfe
+- [ ] `docs/lastenheft.md` Teil C: Namensfrage BOOST/Basic als entschieden
+- [ ] `docs/pruefer-zugang.md`: Checklistenpunkt 2 auf DISCOVER, die Tabelle
+      „Was das Konto sieht" auf **eine** Schwelle bei Rang 4, der Abschnitt
+      „⚠ Nach AGE-903 …" von Ankündigung auf Vollzug
+- [ ] Release-Geschichten **nicht** anfassen
+
+## 6 · Abnahme
+
+- [ ] `pnpm test`, `npx tsc --noEmit`, `pnpm lint`, `openspec validate --all`
+- [ ] Nach jedem `pnpm build`, vor jedem `git add`:
+      `git checkout -- src/content/release-entries.generated.ts`
+- [ ] Sichtprobe am lokalen Stack: je ein Konto auf Rang 1, 3 und 4 —
+      Verzeichnis, Academy, Event, Kontaktanfrage
+- [ ] Verteilung vor/nach der Migration dokumentiert, als Zahl ohne Namen
+- [ ] Oberfläche nennt nur DISCOVER · FOCUS · IMPACT — kein „Basic", kein
+      „Exchange"
+- [ ] Code-Review auf den **Diff**
+- [ ] PR-Text nennt `migrate-prod` und `gh run rerun --failed`
+
+## 7 · Nach dem Merge (ausdrückliche Freigabe nötig)
+
+- [ ] `migrate-prod` dispatchen — **nicht** von der Merge-Freigabe gedeckt
+- [ ] `gh run rerun --failed` für den von `drift-gate` blockierten Deploy
+- [ ] Verteilung auf PROD nach dem Lauf zählen und vorlegen
+- [ ] Prüferkonto auf dem neuen DISCOVER anlegen: `email_confirm: true`,
+      **kein Passwort im Admin-Rumpf**, Kennwort über den Aktivierungslink;
+      Zugangsdaten nach Infisical, nichts davon ins Repo
+- [ ] Vollzug an die Parallelsitzung melden, die den Handschritt in AGE-907 abhakt
+
+## Offen, nicht in diesem Change
+
+- [ ] `open_contact` umlegen — gehört zu AGE-930
+- [ ] BOOST auf 75 € — später (Donald, 25.09.)
+- [ ] Sichtbarer Fokusring auf den `NavLink`s der Seitenleiste (Befund aus
+      AGE-929, eigenes Issue)
