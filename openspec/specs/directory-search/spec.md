@@ -196,19 +196,25 @@ condition SHALL sit in the view body itself, not only in the policies behind it.
 
 The system SHALL reserve full profile rows and extended data (beyond the
 `profiles_public` subset) for the profile's owner OR a caller with
-`level_rank >= 3` (`discover`), enforced by the base-table policy
-`profiles_select_self_or_discover` (`has_level(3)`). Because `search_directory`
-runs as `SECURITY INVOKER`, a below-Discover or anonymous caller SHALL see at
-most their own full row through it.
+`level_rank >= 4` (`discover` in the ladder introduced by AGE-903), enforced by
+the base-table policy `profiles_select_self_or_discover` (`has_level(4)`).
+Because `search_directory` runs as `SECURITY INVOKER`, a below-Discover or
+anonymous caller SHALL see at most their own full row through it.
+
+**The policy name outlives its number on purpose.** It was minted when
+`discover` meant rank 3; it now guards rank 4, which `discover` means after
+AGE-903. Renaming it would rewrite six call sites for a cosmetic gain and cost
+the trail from the migration that created it. The number in the body is the
+authority, never the name.
 
 #### Scenario: Below-Discover caller sees at most their own full row
 
-- **WHEN** a member with `level_rank < 3` invokes `search_directory`
+- **WHEN** a member with `level_rank < 4` invokes `search_directory`
 - **THEN** the base-table RLS yields only their own row (no other members' full rows)
 
 #### Scenario: Discover-and-above caller sees the full directory
 
-- **WHEN** a member with `level_rank >= 3` invokes `search_directory`
+- **WHEN** a member with `level_rank >= 4` invokes `search_directory`
 - **THEN** all `is_public` members' rows are returned
 
 ### Requirement: Directory visibility has a single source of truth
@@ -449,10 +455,10 @@ Academy-Inhalte SHALL NOT durchsucht werden.
 ### Requirement: Der Suchbegriff geht an das Verzeichnis über
 
 Enter im Suchfeld sowie ein Weg „alle Ergebnisse" SHALL für einen Aufrufer ab
-Stufe `connect` auf das Mitgliederverzeichnis führen und den Suchbegriff
-**dorthin übernehmen**.
+**Rang 4** (`discover` nach AGE-903) auf das Mitgliederverzeichnis führen und
+den Suchbegriff **dorthin übernehmen**.
 
-**Unterhalb von `connect` SHALL dieser Weg NICHT ins Verzeichnis führen.**
+**Unterhalb von Rang 4 SHALL dieser Weg NICHT ins Verzeichnis führen.**
 `/mitglieder` liegt hinter einem Stufen-Gate; die Verzeichnisoberfläche entsteht
 dort gar nicht, und der Begriff verschwände in einer Wand. Stattdessen SHALL der
 Aufrufer auf die Aufstiegsseite geführt werden.
@@ -485,7 +491,7 @@ Kompass-Kategorien) SHALL ein Wechsel des Suchbegriffs **nicht** zurücksetzen.
 
 #### Scenario: Enter führt mit Begriff ins Verzeichnis
 
-- **WHEN** ein Mitglied ab `connect` einen Suchbegriff eingibt und Enter drückt
+- **WHEN** ein Mitglied ab Rang 4 einen Suchbegriff eingibt und Enter drückt
 - **THEN** öffnet sich das Mitgliederverzeichnis
 - **AND** sein Suchfeld trägt denselben Begriff und seine Liste zeigt dessen
   Treffer
@@ -516,19 +522,28 @@ Kompass-Kategorien) SHALL ein Wechsel des Suchbegriffs **nicht** zurücksetzen.
 
 #### Scenario: Unterhalb von discover führt Enter auf die Aufstiegsseite
 
-<!-- Der Titel bleibt zeichengleich, obwohl die Schwelle jetzt `connect` heisst.
+<!-- Der Titel bleibt zeichengleich, über drei Schwellenwechsel hinweg.
      `openspec archive` ordnet Szenarien über ihre Überschrift zu und bricht ab,
      wenn eine verschwindet — ein umbenannter Titel wirkt wie ein gelöschtes
      Szenario. Die Hausregel dazu: den RUMPF schärfen, nie den Titel.
 
-     Der Rumpf steht deshalb auf `basic`. Damit ist er unter BEIDEN Lesarten
-     wahr — `basic` liegt unterhalb von `discover` wie von `connect` —, und der
-     interessante neue Fall (`connect` kommt jetzt durch) steht bereits im
-     ersten Szenario dieser Anforderung. -->
+     Der Rumpf stand auf `basic` und steht jetzt auf `active`, dem Schlüssel,
+     der nach AGE-903 denselben Rang 1 trägt. Er liegt unterhalb JEDER Schwelle,
+     die dieses Szenario je hatte (`discover` Rang 3, `connect` Rang 2, jetzt
+     Rang 4) — die Zusage bleibt unter allen drei Lesarten wahr. Der
+     interessante neue Fall (Rang 2 und 3 kommen jetzt NICHT mehr durch) steht
+     im Szenario „Ein Rang unterhalb des Clubs wird abgewiesen". -->
 
-- **WHEN** ein aktiviertes Mitglied auf `basic` einen Begriff eingibt und Enter
+- **WHEN** ein aktiviertes Mitglied auf `active` einen Begriff eingibt und Enter
   drückt
 - **THEN** öffnet sich die Aufstiegsseite statt des Verzeichnisses
+
+#### Scenario: Ein Rang unterhalb des Clubs wird abgewiesen
+
+- **WHEN** ein aktiviertes Mitglied auf Rang 2 (`boost`) oder Rang 3
+  (`connect`) einen Begriff eingibt und Enter drückt
+- **THEN** öffnet sich die Aufstiegsseite statt des Verzeichnisses — genau
+  diese beiden Ränge kamen vor AGE-903 noch durch
 
 ### Requirement: Der Sucheinstieg zeigt sich nur, wem er nützt
 
@@ -550,16 +565,16 @@ Unterscheidung SHALL erst **nach** einer erfolgreichen Antwort getroffen werden:
    gefunden" oder als „Aufstieg nötig" erscheinen: das verkleidete einen
    Betriebs- oder Anmeldefehler als Such- oder Stufenaussage.
 2. **Stufe zu niedrig.** Kommt eine erfolgreiche, **leere** Antwort und liegt der
-   eigene Rang unter `connect`, SHALL ein Hinweis erscheinen, der die nötige
+   eigene Rang unter **4**, SHALL ein Hinweis erscheinen, der die nötige
    Stufe nennt und zum Aufstieg führt. „Keine Mitglieder gefunden" wäre dort
    unwahr: es gibt Treffer, das Konto darf sie nicht sehen.
-3. **Echter Nulltreffer.** Kommt eine erfolgreiche, leere Antwort ab `connect`,
+3. **Echter Nulltreffer.** Kommt eine erfolgreiche, leere Antwort ab Rang 4,
    SHALL eine benannte Meldung samt Weg ins Verzeichnis erscheinen, keine leere
    Liste.
 
 Der eigene Rang SHALL **ausschließlich** die Formulierung des leeren Falls
 bestimmen. Er SHALL NOT die Abfrage unterdrücken und SHALL NOT Treffer
-verbergen: die Policy gibt einem Konto unterhalb `connect` die **eigene** Zeile
+verbergen: die Policy gibt einem Konto unterhalb Rang 4 die **eigene** Zeile
 zurück, und die ist ein gültiger Treffer. Ein Rang, der Ergebnisse ausblendet,
 wäre eine zweite Zugriffskontrolle im Frontend — Kulisse vor einem Gate, das
 schon hält.
@@ -581,12 +596,13 @@ nachgebaut werden; der **Nachweis** SHALL an der Datenbank geführt werden.
 
 #### Scenario: Unterhalb discover und leer erscheint der Aufstiegs-Hinweis
 
-<!-- Titel zeichengleich zur heutigen Fassung, Rumpf auf `basic` geschaerft —
+<!-- Titel zeichengleich zur heutigen Fassung, Rumpf auf `active` geschaerft —
      siehe die Begruendung am Szenario „Unterhalb von discover fuehrt Enter auf
-     die Aufstiegsseite". `basic` liegt unterhalb beider Schwellen, die Zusage
-     bleibt also unter alter wie neuer Lesart wahr. -->
+     die Aufstiegsseite". `active` traegt nach AGE-903 denselben Rang 1 wie
+     `basic` davor und liegt unterhalb JEDER Schwelle, die dieses Szenario je
+     hatte; die Zusage bleibt unter allen Lesarten wahr. -->
 
-- **WHEN** ein aktiviertes Mitglied auf `basic` sucht **und** die
+- **WHEN** ein aktiviertes Mitglied auf `active` sucht **und** die
   Abfrage erfolgreich keine Zeile liefert
 - **THEN** erscheint ein Hinweis, der die nötige Stufe nennt und zum Aufstieg
   führt
@@ -594,19 +610,21 @@ nachgebaut werden; der **Nachweis** SHALL an der Datenbank geführt werden.
 
 #### Scenario: Unterhalb discover wird die eigene Zeile trotzdem gezeigt
 
-<!-- Titel zeichengleich, Rumpf auf `basic`. Genau dieser Fall ist der Grund
+<!-- Titel zeichengleich, Rumpf auf `active`. Genau dieser Fall ist der Grund
      fuer den Selbst-Zweig im Eintrittstor von `search_directory`: ein Konto
      unterhalb der Verzeichnisschwelle findet in der Kopfzeilen-Suche weiterhin
-     sich selbst. -->
+     sich selbst. Der Zweig wird mit AGE-903 WICHTIGER, nicht unwichtiger: die
+     Schwelle steigt von Rang 2 auf Rang 4, also faellt ein groesserer Teil des
+     Bestands darunter. -->
 
-- **WHEN** ein aktiviertes Mitglied auf `basic` nach seinem eigenen
+- **WHEN** ein aktiviertes Mitglied auf `active` nach seinem eigenen
   Namen sucht und die Abfrage seine eigene Zeile liefert
 - **THEN** erscheint dieser Treffer normal
 - **AND** er wird nicht wegen der Stufe unterdrückt
 
 #### Scenario: Echter Nulltreffer ist formuliert
 
-- **WHEN** ein Mitglied ab `connect` einen Begriff eingibt, auf den kein Profil
+- **WHEN** ein Mitglied ab Rang 4 einen Begriff eingibt, auf den kein Profil
   passt
 - **THEN** erscheint eine benannte Meldung samt Weg ins Verzeichnis, keine leere
   Liste
@@ -783,13 +801,21 @@ keinen einzigen Kontakt hat — der Weg soll auffindbar sein, bevor der erste
 Kontakt entsteht.
 
 „Immer" heißt: für jeden, der die Fläche überhaupt erreicht. `/mitglieder` ist
-über `navItems.minTier` ab `connect` freigegeben, und `search_directory` gäbe
-einem Aufrufer darunter ohnehin höchstens die eigene Zeile. Ein Mitglied auf
-`basic` SHALL NOT hier bedient werden, obwohl es Kontaktanfragen annehmen und
-damit Kontakte haben kann. Das ist eine ausdrückliche **Nicht-Zusage**: diese
-Anforderung schafft für `basic` keinen Weg zu seinen Kontakten, und der Reiter
-ist kein Ersatz für einen solchen. Wer ihn schaffen will, braucht eine Fläche
-unterhalb des Rang-Gates — `/kontakte` trägt kein `minTier` und wäre der Ort.
+über `navItems.minTier` ab **Rang 4** (`discover` nach AGE-903) freigegeben, und
+`search_directory` gäbe einem Aufrufer darunter ohnehin höchstens die eigene
+Zeile. Ein Mitglied unterhalb Rang 4 SHALL NOT hier bedient werden, obwohl es
+Kontaktanfragen annehmen und damit Kontakte haben kann. Das ist eine
+ausdrückliche **Nicht-Zusage**: diese Anforderung schafft unterhalb des Clubs
+keinen Weg zu den eigenen Kontakten, und der Reiter ist kein Ersatz für einen
+solchen. Wer ihn schaffen will, braucht eine Fläche unterhalb des Rang-Gates —
+`/kontakte` trägt kein `minTier` und wäre der Ort.
+
+**Die Nicht-Zusage wiegt mit AGE-903 schwerer und bleibt trotzdem stehen.** Die
+Schwelle stieg von Rang 2 auf Rang 4, also fallen mehr Konten darunter — und
+weil `open_contact` auf `true` steht, darf jedes aktivierte Konto weiterhin
+Kontaktanfragen senden und annehmen. Ein Konto unterhalb des Clubs kann damit
+Kontakte haben, die es hier nicht sieht. Das ist kein neuer Zustand, nur ein
+häufigerer; der Ort für die Abhilfe bleibt `/kontakte`.
 
 Das ist ausdrücklich die andere Entscheidung als beim bedingten
 Navigationseintrag für offene Anfragen (AGE-592). Der Unterschied ist der
@@ -843,17 +869,17 @@ die Suchergebnisse („Suchergebnisse überleben keinen Wechsel der Identität")
 
 #### Scenario: Beide Reiter stehen auch ohne Kontakte
 
-- **WHEN** ein Mitglied ab `connect` ohne angenommene Kontaktanfrage
+- **WHEN** ein Mitglied ab Rang 4 ohne angenommene Kontaktanfrage
   `/mitglieder` öffnet
 - **THEN** stehen beide Reiter da, „Meine Kontakte" mit dem Zähler 0
 
 #### Scenario: Unterhalb von discover gibt es die Fläche gar nicht
 
-<!-- Titel zeichengleich zur heutigen Fassung. Der Rumpf stand schon vorher auf
-     `basic` und bleibt damit unter alter wie neuer Schwelle wahr — hier war
-     nichts zu schärfen, nur der Titel zurückzunehmen. -->
+<!-- Titel zeichengleich zur heutigen Fassung. Der Rumpf steht auf `active`,
+     dem Schlüssel, der nach AGE-903 denselben Rang 1 trägt wie `basic` davor;
+     er bleibt damit unter jeder Schwelle wahr, die dieses Szenario je hatte. -->
 
-- **WHEN** ein Mitglied auf `basic` mit einem angenommenen Kontakt
+- **WHEN** ein Mitglied auf `active` mit einem angenommenen Kontakt
   `/mitglieder` aufruft
 - **THEN** greift das bestehende Rang-Gate der Route, und weder Reiter noch
   Kontaktliste erscheinen — diese Anforderung ändert daran nichts
@@ -1034,98 +1060,35 @@ zeigen.
 - **WHEN** das Verzeichnis ab `lg` geöffnet wird
 - **THEN** sind die erweiterten Filter ohne weiteres Zutun sichtbar
 
-### Requirement: Die Verzeichnisliste hat eine eigene, niedrigere Schwelle als ihre erweiterten Spalten
-
-Das System SHALL die Liste und die Suche des Mitgliederverzeichnisses ab Rang 2
-(`connect`) ausliefern und dabei die Rang-3-Grenze für erweiterte Felder
-**unangetastet** lassen. Die beiden Schwellen SHALL getrennte Wirkung haben:
-eine Absenkung der Listenschwelle SHALL NOT erweiterte Felder freigeben.
-
-Als erweiterte Spalten der Verzeichnisantwort SHALL **genau** gelten:
-`competencies`, `has_offers`, `has_needs`, `offer_categories` und
-`need_categories`. Sie SHALL einem Aufrufer unterhalb Rang 3 leer statt gefüllt
-zurückgegeben werden — nicht als Fehler, nicht als fehlende Zeile.
-
-Alle übrigen Spalten der Antwort SHALL Basisfelder sein und auf jeder Stufe
-gefüllt sein, die die Liste sieht. **`branche` SHALL dazugehören** und dafür in
-`profiles_public` aufgenommen werden. Ohne diese Aufnahme fiele die Spalte
-still auf NULL und der Filter `p_branche` liefe wortlos leer — eine
-Verhaltensänderung, die keine Zusage benennt.
-
-Die Aufzählung SHALL **vollständig** sein. Eine Spalte, die weder als Basisfeld
-noch als erweitert benannt ist, ändert ihr Verhalten unbemerkt.
-
-Die Maskierung SHALL sich daraus ergeben, dass die erweiterten Spalten
-weiterhin aus `public.profiles` unter der bestehenden Policy
-`profiles_select_self_or_discover` gelesen werden, während die Basisfelder aus
-`profiles_public` kommen. Die Rangzahl `3` SHALL an keiner zweiten Stelle
-wiederholt werden: eine Kopie driftet, sobald die Grenze sich ändert.
-
-Ein Filter, der auf einer maskierten Spalte arbeitet (`p_competency`,
-`p_offers`, `p_needs`, `p_theme`, `p_offering`), SHALL für einen Aufrufer
-unterhalb Rang 3 ein leeres Ergebnis liefern; die Oberfläche SHALL solche
-Filter unterhalb Rang 3 **gar nicht anbieten** und stattdessen benennen, ab
-welcher Stufe es sie gibt. `p_branche` SHALL NICHT dazugehören — es filtert
-nach der Aufnahme in `profiles_public` auf einem Basisfeld.
-
-#### Scenario: Ein connect-Konto erhält die Liste
-
-- **WHEN** ein aktiviertes Mitglied mit Rang 2 (`connect`) `search_directory`
-  ohne Filter aufruft
-- **THEN** werden die Basisfelder aller öffentlichen Profile aktivierter
-  Eigentümer zurückgegeben, nicht nur die eigene Zeile
-
-#### Scenario: Dasselbe connect-Konto erhält die erweiterten Spalten leer
-
-- **WHEN** dasselbe Mitglied dieselbe Antwort liest
-- **THEN** sind `competencies`, `offer_categories` und `need_categories` leere
-  Arrays und `has_offers`/`has_needs` false — für **fremde** Zeilen, nicht für
-  die eigene
-
-#### Scenario: Ein discover-Konto sieht unverändert alles
-
-- **WHEN** ein aktiviertes Mitglied mit Rang 3 (`discover`) denselben Aufruf
-  macht
-- **THEN** sind dieselben Spalten gefüllt wie vor dieser Änderung — die
-  abgesenkte Listenschwelle hat die Rang-3-Grenze nicht mitgenommen
-
-#### Scenario: Ein basic-Konto erhält weiterhin nur die eigene Zeile
-
-- **WHEN** ein aktiviertes Mitglied mit Rang 1 (`basic`) `search_directory`
-  aufruft
-- **THEN** wird höchstens die eigene Zeile zurückgegeben
-
-#### Scenario: Ein Filter auf einer maskierten Spalte liefert leer
-
-- **WHEN** ein `connect`-Konto nach einer Kompetenz oder einer Biete-/
-  Suche-Kategorie filtert
-- **THEN** ist das Ergebnis leer, und die Oberfläche nennt die Stufe als Grund
-  statt „keine Mitglieder gefunden" zu melden
-
 ### Requirement: Der Volltext gibt nicht preis, was die Ausgabe maskiert
 
 Das System SHALL die Volltextsuche des Verzeichnisses an die **Stufe** des
-Aufrufers binden, nicht nur an seine Aktivierung. Ein Aufrufer unterhalb Rang 3
+Aufrufers binden, nicht nur an seine Aktivierung. Ein Aufrufer unterhalb Rang 4
 SHALL ausschließlich gegen ein Suchdokument aus **Basisfeldern** geprüft werden
-(`name`, `company`, `region`, `short_bio`, `branche`); ab Rang 3 SHALL
+(`name`, `company`, `region`, `short_bio`, `branche`); ab Rang 4 SHALL
 weiterhin das volle `search_doc` gelten.
 
 Der Grund ist ein **Orakel, kein Lesezugriff**. `search_doc` enthält
-`competencies` und `interests`. Die heutige Klausel bindet den Volltext nur an
-`is_activated()`. Solange nur Rang 3 die Liste sieht, ist das folgenlos — wer
-suchen darf, darf die Felder ohnehin lesen. Mit der abgesenkten Listenschwelle
-könnte ein Aufrufer unterhalb Rang 3 die Frage „Hat Mitglied X die Kompetenz
-Y?" stellen und die Antwort daran ablesen, **ob die Zeile stehen bleibt**. Er
-läse die Spalte nicht; er erführe ihren Inhalt trotzdem.
+`competencies` und `interests`. Die Klausel bindet den Volltext sonst nur an
+`is_activated()`. Ein Aufrufer unterhalb der Feldschwelle könnte die Frage „Hat
+Mitglied X die Kompetenz Y?" stellen und die Antwort daran ablesen, **ob die
+Zeile stehen bleibt**. Er läse die Spalte nicht; er erführe ihren Inhalt
+trotzdem.
 
-Diese Zusage SHALL als Fortschreibung derselben Regel gelten, die den **Namen**
-bereits schützt: der Volltext SHALL nichts beantworten, was die Ausgabe
-verschweigt. Eine Maskierung, die sich über die Suche umgehen lässt, SHALL NOT
-als Maskierung gelten.
+**Die Zusage bleibt stehen, obwohl AGE-903 ihre Lücke schliesst.** Sie entstand,
+weil Liste (Rang 2) und Felder (Rang 3) auseinanderlagen; mit einer einzigen
+Schwelle bei Rang 4 sieht niemand mehr die Liste, ohne die Felder zu dürfen, und
+der Selbst-Zweig ist der einzige verbleibende Fall. Eine Sicherheitszusage
+abzuräumen, weil sie gerade nicht auslösen kann, verwechselt „unerreichbar
+heute" mit „unerreichbar" — die nächste Schwellenänderung öffnete die Lücke
+wortlos wieder. Die Zahl wandert von 3 auf 4, der Satz bleibt.
 
 #### Scenario: Ein connect-Konto findet niemanden über eine Kompetenz
 
-- **WHEN** ein aktiviertes Mitglied mit Rang 2 einen Suchbegriff eingibt, der
+<!-- Titel zeichengleich; `connect` heisst nach AGE-903 Rang 3 statt Rang 2.
+     Der Rumpf nennt deshalb den RANG, und beide Ränge liegen unter 4. -->
+
+- **WHEN** ein aktiviertes Mitglied mit Rang 3 einen Suchbegriff eingibt, der
   ausschließlich in `competencies` oder `interests` eines fremden Profils
   vorkommt
 - **THEN** erscheint dieses Profil **nicht** im Ergebnis
@@ -1134,11 +1097,12 @@ als Maskierung gelten.
 
 - **WHEN** dasselbe Mitglied nach einem Firmennamen, einer Region oder einer
   Branche sucht
-- **THEN** erscheinen die passenden Profile
+- **THEN** erscheinen die passenden Profile — soweit die Liste ihm überhaupt
+  fremde Zeilen gibt; unterhalb Rang 4 ist das nur die eigene
 
 #### Scenario: Ab discover findet dieselbe Suche wieder alles
 
-- **WHEN** ein Mitglied ab Rang 3 denselben Kompetenz-Begriff sucht
+- **WHEN** ein Mitglied ab Rang 4 denselben Kompetenz-Begriff sucht
 - **THEN** erscheint das Profil — die Bindung hat die bestehende Suche für
   Berechtigte nicht verengt
 
@@ -1170,4 +1134,61 @@ Es sieht Namen dort, wo sie ihm ohnehin begegnen.
 - **WHEN** dasselbe Mitglied `/mitglieder` aufruft
 - **THEN** greift das Stufen-Gate, und `search_directory` gäbe ihm ohnehin nur
   die eigene Zeile
+
+### Requirement: Liste und erweiterte Spalten tragen dieselbe Schwelle
+
+Das System SHALL die Liste, die Suche **und** die erweiterten Spalten des
+Mitgliederverzeichnisses an **eine** Schwelle binden: Rang 4 (`discover` nach
+AGE-903). Es SHALL keine zweite, niedrigere Schwelle für die Liste geben.
+
+Als erweiterte Spalten der Verzeichnisantwort SHALL **genau** gelten:
+`competencies`, `has_offers`, `has_needs`, `offer_categories` und
+`need_categories`. Alle übrigen Spalten SHALL Basisfelder sein. **`branche`
+SHALL zu den Basisfeldern gehören** und dafür in `profiles_public` geführt
+werden; ohne diese Aufnahme fiele die Spalte still auf NULL und der Filter
+`p_branche` liefe wortlos leer.
+
+Die Aufzählung SHALL **vollständig** bleiben. Eine Spalte, die weder als
+Basisfeld noch als erweitert benannt ist, ändert ihr Verhalten unbemerkt.
+
+Die Rangzahl `4` SHALL an genau **einer** Stelle je Wirkort stehen — im
+Eintrittstor von `search_directory` und in der Policy
+`profiles_select_self_or_discover`. Eine Kopie driftet, sobald die Grenze sich
+ändert; genau daran hing die vorige Fassung mit ihren zwei Zahlen.
+
+Unterhalb Rang 4 SHALL ein Aufrufer **höchstens die eigene Zeile** erhalten —
+nicht eine Liste mit leeren Spalten. Das ist der eigentliche Unterschied zur
+abgelösten Fassung: die Maskierung fremder Zeilen entfällt, weil es fremde
+Zeilen nicht mehr gibt.
+
+Ein Filter, der auf einer erweiterten Spalte arbeitet (`p_competency`,
+`p_offers`, `p_needs`, `p_theme`, `p_offering`), SHALL für einen Aufrufer
+unterhalb Rang 4 ein leeres Ergebnis liefern; die Oberfläche SHALL solche
+Filter dort **gar nicht anbieten**. `p_branche` SHALL NICHT dazugehören.
+
+#### Scenario: Ein Konto unterhalb des Clubs erhält nur die eigene Zeile
+
+- **WHEN** ein aktiviertes Mitglied mit Rang 3 (`connect`) `search_directory`
+  ohne Filter aufruft
+- **THEN** kommt höchstens die eigene Zeile zurück — vor AGE-903 hätte dasselbe
+  Konto die vollständige Liste mit gefüllten erweiterten Spalten erhalten
+
+#### Scenario: Ein Konto ab Rang 4 erhält Liste und erweiterte Spalten zugleich
+
+- **WHEN** ein aktiviertes Mitglied mit Rang 4 denselben Aufruf macht
+- **THEN** kommen die Basisfelder aller öffentlichen Profile aktivierter
+  Eigentümer zurück **und** `competencies`, `offer_categories`,
+  `need_categories`, `has_offers`, `has_needs` sind gefüllt
+
+#### Scenario: Es gibt keinen Zustand „Liste ja, Spalten nein"
+
+- **WHEN** ein beliebiger Rang `search_directory` aufruft
+- **THEN** erhält er entweder fremde Zeilen **mit** gefüllten erweiterten
+  Spalten oder gar keine fremde Zeile — nie fremde Zeilen mit leeren
+  erweiterten Spalten
+
+#### Scenario: `branche` bleibt ein Basisfeld
+
+- **WHEN** ein Aufrufer ab Rang 4 nach einer Branche filtert
+- **THEN** wirkt der Filter, und `branche` ist in der Antwort gefüllt
 

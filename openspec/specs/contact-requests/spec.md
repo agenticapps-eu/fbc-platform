@@ -273,89 +273,6 @@ veraltete Stand.
 - **WHEN** die Abfrage erfolgreich ist und keine offene Anfrage liefert
 - **THEN** erscheint **keine** Karte und **kein** Leerzustand
 
-### Requirement: Kontaktanfragen sind nach Absender- und Empfängerstufe gestaffelt
-
-Das System SHALL die Erlaubnis, eine Kontaktanfrage einzufügen, aus **beiden**
-Stufen ableiten — der des Absenders und der des Empfängers:
-
-- Ein Absender mit Rang 1 (`basic`) SHALL **keine** Kontaktanfrage senden
-  dürfen.
-- Ein Absender mit Rang 2 (`connect`) SHALL nur an einen Empfänger mit **genau**
-  Rang 2 senden dürfen. „`connect` und darüber" ist ausdrücklich **nicht**
-  gemeint; die Auslegung ist am 25.08.2026 entschieden worden, samt der
-  benannten Folge, dass ein `connect`-Mitglied bei heutigem Bestand niemanden
-  erreicht.
-- Ein Absender ab Rang 3 (`discover`) SHALL an jeden Empfänger senden dürfen.
-
-Die Regel SHALL in einem benannten Prädikat stehen, nicht als Bedingungskette in
-der Policy, und SHALL die Empfängerstufe mit den Rechten der Funktion lesen
-(`SECURITY DEFINER`, `search_path` leer, `execute` nur für `authenticated`).
-Ohne erhöhte Rechte fiele die Prüfung für einen Absender unterhalb Rang 3 still
-auf „kein Recht" und verböte **jede** Anfrage — derselbe Grund, aus dem
-`is_contactable(uuid)` DEFINER ist.
-
-<!-- Bis zum Archivieren stand hier `is_new_member` als Beispiel. Der Delta war
-     geschrieben, als es die Funktion noch gab; derselbe Change hat sie
-     gestrichen. Ein Verweis auf eine gelöschte Funktion in der durablen
-     Wahrheit ist genau die Sorte Nachweisschuld, gegen die diese Datei
-     geschrieben ist — deshalb korrigiert statt stehen gelassen.
-     `is_contactable` trägt dasselbe Muster aus demselben Grund
-     (`20260715150000_six_level_model.sql:127`). -->
-
-
-Der Admin-Schalter `platform_settings.open_contact` SHALL diese Staffelung —
-und nur sie — aufheben können, solange er `true` ist. Nur `is_admin()`-Mitglieder
-SHALL den Schalter schreiben dürfen.
-
-Unabhängig vom Schalter und in **jedem** Modus SHALL weiterhin gelten: der
-Absender SHALL sich selbst als `from_id` eintragen, der Status SHALL `pending`
-sein, ein mitgegebenes `match_id` SHALL dem Paar gehören, und das Opt-out des
-Empfängers (`is_contactable`) SHALL greifen.
-
-#### Scenario: Ein basic-Konto darf nicht senden
-
-- **WHEN** `open_contact` false ist und ein Mitglied mit Rang 1 (`basic`) eine
-  Anfrage an einen kontaktierbaren Empfänger einfügt
-- **THEN** wird das INSERT abgelehnt (SQLSTATE 42501), und die Oberfläche nennt
-  die Stufe als Grund statt den rohen Postgres-Fehler zu zeigen
-
-#### Scenario: Ein connect-Konto erreicht ein anderes connect-Konto
-
-- **WHEN** `open_contact` false ist und ein Mitglied mit Rang 2 an einen
-  Empfänger mit Rang 2 sendet
-- **THEN** lässt die Policy das INSERT zu
-
-#### Scenario: Ein connect-Konto erreicht ein impact-Konto nicht
-
-- **WHEN** `open_contact` false ist und dasselbe Mitglied an einen Empfänger mit
-  Rang 6 (`impact`) sendet
-- **THEN** wird das INSERT abgelehnt — die Zielstufe ist nicht genau `connect`
-
-#### Scenario: Ab discover ist jeder Empfänger erreichbar
-
-- **WHEN** `open_contact` false ist und ein Mitglied ab Rang 3 an einen
-  Empfänger beliebiger Stufe sendet
-- **THEN** lässt die Staffelung das INSERT zu
-
-#### Scenario: Der Schalter hebt die Staffelung auf
-
-- **WHEN** `open_contact` true ist und ein `basic`-Mitglied an einen
-  kontaktierbaren Empfänger sendet
-- **THEN** lässt die Staffelungsklausel das INSERT zu
-
-#### Scenario: Der Schalter hebt die übrigen Prüfungen nicht auf
-
-- **WHEN** `open_contact` true ist und ein Mitglied eine Anfrage mit fremdem
-  `from_id`, mit Status `accepted` oder an ein Konto mit gesetztem Opt-out
-  einfügt
-- **THEN** wird das INSERT abgelehnt
-
-#### Scenario: Nur Admins schreiben den Schalter
-
-- **WHEN** ein Mitglied ohne `is_admin()` `platform_settings.open_contact`
-  aktualisiert
-- **THEN** verweigert die Policy `platform_settings_update_admin` den Schreibzugriff
-
 ### Requirement: Eine Kaltanfrage hängt nicht am Alter des Empfängers
 
 Das System SHALL die Erlaubnis, eine Kontaktanfrage einzufügen, **nicht** vom
@@ -389,4 +306,81 @@ sendet**, statt wer empfängt.
 
 - **WHEN** `public.is_new_member(uuid)` aufgerufen wird
 - **THEN** existiert die Funktion nicht
+
+### Requirement: Kontaktanfragen hängen allein an der Absenderstufe
+
+Das System SHALL die Erlaubnis, eine Kontaktanfrage einzufügen, **allein** aus
+der Stufe des Absenders ableiten: ein Absender ab **Rang 4** (`discover` nach
+AGE-903) SHALL an jeden Empfänger senden dürfen, ein Absender darunter an
+niemanden. Die Stufe des **Empfängers** SHALL keine Rolle mehr spielen.
+
+Die Regel SHALL in einem benannten Prädikat stehen, nicht als Bedingungskette
+in der Policy. Es SHALL `SECURITY DEFINER` mit leerem `search_path` bleiben und
+`execute` nur für `authenticated` tragen — auch wenn es die Empfängerzeile
+nicht mehr liest. Der Grund ist nicht mehr der Lesezugriff, sondern die
+Einheitlichkeit mit `is_contactable(uuid)`: zwei benachbarte Prädikate
+derselben Policy mit verschiedenen Rechten sind eine Einladung, beim nächsten
+Mal das falsche zu kopieren.
+
+**Warum die Staffelung ersatzlos entfällt.** Sie war die Antwort auf eine
+Leiter, auf der Rang 2 und Rang 3 beide im Club lagen und unterschiedlich viel
+durften. Nach AGE-903 liegt alles unterhalb Rang 4 ausserhalb des Clubs, und
+„wer nicht im Club ist, schreibt keine Mitglieder an" braucht keine Staffelung,
+sondern eine Zahl. Die am 25.08.2026 entschiedene Auslegung („`connect` nur an
+genau `connect`") wird damit gegenstandslos, nicht überstimmt.
+
+Der Admin-Schalter `platform_settings.open_contact` SHALL diese Schwelle — und
+nur sie — aufheben können, solange er `true` ist. Nur `is_admin()`-Mitglieder
+SHALL den Schalter schreiben dürfen.
+
+**Der Schalter steht auf PROD auf `true` und bleibt es.** Damit darf faktisch
+jedes aktivierte Konto senden, auch unterhalb Rang 4 — die Schwelle in dieser
+Anforderung ist der **Rückfallwert**, nicht der Ist-Zustand. Wer über
+Kontaktanfrage-Rechte eine Aussage trifft, SHALL zuerst
+`platform_settings.open_contact` lesen und darf sie nicht aus dem Policy-Text
+ableiten. Das Umlegen des Schalters ist AGE-930 vorbehalten.
+
+Unabhängig vom Schalter und in **jedem** Modus SHALL weiterhin gelten: der
+Absender SHALL sich selbst als `from_id` eintragen, der Status SHALL `pending`
+sein, ein mitgegebenes `match_id` SHALL dem Paar gehören, und das Opt-out des
+Empfängers (`is_contactable`) SHALL greifen.
+
+#### Scenario: Unterhalb des Clubs darf niemand senden
+
+- **WHEN** `open_contact` false ist und ein Mitglied auf Rang 1, 2 oder 3 eine
+  Anfrage an einen kontaktierbaren Empfänger einfügt
+- **THEN** wird das INSERT abgelehnt (SQLSTATE 42501), und die Oberfläche nennt
+  die Stufe als Grund statt den rohen Postgres-Fehler zu zeigen
+
+#### Scenario: Ab Rang 4 ist jeder Empfänger erreichbar
+
+- **WHEN** `open_contact` false ist und ein Mitglied ab Rang 4 an einen
+  Empfänger beliebiger Stufe sendet
+- **THEN** lässt die Policy das INSERT zu
+
+#### Scenario: Die Empfängerstufe ändert nichts mehr
+
+- **WHEN** `open_contact` false ist und ein Mitglied ab Rang 4 nacheinander an
+  einen Empfänger auf Rang 1 und an einen auf Rang 6 sendet
+- **THEN** werden **beide** INSERTs zugelassen — vor AGE-903 hing das Ergebnis
+  von der Empfängerstufe ab
+
+#### Scenario: Der Schalter hebt die Schwelle auf
+
+- **WHEN** `open_contact` true ist und ein Mitglied auf Rang 1 an einen
+  kontaktierbaren Empfänger sendet
+- **THEN** lässt die Stufenklausel das INSERT zu
+
+#### Scenario: Der Schalter hebt die übrigen Prüfungen nicht auf
+
+- **WHEN** `open_contact` true ist und ein Mitglied eine Anfrage mit fremdem
+  `from_id`, mit Status `accepted` oder an ein Konto mit gesetztem Opt-out
+  einfügt
+- **THEN** wird das INSERT abgelehnt
+
+#### Scenario: Nur Admins schreiben den Schalter
+
+- **WHEN** ein Mitglied ohne `is_admin()` `platform_settings.open_contact`
+  aktualisiert
+- **THEN** verweigert die Policy `platform_settings_update_admin` den Schreibzugriff
 
