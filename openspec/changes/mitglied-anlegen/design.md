@@ -145,7 +145,20 @@ Ablauf:
 
    Folge für den Entwurf: die Datenbank fängt den Rennfall nur bei **exakt**
    gleicher Schreibung. Für die abweichende Schreibung ist die Normalisierung
-   **tragend**, nicht bequem. Dasselbe Bild hat der WordPress-Import schon
+   **tragend**, nicht bequem.
+
+   **Die Prüfung wird deshalb semantisch festgelegt, nicht dem Zufall
+   überlassen:** verglichen wird `lower(email)` gegen `lower(:adresse)`, nicht
+   Zeichenkette gegen Zeichenkette. Der Fremdreview hat zu Recht angemerkt, dass
+   die Zusage sonst auf einer Messung steht, die es noch nicht gibt.
+
+   **Das Restrisiko bleibt und wird benannt:** zwei *gleichzeitige* Anlagen mit
+   verschieden geschriebener Adresse laufen beide durch die Vorprüfung und
+   beide am partiellen Index vorbei. Das ist kein Datenverlust, sondern ein
+   Zweitkonto — dasselbe Bild, das der WordPress-Import erzeugt hat. Es zu
+   schliessen hiesse, einen eigenen Unique-Index über `lower(email)` in
+   `auth.users` anzulegen, also in fremdes Schema zu schreiben; das ist eine
+   eigene Entscheidung und nicht Teil dieses Change. Dasselbe Bild hat der WordPress-Import schon
    einmal erzeugt: Kollision nur bei exakter Adresse, sonst still ein
    Zweitkonto. Ob GoTrue beim Anlegen selbst kleinschreibt, ist zu **messen**,
    nicht anzunehmen — steht als Aufgabe in §4.
@@ -155,9 +168,33 @@ Ablauf:
    `admin_activate_member`.
 
 **Die Reihenfolge 3 → 4 ist nicht umkehrbar**, und Schritt 4 darf Schritt 3 nicht
-zurückdrehen: scheitert der Versand, ist das Konto trotzdem angelegt und steht in
-① Angelegt. Das ist der bessere Ausgang als ein halb entstandenes Konto — und die
-Antwort muss es sagen.
+zurückdrehen: scheitert der Versand, ist das Konto trotzdem angelegt. Das ist der
+bessere Ausgang als ein halb entstandenes Konto — und die Antwort muss es sagen.
+
+**Wo es dann steht, ist ② und nicht ① — und die frühere Fassung behauptete das
+Gegenteil.** Der Fremdreview hat den Widerspruch gefunden: `issue_activation_token`
+legt die Tokenzeile an, **bevor** gesendet wird. Lehnt Resend ab, wird sie
+entwertet, aber sie **bleibt stehen** — und `eingeladen` ist definiert als „je ein
+Token erzeugt". Das Mitglied steht also in ②, obwohl keine Mail ankam.
+
+Das wird **benannt statt wegdefiniert**. Eine Ausnahme für „entwertet und kein
+Nachfolger" wäre eine Sonderregel, die bei jedem regulären Neuausstellen
+mitgedacht werden müsste. Stattdessen:
+
+* Der **Bericht** ist die Stelle, an der die Ablehnung steht — und mit dem
+  eigenen Endpunkt kann er sie tatsächlich nennen.
+* Das Mitglied ist **sofort wieder einladbar**: das 24-Stunden-Fenster prüft
+  `invalidated_at is null`, ein entwertetes Token blockiert also nichts.
+* Die Spalte heisst `eingeladen_am` und sagt „ein Link wurde erzeugt". Sie hat
+  nie „eine Mail kam an" behauptet; das steht schon als Zusage im Delta.
+
+**Und der Fehlerfall INNERHALB von Schritt 3** — Konto entstanden, das Setzen von
+Name oder `tier` scheitert danach — war bisher gar nicht benannt. Er endet mit
+einem Konto auf der Vorgabestufe `active`, also **ausserhalb** des Clubs. Die
+Antwort sagt es, und das Konto steht in ① Angelegt mit sichtbarer Stufe: dort ist
+es über „Stufe setzen" reparierbar, und die Liste zeigt es, statt es zu
+verstecken. Ein Rückbau des Kontos wäre der schlechtere Ausgang — er nähme dem
+Admin die einzige Spur.
 
 ## Die Oberfläche
 
@@ -173,18 +210,101 @@ Detlev soll sehen, dass ein Mitglied einen Weg durchläuft.
 **Die Auswahl gilt je Seite.** Ein „alles auswählen", das stillschweigend 35
 ungesehene Zeilen umfasst, wäre genau das „an alle", das ADR-0007 ausschliesst.
 
-**Die Schleife lebt im Frontend**, über die bestehende Einzel-Function
-`send-activation` — kein neuer Sammel-Endpunkt. *Warum:* damit gilt jeder
-Schutzriegel unverändert und nachweislich, statt in einer zweiten
-Implementierung nachgebaut zu werden. Der Preis sind N Aufrufe; bei den 35, um
-die es real geht, ist das nichts.
+### Warum es einen eigenen Admin-Endpunkt braucht
+
+Eine frühere Fassung dieses Entwurfs liess die Schleife im Frontend über die
+bestehende `send-activation` laufen — „damit jeder Schutzriegel unverändert
+gilt". Die Begründung stimmte, die Entscheidung nicht: **`send-activation`
+antwortet auf JEDEM Pfad mit `202 {accepted: true}`.** Gemessen, vier
+Rückgabestellen, alle gleich. Und das ist Absicht, mit einer guten Begründung
+im Code:
+
+> „Erst antworten, dann senden: sonst dauert eine bestehende Adresse messbar
+> länger als eine unbekannte, und die Antwortzeit verrät den Bestand."
+
+Der Aufrufer erfährt also nicht, ob die Adresse existiert, ob ein Token erzeugt
+oder wegen `pending` übersprungen wurde, und schon gar nicht, ob Resend die Mail
+angenommen hat — der Versand läuft nach der Antwort weiter. **Der Bericht mit
+seinen vier Ausgängen ist über diesen Weg nicht herstellbar.** Zwölf Aufrufe,
+zwölfmal „angenommen", keine Auskunft.
+
+Deshalb: **`admin-invite-members`**, `verify_jwt = true`, Admin-Prüfung über
+`staff_roles`.
+
+*Der Aufzählungsschutz entfällt hier zu Recht.* Er verbirgt vor einem
+**anonymen** Aufrufer, ob es eine Adresse gibt. Ein Admin sieht die
+Mitgliederliste ohnehin — vor ihm ist nichts zu verbergen, und ein Schutz, der
+nur noch die eigene Auskunft verhindert, schützt niemanden.
+
+*Und die Schutzriegel gelten trotzdem unverändert*, weil sie nicht im
+Transport liegen, sondern in `issue_activation_token`. Der neue Endpunkt ruft
+dieselbe Funktion; die 60 Sekunden, die fünf pro Tag und das 24-Stunden-Fenster
+entscheiden weiter dort.
+
+*Was NICHT zweimal entstehen darf*, ist der Mailtext und der Versand. Beides
+wandert in ein Modul, das `send-activation` und `admin-invite-members`
+gemeinsam benutzen — einschliesslich der Entwertung bei einer Ablehnung durch
+Resend. Eine zweite Implementierung wäre genau die Kopie, die dieser Entwurf an
+anderer Stelle vermeidet.
+
+*Der eine Unterschied zwischen beiden:* `send-activation` antwortet **vor** dem
+Versand, `admin-invite-members` **danach**. Das ist der ganze Zweck.
 
 **Teilausfall ist der Normalfall, nicht die Ausnahme.** Die Aufrufe laufen
 nacheinander, das Ergebnis jedes einzelnen wird festgehalten, und ein
-Fehlschlag bricht die Schleife **nicht** ab. Verlässt der Admin die Seite
-mittendrin, ist alles bis dahin Verschickte verschickt — das lässt sich nicht
-zurückdrehen, also muss die Fläche es vorher sagen und hinterher zeigen, wie
-weit sie kam.
+Fehlschlag bricht die Schleife **nicht** ab.
+
+### Was der Admin dabei sieht
+
+Der Fremdreview hat diese Stelle zu Recht als zu vage benannt: die Zusage stand,
+die Darstellung nicht. Vier Zeitpunkte, vier Antworten.
+
+**Vorher — eine Rückfrage, die die Zahl nennt und die Unumkehrbarkeit.**
+„An 12 Mitglieder eine Einladung schicken? Verschickte Mails lassen sich nicht
+zurückholen." Nicht „Sind Sie sicher?" — die Zahl ist die Auskunft, und die
+Unumkehrbarkeit ist der Grund für die Frage.
+
+**Währenddessen — ein Fortschrittsstreifen über der Liste, kein Modal.**
+`3 von 12`, und der Knopf ist gesperrt. Kein Modal, weil der Admin die Liste
+weiter lesen können soll; kein Spinner ohne Zahl, weil „es passiert etwas" bei
+zwölf Aufrufen keine Auskunft ist.
+
+**Die Tabelle aktualisiert sich NICHT zeilenweise mit.** Eine Zeile, die
+mittendrin von ① nach ② springt, verschöbe unter dem Auge des Admins die Liste,
+die er gerade ausgewählt hat — und die Auswahl gilt je Seite. Stattdessen bleibt
+die Liste stehen, und **nach** dem Lauf wird einmal neu geladen. Die Bewegung
+gehört ans Ende, nicht in die Mitte.
+
+**Beim Wegnavigieren bricht die Reihe ab — und das ist sicher.** Die Schleife
+hängt an der Seite; verlässt der Admin sie, werden keine weiteren Aufrufe
+abgesetzt. Halb verschickt gibt es dabei nicht: jede Einladung ist für sich
+abgeschlossen, es gibt keinen Zwischenzustand zwischen zwei Mitgliedern. Deshalb
+wird der Abbruch **nicht** durch eine Browser-Rückfrage verhindert — die wäre
+eine Warnung vor einer Gefahr, die es nicht gibt. Was verschickt ist, steht nach
+dem Neuladen in ②; darauf ist Verlass, weil die Wahrheit in
+`activation_tokens` steht und nicht im Bildschirm.
+
+**Der Bericht entsteht aus den Antworten selbst, nicht aus einem Vorher-Bild.**
+Jeder Aufruf trägt seinen eigenen Ausgang bei. Bestätigt ein Mitglied mitten im
+Lauf seinen alten Link, ist die Antwort für es genau das, was in diesem Moment
+galt — es wird nichts nachträglich umgedeutet. Das ist der Grund, keine
+Vorher-Nachher-Differenz zu rechnen.
+
+**Das Neuladen danach behält Filter, Suchbegriff und Seite.** Ein Lauf, der den
+Admin zurück auf Seite 1 ohne Filter wirft, macht aus einer Auskunft eine
+Suchaufgabe.
+
+**Danach — ein Bericht, der die vier Ausgänge trennt** und offen bleibt, bis der
+Admin ihn schliesst. Kein Toast: ein Toast verschwindet, und dieser Bericht ist
+das Einzige, was sagt, was wirklich passiert ist.
+
+    9 verschickt
+    2 übersprungen — es liegt noch ein gültiger Link im Postfach
+    1 nicht verschickt — heute schon fünfmal angefordert
+
+Die übersprungenen und die abgewiesenen SHALL namentlich aufführbar sein, nicht
+nur gezählt: „2 übersprungen" ohne die Namen zwingt den Admin, sie sich aus der
+Liste zusammenzusuchen.
 
 **Der Bericht trennt die Ausgänge.** `issue_activation_token` kennt vier, die
 den Admin verschieden angehen: verschickt, `pending` (gültiger Link im

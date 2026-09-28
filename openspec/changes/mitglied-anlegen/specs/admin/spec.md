@@ -218,12 +218,22 @@ Platzhalterzeichen des Mustervergleichs SHALL die Funktion entschärfen.
 - **THEN** liefert `angelegt` genau das erste und `eingeladen` genau das zweite,
   beide zusammen genau das, was `offen` liefert
 
-#### Scenario: Ein benutzter oder entwerteter Link zählt weiter als Einladung
+#### Scenario: Ein abgelaufener, entwerteter oder benutzter Link zählt weiter als Einladung
 
 - **WHEN** für ein unbestätigtes Profil ein Token besteht, dessen `expires_at`
-  vergangen ist oder dessen `invalidated_at` gesetzt wurde
-- **THEN** steht das Profil unter `eingeladen` und nicht unter `angelegt` — die
-  Frage lautet „wurde je eingeladen?", nicht „liegt gerade ein gültiger Link?"
+  vergangen ist, dessen `invalidated_at` gesetzt wurde, **oder dessen `used_at`
+  gesetzt ist, ohne dass das Profil dadurch bestätigt wurde**
+- **THEN** steht das Profil in allen drei Fällen unter `eingeladen` und nicht
+  unter `angelegt` — die Frage lautet „wurde je eingeladen?", nicht „liegt
+  gerade ein gültiger Link?"
+
+#### Scenario: Ein abgelehnter Versand lässt das Mitglied in „Eingeladen" stehen
+
+- **WHEN** der Versand für ein gerade eingeladenes Mitglied vom Maildienst
+  abgelehnt wird und das Token daraufhin entwertet wird
+- **THEN** steht das Mitglied in Schritt „Eingeladen", weil ein Link erzeugt
+  wurde; der **Bericht** nennt die Ablehnung, und eine erneute Einladung ist
+  sofort möglich, weil ein entwertetes Token das Schutzfenster nicht hält
 
 #### Scenario: `eingeladen_am` trägt den jüngsten Zeitpunkt
 
@@ -571,6 +581,34 @@ aktiviert werden — das Mitglied bestätigt selbst (AGE-604).
 SHALL benennen, dass die Adresse schon zu einem Mitglied gehört, und SHALL zu
 diesem führen.
 
+**Die Prüfung SHALL ohne Rücksicht auf Gross- und Kleinschreibung erfolgen**
+(`lower(email)` gegen `lower(:adresse)`) und SHALL NOT Zeichenkette gegen
+Zeichenkette vergleichen. Der Unique-Index auf `auth.users(email)` ist partiell
+und **schreibungsempfindlich**; ohne diese Zusage entstünde `A@x.de` neben
+`a@x.de` als zweites Konto.
+
+**Das verbleibende Rennen SHALL benannt bleiben und gilt als nicht geschlossen:**
+zwei *gleichzeitige* Anlagen mit verschieden geschriebener Adresse laufen beide
+durch die Prüfung und beide am Index vorbei. Es zu schliessen verlangte einen
+eigenen Index in fremdem Schema und ist nicht Teil dieser Änderung.
+
+**Gehört die Adresse zu einem deaktivierten oder gelöschten Mitglied, SHALL die
+Antwort das sagen** und SHALL NOT nur auf ein „bestehendes Mitglied" verweisen,
+das der Admin in keiner der sichtbaren Listen findet. Der Fall ist der
+wiederkehrende Bewerber und damit erwartbar.
+
+**Scheitert nach der Kontoanlage das Setzen von Name oder Stufe, SHALL das Konto
+bestehen bleiben** und die Antwort SHALL es benennen. Es steht dann auf der
+Vorgabestufe und in Schritt „Angelegt", wo es über „Stufe setzen" zu berichtigen
+ist. Ein Rückbau SHALL NOT erfolgen — er nähme dem Admin die einzige Spur.
+
+**Das Anlegen SHALL eine Spur hinterlassen** wie andere privilegierte
+Änderungen. Ein Konto samt bezahlter Stufe entstehen zu lassen ist mindestens so
+folgenreich wie eine Stufe zu ändern, und für die Änderung besteht die Zusage
+bereits.
+
+Die Adresse SHALL auf ihre Form geprüft werden, bevor ein Konto entsteht.
+
 Ein Aufrufer ohne Admin-Rolle SHALL abgewiesen werden.
 
 #### Scenario: Ein Mitglied entsteht mit Plan und Einladung
@@ -593,6 +631,34 @@ Ein Aufrufer ohne Admin-Rolle SHALL abgewiesen werden.
 - **THEN** entsteht kein zweites Konto, und die Antwort benennt das bestehende
   Mitglied und führt zu ihm
 
+#### Scenario: Eine andere Schreibung ist dieselbe Adresse
+
+- **WHEN** zu `a@x.de` ein Konto besteht und ein Admin `A@X.de` einträgt
+- **THEN** entsteht kein zweites Konto — die Prüfung vergleicht ohne Rücksicht
+  auf Gross- und Kleinschreibung
+
+#### Scenario: Ein wiederkehrendes Mitglied wird als entfernt erkannt
+
+- **WHEN** die Adresse zu einem gelöschten oder deaktivierten Mitglied gehört
+- **THEN** sagt die Antwort genau das, statt auf ein Mitglied zu verweisen, das
+  in keiner sichtbaren Liste steht
+
+#### Scenario: Ein halb eingerichtetes Konto verschwindet nicht
+
+- **WHEN** das Konto entsteht und das Setzen der Stufe danach scheitert
+- **THEN** bleibt das Konto bestehen, steht in Schritt „Angelegt" auf der
+  Vorgabestufe, und die Antwort benennt den Fehlschlag
+
+#### Scenario: Das Anlegen hinterlässt eine Spur
+
+- **WHEN** ein Admin ein Mitglied anlegt
+- **THEN** entsteht derselbe Nachweis wie bei anderen privilegierten Änderungen
+
+#### Scenario: Eine unbrauchbare Adresse legt kein Konto an
+
+- **WHEN** ein Admin eine Adresse ohne gültige Form einträgt
+- **THEN** entsteht kein Konto, und die Maske sagt, was fehlt
+
 #### Scenario: Die Maske bietet nur die drei Clubstufen an
 
 - **WHEN** ein Admin die Planauswahl öffnet
@@ -609,6 +675,11 @@ Ein Aufrufer ohne Admin-Rolle SHALL abgewiesen werden.
 Das System SHALL in der Mitgliederliste ein Kontrollkästchen je Zeile führen und
 eine Handlung „Ausgewählte einladen". Diese Handlung SHALL die **einzige** sein,
 die aus einer Mehrfachauswahl folgt (ADR-0007).
+
+**Sie SHALL in den Schritten „Angelegt" und „Eingeladen" angeboten werden** — in
+② heisst sie erinnern und ist derselbe Vorgang — und SHALL NOT in „Bestätigt",
+„Deaktiviert", „Gelöscht" oder „Mitgliedschaft" erscheinen, wo sie nichts
+bewirken könnte.
 
 Sie SHALL für jedes ausgewählte Mitglied dieselbe Kette auslösen, die die Zeile
 einzeln auslöst — `send-activation` → `issue_activation_token` — und SHALL deren
@@ -630,10 +701,45 @@ Kontrollkästchen je Zeile. Ein Kopfkästchen über einem Filter, der die ganze
 Gruppe zeigt, wäre mit einem Klick deckungsgleich mit „an alle" — der Handlung,
 die ADR-0007 ausdrücklich verwirft.
 
-**Die Aufrufe SHALL nacheinander über die bestehende Einzel-Function laufen**,
-und ein Fehlschlag SHALL die Reihe nicht abbrechen. Was verschickt ist, ist
-verschickt: die Fläche SHALL vor dem Auslösen sagen, dass sich das nicht
-zurückdrehen lässt, und danach zeigen, wie weit sie kam.
+**Die Aufrufe SHALL über einen eigenen, Admin-geprüften Endpunkt laufen**
+(`admin-invite-members`, `verify_jwt = true`) und SHALL NOT über die anonyme
+`send-activation` gehen. *Der Grund gehört zur Zusage:* jene antwortet auf jedem
+Pfad mit `202 {accepted: true}`, weil ihre Antwortzeit sonst verriete, ob eine
+Adresse besteht — über sie ist ein wahrheitsgemässer Bericht nicht herstellbar.
+Der Aufzählungsschutz entfällt gegenüber einem Admin, der die Mitgliederliste
+ohnehin sieht.
+
+**Die Schutzriegel SHALL dabei unverändert aus `issue_activation_token`
+kommen** und SHALL NOT im neuen Endpunkt nachgebaut werden. Mailtext und
+Versand SHALL beide Wege aus **einem** Modul beziehen.
+
+Ein Fehlschlag SHALL die Reihe nicht abbrechen.
+
+Die Fläche SHALL **vor** dem Auslösen rückfragen und dabei die **Zahl** der
+Empfänger und die Unumkehrbarkeit nennen. **Während** des Laufs SHALL sie den
+Fortschritt als Zahl ausweisen („3 von 12") und den Auslöser sperren; sie SHALL
+NOT die Sicht mit einem Modal verstellen.
+
+**Die Liste SHALL sich während des Laufs NICHT zeilenweise ändern** und SHALL
+erst nach seinem Ende einmal neu laden. Eine Zeile, die mittendrin den Schritt
+wechselt, verschöbe die Auswahl unter der Hand des Admins.
+
+**Ein Abbruch durch Wegnavigieren SHALL zulässig sein und SHALL NOT durch eine
+Rückfrage des Browsers verhindert werden.** Es entsteht dabei kein
+Zwischenzustand: jede Einladung ist für sich abgeschlossen. Was verschickt
+wurde, SHALL nach dem Neuladen im Schritt „Eingeladen" stehen — die Auskunft
+kommt aus `activation_tokens`, nicht aus dem Bildschirm.
+
+**Der Bericht SHALL stehen bleiben, bis der Admin ihn schliesst**, und SHALL NOT
+als flüchtige Einblendung erscheinen. Übersprungene und abgewiesene Mitglieder
+SHALL namentlich aufführbar sein und SHALL NOT nur gezählt werden.
+
+**Er SHALL aus den Antworten der einzelnen Aufrufe entstehen** und SHALL NOT aus
+einem Vorher-Nachher-Vergleich gerechnet werden. Was für ein Mitglied galt, als
+sein Aufruf lief, ist sein Ausgang — auch wenn sich der Bestand währenddessen
+ändert.
+
+**Das Neuladen nach dem Lauf SHALL Filter, Suchbegriff und Seite behalten.**
 
 #### Scenario: Mehrere Einladungen mit einem Griff
 
@@ -673,6 +779,31 @@ zurückdrehen lässt, und danach zeigen, wie weit sie kam.
 - **WHEN** in einer Auswahl von fünf der dritte Aufruf fehlschlägt
 - **THEN** laufen der vierte und fünfte trotzdem, und der Bericht nennt den
   dritten als fehlgeschlagen
+
+#### Scenario: Die Rückfrage nennt die Zahl, nicht nur eine Warnung
+
+- **WHEN** ein Admin zwölf Zeilen gewählt hat und „Ausgewählte einladen" auslöst
+- **THEN** nennt die Rückfrage die Zahl zwölf und dass sich Verschicktes nicht
+  zurückholen lässt
+
+#### Scenario: Die Liste bewegt sich erst danach
+
+- **WHEN** der Lauf über mehrere Mitglieder läuft
+- **THEN** bleiben die Zeilen und die Auswahl stehen, der Fortschritt erscheint
+  als Zahl daneben, und erst nach dem Ende lädt die Liste einmal neu
+
+#### Scenario: Wegnavigieren bricht ab, ohne etwas zu zerreissen
+
+- **WHEN** ein Admin die Seite mitten im Lauf verlässt
+- **THEN** hält ihn keine Rückfrage des Browsers auf, es gehen keine weiteren
+  Einladungen hinaus, und die bereits verschickten stehen nach dem Neuladen im
+  Schritt „Eingeladen"
+
+#### Scenario: Der Bericht nennt Namen, nicht nur Zahlen
+
+- **WHEN** zwei Mitglieder übersprungen wurden
+- **THEN** lässt sich dem Bericht entnehmen, **welche** zwei — und er bleibt
+  stehen, bis der Admin ihn schliesst
 
 #### Scenario: Die Auswahl kann nichts anderes
 

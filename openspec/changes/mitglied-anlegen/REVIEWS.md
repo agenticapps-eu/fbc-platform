@@ -7,77 +7,142 @@
 # Review record
 
 - requested: gemini opencode
-- counted:   gemini (REQUEST-CHANGES)
+- counted:   gemini (REQUEST-CHANGES) opencode (REQUEST-CHANGES)
 - excluded:  (none) (declared implementing host)
-- failed:
-  - opencode: timed out at 180s
+- failed:    (none)
 
 ## Reviewer: gemini
-_generated 2026-09-28T15:20:02Z · timeout 180s_
+_generated 2026-09-28T16:56:20Z · timeout 900s_
 
-I will use the `the-pragmatic-programmer` skill if it is available. If not, I will say so and review without it.
-I was not able to use the `the-pragmatic-programmer` skill. I will review without it.
+I have read the rules from the `the-pragmatic-programmer` skill.
 
 VERDICT: REQUEST-CHANGES
 
-The spec is thorough and demonstrates deep, valuable forensics on existing system behavior (e.g., case-sensitivity of the email index, `regprocedure` cast behavior). The core decision to derive invitation status is correct. However, several assumptions and specified behaviors introduce risks or problematic UX.
+*   **Race condition on create:** The pre-check for an existing email is not atomic with the user creation. Two concurrent requests with case-variant emails (e.g., `a@x.de` and `A@x.de`) can both pass the check, resulting in two accounts being created, violating the requirement that a duplicate address leads to the existing member.
+*   **Manual type generation:** The process relies on a developer manually updating `src/types/database.types.ts`. This is a fragile process guaranteed to fail eventually. The project should automate this step to keep database and frontend types synchronized.
+*   **Loss of UI state:** The spec says the list reloads after the batch invitation is complete. It should specify that this reload must preserve the admin's current filter, search, and pagination settings to avoid disorientation.
+*   **Assumed atomicity of batch report:** The UI reports skipped/failed members by name. This implies the state is read *before* the batch operation starts. If an admin invites members A, B, and C, and B confirms their existing invitation link *while* the batch for A, B, C is running, the final report might inaccurately list B as "verschickt" when it should have been "übersprungen". The timing of when the report data is gathered versus when actions are executed is unclear.
 
-*   **Race Condition on Create:** The check for an existing email (`lower(trim(...))`) followed by a separate creation call is a classic TOCTOU (Time-of-check to time-of-use) race condition. If two admins try to create `a@x.de` and `A@x.de` concurrently, both checks could pass before either account is created, resulting in a duplicate account that the spec explicitly aims to prevent. The normalization logic is necessary but not sufficient without a transactional or locking mechanism.
-*   **"No Select All" is Overly Restrictive:** The spec forbids a "select all on this page" checkbox, reasoning that it's equivalent to a mass-mail action. This conflates selecting the *entire dataset* with selecting the *current viewport*. Forcing an admin to manually click 50 checkboxes on a single page to perform a legitimate bulk action is poor UX and doesn't meaningfully add safety beyond what a page-limited selection would. The spirit of ADR-0007 (no mass targeting) can be upheld while still providing a basic "select all visible" convenience.
-*   **Manual Type Generation is Unacceptable Risk:** The spec correctly identifies that `src/types/database.types.ts` is hand-maintained but accepts this. This is a significant source of fragility. A manual process guarantees that the frontend and database types will eventually drift, leading to runtime errors. The project should be using `supabase gen types` and adapting the code to work with the generated types, not the other way around. Accepting a manual process for a core artifact like this is a pragmatic debt the project should not take on.
-*   **Partial Failure UX is Underspecified:** The spec says a bulk invitation failure won't stop the loop and the UI will show "how far it got." This is too vague. What does the user see during the 35 sequential API calls? A spinner? Does the table update live? What if they navigate away mid-process? A robust design for this "normal case" of partial failure, including a clear final summary report, needs to be specified to avoid a confusing and indeterminate user experience.
+## Reviewer: opencode
+_generated 2026-09-28T16:58:11Z · timeout 900s_
+
+Ich habe das Mini-Regelset von `the-pragmatic-programmer` gelesen und durch seine Brille (v. a. Regeln 16, 22, 25, 26 — eine Autorität je Fakt, reale Anforderungen statt Lösungsprosa, explizite Fehlerverträge) geprüft.
+
+VERDICT: REQUEST-CHANGES
+
+- **Duplikatprüfung vs. Gross-/Kleinschreibung: Das Spec-Delta verspricht, was der Entwurf selbst als ungesichert markiert.** Die Anforderung sagt flach „eine bereits vergebene Adresse SHALL kein zweites Konto erzeugen". Der Entwurf weist aber nach: Der Unique-Index auf `auth.users(email)` ist partiell und schreibungsempfindlich, und ob GoTrue beim Anlegen kleinschreibt, ist offene Messaufgabe (§4). Wenn die Existenzprüfung mit der normalisierten (kleingeschriebenen) Adresse gegen die schreibungsempfindliche Spalte läuft, übersieht sie ein bestehendes `A@x.de` und legt `a@x.de` als Zweitkonto an. Die Spezifikation muss die Prüfung semantisch festlegen (z. B. `lower(email) = lower(:adresse)` als SHALL) oder das Restrisiko ausdrücklich als ausgenommen benennen — so steht die Zusage auf Messung, die noch nicht existiert.
+
+- **Teilzustand bei der Profil-Nachbearbeitung ist nicht definiert.** Schritt 3 ist zweistufig: Konto in `auth.users` anlegen (Trigger baut das Profil), danach Name und `tier` setzen. Der Entwurf diskutiert ausführlich den Fehlerfall 3→4 (Versand scheitert), aber kein Wort zum Fehlerfall *innerhalb* von 3: Konto existiert, Tier/Name-Update schlägt fehl. Ergebnis: ein Konto auf Default-Stufe, ohne Antwortvertrag. Das ist genau die Fehlerklassen-Trennung (Regel 26), die der Rest des Dokuments vorbildlich macht — hier fehlt sie.
+
+- **Widerspruch zwischen „steht in ① Angelegt" und der abgeleiteten Zustandsdefinition.** Der Entwurf sagt: Scheitert der Versand nach dem Anlegen, steht das Mitglied „in ① Angelegt". Gleichzeitig definiert die Spezifikation `eingeladen` als „mindestens ein Token wurde je erzeugt" — abgeleitet, nicht löschbar. Das stimmt nur, wenn `issue_activation_token` bei fehlgeschlagenem Versand *keine* Tokenzeile hinterlässt (Rollback oder Invalidierung). Diese invariante Kopplung zwischen Versandfehler und Token-Existenz ist nirgends als Anforderung festgeschrieben — sie ist aber die Brücke, ohne die die Aussage über ① falsch wird.
+
+- **Bekannte Adresse eines gelöschten/deaktivierten Mitglieds: offener Pfad.** „Benennt das bestehende Mitglied und führt zu ihm" ist spezifiziert — aber wenn das bestehende Mitglied `deleted_at`/`disabled_at` trägt, führt der Weg in eine Sackgasse (wiederkehrendes Mitglied nach Odoo-Neubezahlung ist der realistische Fall). Kein Szenario deckt das ab.
+
+- **Keine Spur für das Anlegen, während vergleichbare Handlungen eine verlangen.** „Stufe setzen" verlangt Pflichtbegründung und hinterlässt eine Spur (AGE-707); das Anlegen eines Kontos *mit* Stufe — die mächtigere Handlung — bekommt keine Audit-Anforderung. Entweder bewusst ausnehmen und begründen, oder als Anforderung aufnehmen.
+
+Kleinere Punkte (keine Blocker, aber zu benennen):
+
+- Das Szenario „Ein benutzter oder entwerteter Link…" benennt im Titel „benutzter", prüft im Rumpf aber nur `expires_at`/`invalidated_at` — ein `used_at`-Token (bei dem die Aktivierung dennoch scheiterte) ist nicht abgedeckt.
+- „Ausgewählte einladen" ist nur für Schritt ① szenarisiert; ob die Handlung in ② (Erinnern) und anderen Reitern angeboten wird, bleibt unbestimmt.
+- Keine Eingabevalidierung für `admin-create-member` (Adressformat, Namenslängen) — admin-seitig, geringes Risiko, aber ein Szenario „ungültige Adresse wird abgewiesen" wäre billig.
+
+Positiv festzuhalten: Die geteilte `immutable` Zustandsfunktion (eine Autorität für die Zustandsdefinition statt zweier Kopien), die abgeleitete statt gepflegte Spalte, die Vierer-Taxonomie des Berichts und der ehrliche Verzicht auf Zustellbestätigung sind genau die pragmatischen Entscheidungen, die das Regelwerk verlangt.
 
 
 ## Resolution
 
-**Es gab zwei Runden.** Runde 1 lief von Hand gegen die erste Fassung, Runde 2
-über `run-plan-review.sh` gegen die **korrigierte** — der Digest oben bindet
-deshalb die Bytes, die wirklich gelten, nicht die, die kritisiert wurden.
+**Zwei gezaehlte Runden, beide REQUEST-CHANGES.** Runde 1 lief von Hand gegen
+die erste Fassung (gemini APPROVE, opencode REQUEST-CHANGES); ihre Befunde
+waren eingearbeitet, bevor die oben protokollierte Runde 2 gegen die
+korrigierte Fassung lief. Kein Befund wurde bestritten — die pruefbaren sind am
+Katalog gemessen worden.
 
-### Runde 1 (von Hand, gegen die erste Fassung)
-
-gemini: APPROVE, zwei LOW. opencode (Kimi-K3): REQUEST-CHANGES, drei HIGH, vier
-MEDIUM, drei LOW. Jeder Befund wurde **nachgemessen**, nicht bestritten — und
-drei Annahmen fielen dabei, zwei davon meine eigenen:
+### Runde 1 — drei Annahmen fielen, zwei davon eigene
 
 | Befund | Gemessen | Folge |
 |---|---|---|
-| HIGH: `admin_member_counts` bricht an „cannot change return type" | Sie liefert `TABLE(status text, anzahl bigint)` — **Zeilen** je Zustand, keine Spalte je Zustand | Rückgabetyp ändert sich **nicht**, `create or replace` genügt. Im Entwurf stand es nicht; jetzt steht es dort mit der Messung |
-| HIGH: `drop` scheitert an `pg_depend`, wenn die Aufrufer SQL-Funktionen sind | `member_state_matches` ist `sql`, **beide Aufrufer sind `plpgsql`**; `pg_depend` führt für alle drei **null** Referenten | Der Abwurf gelingt — und bricht die Aufrufer *still* bis zur Neuanlage. Abwurfreihenfolge steht jetzt als eigene Aufgabe, `cascade` ausdrücklich ausgeschlossen |
-| HIGH: Szenario „Kein Profil fällt still durch die Verbindung" ist unerfüllbar | Trifft zu: `alle` schliesst Deaktivierte und Gelöschte aus, kein `p_status` liefert sie zusammen | Szenario benennt jetzt seine Voraussetzung. Es ist eine **übernommene** Zusage — sie wortgleich weiterzureichen, obwohl der Fehler bekannt ist, wäre Weitergeben statt Erben |
-| MEDIUM: ADR-0007 holt das verworfene „an alle" über ein Kopfkästchen zurück | Trifft zu, und es ist der schärfste Befund der Runde | **Kein „alle auswählen"** mehr — in ADR, Spec und Aufgaben. Ein Kopfkästchen über Schritt ① wäre mit einem Klick deckungsgleich mit den 35 |
-| MEDIUM: `::regprocedure` auf eine verschwundene Signatur „prüft nichts" | Falsch — es wirft `42883`, die Datei wird **rot**. Und die Casts nennen `admin_list_members(text,text,int,int)`, die Parameterliste bleibt gleich | Meine eigene Behauptung im Entwurf war falsch und ist korrigiert. Die Casts lösen sich unverändert auf |
-| MEDIUM: Wo lebt die Schleife? | Entschieden: Frontend über die bestehende Einzel-Function | Kein zweiter Endpunkt, damit jeder Schutzriegel unverändert **gilt** statt nachgebaut zu werden. Teilausfall steht als Zusage |
-| MEDIUM: Wahrheitsquelle der Adressprüfung, Rennfall | **Die Annahme war falsch:** kein Unique-*Constraint* auf `auth.users(email)`, sondern der partielle Unique-**Index** `users_email_partial_key` — `btree (email) where (is_sso_user = false)`, also **schreibungsempfindlich**. Der einzige Index über `lower(email)` ist nicht unique | Die Normalisierung ist **tragend**, nicht bequem. Ob GoTrue selbst kleinschreibt, steht als Messaufgabe — nicht als Annahme |
-| Annahme: Index auf `activation_tokens(profile_id)` | `activation_tokens_profil_zeit` auf `(profile_id, created_at desc)` | Behauptet war er, jetzt gemessen |
-| Annahme: „fünf pro Tag" je Absender? | `count(*) … where t.profile_id = v_id` — **je Profil** | Eine Auswahl aus 35 verschiedenen Mitgliedern läuft nicht beim sechsten tot |
-| LOW: `?tab=offen` ändert still die Bedeutung (50 → 35) | Trifft zu | Einmaliger Hinweis beim Sprung, als Aufgabe |
-| LOW: Deno-Tests nur für den 403 RED-first | Trifft zu | RED-Test je Antwortzusage; dazu das bisher unbenannte Verhalten, wenn das Setzen von Name oder `tier` **nach** erfolgreicher Kontoanlage scheitert |
-| LOW (gemini): `admin_member_counts` fehlt im Entwurf | Trifft zu | Eigener Abschnitt, mit der gemessenen Rückgabeform |
+| `admin_member_counts` bricht an „cannot change return type" | Sie liefert `TABLE(status, anzahl)` — **Zeilen** je Zustand | Rueckgabetyp aendert sich nicht, `create or replace` genuegt |
+| `drop` scheitert an `pg_depend` | `member_state_matches` ist `sql`, beide Aufrufer `plpgsql`, **null** Referenten | Der Abwurf gelingt und bricht die Aufrufer nur **still** — das zu wissen ist wichtiger als ein Fehlschlag |
+| Szenario „Kein Profil faellt still durch die Verbindung" unerfuellbar | Trifft zu: kein `p_status` liefert Entfernte mit | Szenario benennt jetzt seine Voraussetzung |
+| ADR-0007 holt das verworfene „an alle" ueber ein Kopfkaestchen zurueck | Trifft zu — schaerfster Befund der Runde | **Kein „alle auswaehlen"** mehr, in ADR, Spec und Aufgaben |
+| `::regprocedure` auf verschwundene Signatur „prueft nichts" | Falsch, es wirft `42883`; und die Parameterliste bleibt ohnehin gleich | Eigene Falschbehauptung im Entwurf korrigiert |
+| Rennfall stuetzt sich auf Eindeutigkeit in `auth.users(email)` | **Es gibt keinen Constraint**, sondern den partiellen Index `users_email_partial_key`, `btree(email) where is_sso_user = false` — **schreibungsempfindlich** | Die Normalisierung ist tragend; die Pruefung ist jetzt semantisch festgelegt |
+| Index auf `activation_tokens(profile_id)` behauptet | `activation_tokens_profil_zeit` auf `(profile_id, created_at desc)` | Gemessen statt angenommen |
+| „fuenf pro Tag" je Absender? | `count(*) … where t.profile_id = v_id` — **je Profil** | 35 Mitglieder laufen nicht beim sechsten tot |
 
-### Runde 2 (Erzeuger, gegen die korrigierte Fassung) — **offen**
+### Runde 2 — und der Fund, der den Entwurf umgeworfen hat
 
-gemini zählt mit REQUEST-CHANGES; sein Haupteinwand ist, dass die
-**Teilausfall-Oberfläche** noch zu vage ist: was sieht der Admin während 35
-aufeinanderfolgenden Aufrufen, aktualisiert sich die Tabelle mit, was passiert
-beim Wegnavigieren. Der Einwand trifft zu — die Zusage steht, die Darstellung
-nicht.
+opencode fand einen Widerspruch: der Entwurf sagte, ein fehlgeschlagener Versand
+lasse das Mitglied in ① Angelegt stehen, waehrend die Spec `eingeladen` als „je
+ein Token erzeugt" definiert. Beim Nachmessen kam mehr heraus als der Befund:
 
-**opencode lief in den Timeout (180 s) und ist nicht gezählt.** Seine Runde-1-
-Befunde sind vollständig eingearbeitet (Tabelle oben), aber eine Stimme auf die
-korrigierte Fassung fehlt. Die Zwei-Anbieter-Regel ist damit für Runde 2
-**nicht** erfüllt.
+**`send-activation` antwortet auf JEDEM ihrer vier Rueckgabepfade mit
+`202 {accepted: true}`.** Absichtlich — „erst antworten, dann senden: sonst
+dauert eine bestehende Adresse messbar laenger als eine unbekannte, und die
+Antwortzeit verraet den Bestand." Der Aufrufer erfaehrt also nicht, ob ein Token
+erzeugt oder wegen `pending` uebersprungen wurde, und nicht, ob Resend die Mail
+annahm.
 
-### Was als nächstes zu tun ist
+**Damit war der Vier-Ausgaenge-Bericht, den ich selbst ins Delta geschrieben
+hatte, ueber diesen Weg nicht herstellbar.** Donald hat entschieden (28.09.):
+eigener Endpunkt `admin-invite-members`, Admin-geprueft, der dieselbe
+`issue_activation_token` ruft — die Schutzriegel liegen in der DB-Funktion, nicht
+im Transport — den Versand abwartet und je Mitglied den echten Ausgang meldet.
+Der Aufzaehlungsschutz entfaellt gegenueber einem Admin, der die Liste ohnehin
+sieht. Mailtext und Versand ziehen in ein gemeinsames Modul.
 
-1. `REVIEW_TIMEOUT` hochsetzen und opencode auf der korrigierten Fassung
-   wiederholen — opencode war in Runde 1 der schärfere der beiden.
-2. Die Teilausfall-Oberfläche im Entwurf festnageln (gemini, Runde 2).
-3. Erst danach die erste Codezeile.
+Der Widerspruch selbst ist **benannt statt wegdefiniert**: ein abgelehnter
+Versand laesst das Mitglied in ② stehen, weil ein Link erzeugt wurde. Der
+Bericht nennt die Ablehnung, und eine erneute Einladung ist sofort moeglich, weil
+ein entwertetes Token das 24-Stunden-Fenster nicht haelt.
+
+**Die uebrigen Befunde aus Runde 2, alle eingearbeitet:**
+
+* Teilzustand *innerhalb* der Anlage (Konto da, Stufe scheitert) war nicht
+  benannt — jetzt: Konto bleibt, Antwort sagt es, es steht in ① auf der
+  Vorgabestufe und ist ueber „Stufe setzen" zu berichtigen.
+* Bekannte Adresse eines **geloeschten oder deaktivierten** Mitglieds lief in
+  eine Sackgasse — jetzt eigenes Szenario. Der wiederkehrende Bewerber ist der
+  realistische Fall.
+* **Keine Spur fuers Anlegen**, waehrend „Stufe setzen" eine verlangt — jetzt als
+  Zusage. Ein Konto samt bezahlter Stufe entstehen zu lassen ist die maechtigere
+  Handlung.
+* Neuladen behaelt Filter, Suchbegriff und Seite (gemini).
+* Der Bericht entsteht aus den **Antworten**, nicht aus einem
+  Vorher-Nachher-Vergleich (gemini) — ein Mitglied, das mittendrin bestaetigt,
+  wird nicht nachtraeglich umgedeutet.
+* Szenariotitel nannte „benutzter Link", der Rumpf pruefte ihn nicht — jetzt
+  deckt er `expires_at`, `invalidated_at` UND `used_at` ab.
+* „Ausgewaehlte einladen" gilt in ① und ②, sonst nirgends.
+* Eingabevalidierung der Adresse als Szenario.
+
+### Bewusst NICHT geaendert
+
+**`database.types.ts` bleibt handgepflegt** (gemini: „fragile, guaranteed to
+fail"). Der Einwand stimmt. `supabase gen types` darueberlaufen zu lassen ist
+hier trotzdem verboten: die Datei traegt von Hand gepflegte Verengungen, die der
+Erzeuger plattmacht. Das zu aendern ist eine eigene Entscheidung mit eigenem
+Vorgang.
+
+**Das Rennen bei verschieden geschriebenen Adressen bleibt offen.** Es zu
+schliessen verlangte einen eigenen Unique-Index ueber `lower(email)` in
+`auth.users`, also einen Schreibzugriff in fremdes Schema. Benannt im Delta,
+als eigener Punkt in `tasks.md`.
+
+### Eine Ehrlichkeit zum Verfahren
+
+Die Artefakte haben sich **nach** Runde 2 noch einmal strukturell geaendert — der
+neue Endpunkt ist keine Textkorrektur. Der Digest oben bindet die Bytes von
+Runde 2, nicht die heutigen. Eine dritte Runde waere billig und ist nicht
+gelaufen; die Aenderung folgt der Richtung, die beide Reviewer selbst benannt
+haben. Wer das anders sieht, laesst
+`REVIEW_TIMEOUT=900 run-plan-review.sh mitglied-anlegen --implementing-host claude gemini opencode`
+noch einmal laufen — **vorher diese Resolution sichern**, der Erzeuger schreibt
+die Datei neu.
 
 <!-- openspec-review-trailer v1
 implementing-host: claude
-digest: sha256:ddb9089651258c66cda8b29110da1753e4e3e962f6da4820cb8c4e193d4a0352
+digest: sha256:9378928451b57ea9963e941052dc6d80d06fe5e374c912d69e7ac9b97bdf5360
 producer-version: 1.3.1
 tasks-digest: sha256:92127c46465441b05300399d3ec14ca6f9f75d0fc1f95d18c74458a800540156
 -->

@@ -54,7 +54,9 @@ bestehenden SECURITY-DEFINER-Funktionen, nicht über eine neue Policy.
   einzige Handlung, die die Auswahl auslöst.
 - **Der Bericht sagt die Wahrheit, auch wenn nichts verschickt wurde.** Liegt
   ein noch gültiger Link im Postfach, schickt die Kette absichtlich nichts. Die
-  Rückmeldung nennt das beim Namen, statt einen Versand zu behaupten.
+  Rückmeldung nennt das beim Namen, statt einen Versand zu behaupten — und
+  dafür braucht es einen eigenen Admin-Endpunkt, weil der bestehende Weg
+  grundsätzlich nur „angenommen" antwortet.
 - **Eine doppelte Adresse legt kein zweites Konto an**, sondern führt zum
   bestehenden Mitglied.
 
@@ -106,9 +108,20 @@ Keine. Der Change erweitert die bestehende `admin`-Capability.
 - Der Einladungsstand wird aus `activation_tokens` **abgeleitet**, innerhalb der
   SECURITY-DEFINER-Funktion. Keine Policy, kein Grant auf die Tabelle.
 
-**Edge Function.** Neu: `admin-create-member`, nach dem Muster von
-`admin-change-email` (`verify_jwt = true`, Admin-Prüfung über `staff_roles`,
-Admin-API mit `service_role`, weil das Konto in `auth.users` entstehen muss).
+**Edge Functions.** Zwei neue, beide `verify_jwt = true` mit Admin-Prüfung über
+`staff_roles`, nach dem Muster von `admin-change-email`:
+
+* `admin-create-member` — legt das Konto an (Admin-API mit `service_role`, weil
+  es in `auth.users` entstehen muss).
+* `admin-invite-members` — schickt die Einladungen und **meldet je Mitglied den
+  echten Ausgang**. Der zweite Endpunkt ist nicht Bequemlichkeit: die
+  bestehende `send-activation` antwortet auf jedem Pfad mit
+  `202 {accepted: true}`, damit ihre Antwortzeit nicht verrät, ob eine Adresse
+  besteht. Über sie ist ein wahrheitsgemässer Bericht nicht herstellbar.
+
+Mailtext und Versand ziehen in ein Modul, das beide Wege benutzen — die
+Schutzriegel liegen ohnehin in `issue_activation_token` und werden nicht
+nachgebaut.
 
 **Frontend.** `src/pages/AdminMitgliederPage.tsx` (Reiter, Auswahl, „+"), eine
 neue Maske, `src/lib/admin-members.ts`, und `src/types/database.types.ts` —

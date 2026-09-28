@@ -105,7 +105,7 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [ ] Neue Dateien in die Liste in `.github/workflows/ci.yml` eintragen;
       `scripts/pgtap-dateiliste.test.ts` prüft sie in beide Richtungen
 
-## 4 · Edge Function `admin-create-member`
+## 4 · Edge Functions
 
 - [ ] RED: Deno-Test, der 403 für ein Konto ohne Admin-Rolle erwartet
 - [ ] Function nach dem Muster `admin-change-email`; `sub` aus dem JWT lesen,
@@ -129,6 +129,35 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [ ] Scheitert der Versand, bleibt das Konto angelegt und die Antwort sagt es
 - [ ] `verify_jwt = true` in der Konfiguration — und der Wächter, der das pinnt,
       mitgezogen
+- [ ] **Adressprüfung ohne Rücksicht auf Gross-/Kleinschreibung** —
+      `lower(email)` gegen `lower(:adresse)`. Der Index ist partiell UND
+      schreibungsempfindlich; ein Vergleich Zeichenkette gegen Zeichenkette
+      legte `A@x.de` neben `a@x.de` an
+- [ ] Gehört die Adresse zu einem gelöschten oder deaktivierten Mitglied, sagt
+      die Antwort genau das — sonst verweist sie auf jemanden, den der Admin in
+      keiner sichtbaren Liste findet
+- [ ] Das Anlegen hinterlässt dieselbe Spur wie andere privilegierte Änderungen
+- [ ] Adressform prüfen, bevor ein Konto entsteht
+
+### `admin-invite-members` (neu, aus dem Plan-Review)
+
+Die bestehende `send-activation` antwortet auf **jedem** Pfad mit
+`202 {accepted: true}` — absichtlich, damit die Antwortzeit nicht verrät, ob
+eine Adresse besteht. Über sie ist der zugesagte Bericht nicht herstellbar.
+
+- [ ] RED: Deno-Test, der für eine Auswahl aus drei Mitgliedern drei
+      **unterschiedliche** Ausgänge erwartet — verschickt, übersprungen
+      (`pending`), abgewiesen (Grenze)
+- [ ] `admin-invite-members` mit `verify_jwt = true` und Admin-Prüfung über
+      `staff_roles`; ruft dasselbe `issue_activation_token`, wartet den Versand
+      ab und meldet je Mitglied den Ausgang
+- [ ] Mailtext, Versand und die Entwertung bei Ablehnung in ein **gemeinsames
+      Modul** ziehen, das `send-activation` und der neue Endpunkt benutzen.
+      `send-activation` behält dabei sein „erst antworten, dann senden" —
+      der Aufzählungsschutz gilt dort weiter
+- [ ] Belegen, dass `send-activation` sich nicht verändert hat: ihre
+      Bestandstests bleiben **unverändert** grün, nicht angepasst
+- [ ] Ein Fehlschlag bricht die Reihe nicht ab
 
 ## 5 · Frontend
 
@@ -149,7 +178,17 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [ ] Beim Sprung von `?tab=offen` auf ① einen einmaligen Hinweis zeigen — das
       alte Lesezeichen meinte die Vereinigung (50), ① zeigt 35
 - [ ] Der Bericht trennt die Ausgänge: verschickt, übersprungen (gültiger Link),
-      abgewiesen (Grenze), fehlgeschlagen. Keine Sammelzahl über gemischter Menge
+      abgewiesen (Grenze), fehlgeschlagen. Keine Sammelzahl über gemischter Menge.
+      Er entsteht aus den **Antworten**, nicht aus einem Vorher-Nachher-Vergleich
+- [ ] Übersprungene und abgewiesene Mitglieder namentlich, nicht nur gezählt;
+      der Bericht bleibt stehen, bis der Admin ihn schliesst
+- [ ] Vorher eine Rückfrage, die die **Zahl** nennt und die Unumkehrbarkeit;
+      währenddessen Fortschritt als Zahl, kein Modal
+- [ ] Die Liste bewegt sich während des Laufs nicht und lädt erst danach einmal
+      neu — **mit** Filter, Suchbegriff und Seite
+- [ ] Wegnavigieren bricht ab, ohne Browser-Rückfrage: es gibt keinen
+      Zwischenzustand zwischen zwei Mitgliedern
+- [ ] „Ausgewählte einladen" nur in den Schritten ① und ②
 - [ ] Zugänglichkeit: „+" auf Desktop und Mobil mit Tastatur und Vorlesesoftware
       bedienbar, auf Mobil nicht von Feedback- oder Chat-Fläche verdeckt
 - [ ] `pnpm build`, danach `git checkout -- src/content/release-entries.generated.ts`
@@ -172,9 +211,20 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [ ] Der Neuigkeiten-Eintrag dieses Change ist für Mitglieder **nicht** gedacht
       (reine Admin-Fläche) — im PR dazuschreiben, dass er zum Überspringen ist
 
+## Bewusst NICHT geändert, obwohl im Review benannt
+
+- **`src/types/database.types.ts` bleibt handgepflegt.** gemini hält das für
+  fragil, und das stimmt. `supabase gen types` darüberlaufen zu lassen ist hier
+  trotzdem verboten: die Datei trägt von Hand gepflegte Verengungen, die der
+  Erzeuger plattmacht. Das zu ändern ist eine eigene Entscheidung mit eigenem
+  Vorgang, nicht ein Nebenschauplatz dieses Change.
+
 ## Offen, nicht in diesem Change
 
 - [ ] Odoo-Anbindung (AGE-263)
 - [ ] Massenmail, CRM, Newsletter (AGE-304) — der Zaun bleibt
 - [ ] Zustellbestätigung: `eingeladen_am` sagt „Link erzeugt", nicht „Mail
       angekommen"
+- [ ] Ein Unique-Index über `lower(email)` in `auth.users` — er schlösse das
+      Rennen bei verschieden geschriebenen Adressen, schreibt aber in fremdes
+      Schema. Eigene Entscheidung
