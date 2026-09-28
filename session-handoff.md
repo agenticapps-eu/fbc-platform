@@ -1,151 +1,136 @@
-# Session Handoff — 2026-09-26 (AGE-903 Zugangsleiter V5)
+# Session Handoff — 2026-09-28 (AGE-927 Mitglied anlegen)
 
-> **Scope dieser Übergabe: AGE-903.** Fremde offene Punkte stehen hier bewusst
-> NICHT. Die vorige Fassung (25.09., AGE-905) steht in
-> `git log -- session-handoff.md` und gehört der Sitzung, die daran arbeitet.
+> **Scope dieser Übergabe: AGE-927.** Fremde offene Punkte stehen hier bewusst
+> NICHT. Die Fassung zu AGE-903 steht in `git log -- session-handoff.md` auf
+> `main` und gehört der abgeschlossenen Arbeit.
 
 > ## ⚠ ZUERST
 >
-> **AGE-903 ist vollstaendig ausgeliefert.** PR #436/#437/#438 gemergt,
-> `migrate-prod` gelaufen (`36259620920`), Deploy freigegeben (`36257009989`,
-> alle vier Jobs gruen). Der ausgelieferte Chunk traegt
-> `SENTRY_RELEASE.id = 94b73ef148e9…` — der Kopf von `main`, kein Rueckfall.
+> **Kein Code geschrieben — das Gate steht noch offen und soll es bleiben.**
+> Der Change ist vorgeschlagen, das Delta geschrieben, eine Review-Runde
+> aufgelöst. `openspec validate --all` 36/0.
 >
-> **Es ist nichts mehr offen, das eine Freigabe braucht.** Was bleibt, gehoert
-> in eigene Vorgaenge: `open_contact` (AGE-930), die Preise fuer BOOST und
-> CONNECT, und der Fokusring aus AGE-929.
+> **Zwei Dinge fehlen vor der ersten Codezeile:**
 >
-> Naechster Handgriff: `wt remove` fuer den Worktree `stufen-v5`. Danach die
-> Schritte 3–5 des Auftrags: AGE-927, AGE-928, AGE-930.
+> 1. **opencode lief in Runde 2 in den 180-s-Timeout** und ist nicht gezählt.
+>    Die Zwei-Anbieter-Regel ist für die **korrigierte** Fassung damit nicht
+>    erfüllt. Wiederholen mit hochgesetztem Timeout:
+>    `REVIEW_TIMEOUT=600 ~/.agenticapps/bin/run-plan-review.sh mitglied-anlegen --implementing-host claude gemini opencode`
+>    — opencode war in Runde 1 der schärfere der beiden.
+> 2. **gemini (Runde 2) hält die Teilausfall-Oberfläche für zu vage:** was sieht
+>    der Admin während 35 aufeinanderfolgenden Aufrufen, aktualisiert sich die
+>    Tabelle mit, was beim Wegnavigieren. Die Zusage steht, die Darstellung
+>    nicht. Gehört in `design.md`.
+>
+> Der Erzeuger schreibt `REVIEWS.md` neu. **Die Resolution vorher sichern** —
+> sie steht dort vor dem Trailer und wäre sonst weg.
 
 ## Accomplished
 
-Der Change `stufen-v5` ist gebaut, gemergt und archiviert.
+**Die Frage beantwortet, mit der die Sitzung begann:** nein, ein Weg, ein
+Mitglied von Hand anzulegen, existiert nicht. AGE-927 stand auf Todo, ohne
+Change, ohne Branch.
 
-Die Leiter danach: `active`(1, 0 €) · `boost`(2, 0 €) · `connect`(3, 0 €) ·
-**`discover`(4, 300 € — der Club beginnt hier)** · `focus`(5, 600 €) ·
-`impact`(6, 1200 €). `basic` und `exchange` entfallen.
+**AGE-927 in Linear ergänzt** um den Prozessteil, die auf PROD gemessenen Zahlen
+und die Begründung, warum der Filter eine Migration braucht:
 
-| Lauf | Ergebnis |
+| | |
 |---|---|
-| pgTAP über `supabase test db` | 40 Dateien, 1391 Zusagen, PASS |
-| Vitest | 253 Dateien, 2928 Zusagen |
-| `tsc --noEmit` | sauber |
-| `pnpm lint` | 0 Fehler |
-| Deno (Kaufweg) | 15 Zusagen |
-| `openspec validate --all` | **35/0** (nach dem Falten) |
-| CI auf `main` (`36255511837`) | success |
+| Profile gesamt | 78 |
+| bestätigt | 28 |
+| **nicht bestätigt** | **50** |
+| … davon Link schon verschickt | 15 |
+| … davon **nie eingeladen** | **35** |
 
-Zwei Reviewer-Runden (Plan und Diff, je gemini und opencode, alle vier
-REQUEST-CHANGES), zehn Befunde, jeder nachgemessen und in
-`openspec/changes/archive/2026-09-26-stufen-v5/REVIEWS.md` aufgelöst.
+**Change `mitglied-anlegen`** mit Proposal, Design, Delta (vier Anforderungen
+geändert mit allen 31 Szenarien, zwei neu), Tasks und `REVIEWS.md`.
+
+**ADR-0007** zur Grenzverschiebung — siehe unten.
 
 ## Decisions
 
-**CONNECT trägt 0 €, nicht 150 €** (Donald, 26.09.: „aktuell 0, wird ja später
-kommen"). *Warum:* ein Preis ohne Kaufweg ist eine Zusage ohne Gegenstand.
+**Der Einladungsstand wird ABGELEITET, nicht gespeichert.** Keine Spalte in
+`profiles`, kein Flag, kein Trigger. *Warum:* die Wahrheit steht in
+`activation_tokens`; eine zweite Ablage liefe auseinander, sobald irgendein Weg
+ein Token erzeugt, ohne die Kopie zu berühren.
 
-**Der Bestand zieht NICHT rangtreu um.** `connect`·`discover`·`exchange` →
-DISCOVER, `basic` → ACTIVE. *Warum:* rangtreu verlöre ein Konto auf altem
-`discover` seinen Clubzugang. „Niemand verliert, was er heute hat."
+**Die Mehrfachauswahl öffnet den AGE-304-Zaun eng** (Donald, 28.09.). Die
+geltende Spec schloss sie **wörtlich** aus. Sie darf jetzt ausschliesslich den
+bestehenden Aktivierungslink auslösen; Massenmail, CRM und Newsletter bleiben
+wortgleich verboten. Festgehalten in **ADR-0007**, mit den verworfenen
+Alternativen und der ausdrücklichen Folge, dass der Zaun dünner wird.
 
-**`regs_write_own` SPIEGELT `register_for_event`**, statt eine eigene Zahl zu
-tragen. *Warum:* der `public`-Zweig hat in einer pauschalen Rangprüfung keine
-Entsprechung.
+**Kein „alle auf dieser Seite auswählen".** *Warum:* ein Kopfkästchen über
+Schritt ① wäre mit **einem** Klick deckungsgleich mit „alle 35 einladen" — genau
+der Alternative, die ADR-0007 verwirft. Befund des Plan-Reviews, und er trifft.
 
-**Die Admin-Beschränkung liegt in der Oberfläche, nicht in `admin_set_tier()`.**
-*Warum:* eine Korrektur nach unten muss möglich bleiben.
+**Die Schleife lebt im Frontend** über die bestehende Einzel-Function. *Warum:*
+so **gilt** jeder Schutzriegel unverändert, statt in einem zweiten Endpunkt
+nachgebaut zu werden.
 
-**Nur ZWEI Zwischenränge (101, 102).** *Warum:* neu sind allein `active` und
-`boost`.
+## Drei Annahmen, die am Katalog fielen
 
-## Das Store-Prüferkonto — erledigt, steht auf PROD
+Zwei davon meine eigenen. Alle drei gemessen, nicht diskutiert:
 
-Angelegt am 26.09. auf **ausdrückliche Freigabe Donalds**, weil die externe
-TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
+* **`admin_member_counts` liefert `TABLE(status, anzahl)`** — Zeilen je Zustand,
+  keine Spalte je Zustand. Ihr Rückgabetyp ändert sich nicht, `create or
+  replace` genügt.
+* **Der Abwurf scheitert NICHT an `pg_depend`.** `member_state_matches` ist
+  `sql`, beide Aufrufer sind `plpgsql`, und für alle drei stehen **null**
+  Referenten. Er bricht die Aufrufer nur **still** bis zur Neuanlage in
+  derselben Transaktion — das zu wissen ist wichtiger als ein Fehlschlag.
+* **Auf `auth.users(email)` gibt es keinen Unique-Constraint**, sondern den
+  partiellen Unique-**Index** `users_email_partial_key` —
+  `btree (email) where (is_sso_user = false)`, also **schreibungsempfindlich**.
+  Der einzige Index über `lower(email)` ist nicht unique. `A@x.de` neben
+  `a@x.de` fängt die Datenbank nicht.
 
-* Stufe **`exchange` (Rang 4)** — die unterste Clubstufe der HEUTIGEN Leiter.
-  Es wandert mit `migrate-prod` **ohne Sonderregel** nach `discover`.
-* Zugangsdaten: Infisical `prod`, `STORE_REVIEW_LOGIN` / `STORE_REVIEW_PASSWORD`.
-* `is_public = false`, `activated_at` gesetzt, abgenommen mit einer **echten
-  Anmeldung**: 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge.
+Dazu eine eigene Falschbehauptung korrigiert: ein `::regprocedure`-Cast auf eine
+verschwundene Signatur prüft nicht stillschweigend nichts — er wirft `42883`.
 
-**PROD-Verteilung, vorher und nachher gezaehlt** — 78 Profile, keines verloren:
+## Der Schutzriegel, der jede Oberfläche hier betrifft
 
-| Rang | vorher | n | nachher | n |
-|---|---|---|---|---|
-| 1 | `basic` 0 € | 3 | `active` 0 € | 3 |
-| 2 | `connect` 0 € | 0 | `boost` 0 € | 0 |
-| 3 | `discover` 150 € | 1 | `connect` 0 € | 0 |
-| 4 | `exchange` 300 € | 1 | `discover` 300 € | **2** |
-| 5 | `focus` 600 € | 0 | `focus` 600 € | 0 |
-| 6 | `impact` 1200 € | 73 | `impact` 1200 € | 73 |
-
-Das Prueferkonto steht danach auf `discover` / **Rang 4**, `is_public = false`,
-aktiviert — am Rang geprueft, nicht am Namen.
+`issue_activation_token` verschickt **nichts**, wenn ein gültiger, unbenutzter
+Link jünger als 24 h im Postfach liegt (`pending`). Dazu 60 s je Profil und 5 pro
+Tag — **je Profil**, nicht je Absender (gemessen). Ein Bericht, der dann
+„verschickt" meldet, wäre gelogen; die getrennte Rückmeldung steht deshalb als
+Zusage im Delta, nicht als Detail im Entwurf.
 
 ## Files modified
 
-* `supabase/migrations/20260926120000_stufen_v5.sql` — neu. Leiter, sechs
-  Policies, drei RPCs, `handle_new_user`, sechs Katalog-Kommentare,
-  Schluss-Wächter über Rang UND Preis.
-* `supabase/tests/stufen_v5_leiter_test.sql`, `…_absage_test.sql` — neu.
-* `supabase/tests/kontaktanfrage_staffelung_test.sql` → `…_stufe_test.sql`.
-* `src/config/levels.ts` — neu `CLUB_LEVEL` / `CLUB_RANK`; die Zahl 4 steht im
-  Frontend an EINER Stelle.
-* `src/lib/contact-requests.ts` — der Staffelungs-Parameter ist WEG.
-* Neun `openspec/specs/*` — das Delta ist gefaltet, plus
-  `src/content/release-entries.generated.ts` (89 Einträge).
+* `openspec/changes/mitglied-anlegen/{proposal,design,tasks}.md`,
+  `specs/admin/spec.md`, `REVIEWS.md` — neu.
+* `docs/decisions/0007-mehrfachauswahl-nur-fuer-den-aktivierungslink.md` — neu.
+* Kein Produktionscode. Keine Migration. Nichts an der Datenbank.
 
 ## Next session: start here
 
-**AGE-903 ist fertig und ausgeliefert — hier ist nichts mehr aufzunehmen.** Der
-Worktree `/Users/donald/worktrees/fbc-platform/stufen-v5` kann mit `wt remove`
-weg; er steht auf einem gemergten Branch, der Arbeitsbaum ist sauber.
+`cd /Users/donald/worktrees/fbc-platform/mitglied-anlegen`. Branch
+`mitglied-anlegen`, **bewusst ohne Kürzel** — AGE-927 gehört nur in den Titel
+des letzten PR, sonst schliesst ein Teil-PR das Issue zu früh. Zwei Commits,
+**noch nicht gepusht**, Arbeitsbaum sauber.
 
-Danach die Schritte 3–5 des Fuenf-Punkte-Auftrags, in dieser Reihenfolge:
-**AGE-927** (Admin legt Mitglied an), **AGE-928** (Mitgliedschaft anzeigen),
-**AGE-930** (Selbstregistrierung schliessen — legt auch `open_contact` um).
+Die beiden Punkte aus dem ZUERST-Block abarbeiten, dann §2 der `tasks.md`: die
+Migration, RED zuerst.
 
 ## Zustand der Umgebung
 
-* **Lokaler Stack: migriert** (Freigabe von `fbc-platform-61` eingeholt). 28
-  Profile: `active` 3 · `discover` 11 · `focus` 6 · `impact` 8. Null Waisen.
-  `open_contact` steht auf `true`, wie vorgefunden.
-* Der Stack hat **136 von 137** Migrationen plus meiner.
-  `20260925120000_release_backfill.sql` (AGE-905) fehlt und bricht lokal an
-  „Profile vorhanden, aber kein Admin in `staff_roles`". **Nicht anfassen**,
-  aber einrechnen: `db push --local` scheitert daran, nicht an AGE-903.
-* **EIN Rest bleibt, harmlos und benannt:** im geteilten chrome-devtools-Chrome
-  steht eine Seite auf `http://localhost:5217` — ein eigener Rest aus AGE-929,
-  nicht der einer Nachbarsitzung (von `fbc-platform-61` bestätigt). Der Server
-  dort ist tot (`curl` → 000). Die MCP-Schnittstelle antwortete dreimal leer;
-  den Chrome habe ich **nicht** blind abgeschossen. Wegräumen, wenn sie wieder
-  antwortet: Seite auf `about:blank`, `localStorage` leeren (dort steht ein
-  `sb-127-auth-token` eines gelöschten Kontos).
+* **AGE-903 ist fertig und auf PROD ausgeliefert** (vorige Sitzung). `main` steht
+  auf `150c0a2`, alles grün.
+* Im **Haupt-Checkout** `/Users/donald/Sourcecode/factiv/fbc-platform` liegt
+  **fremde ungesicherte Arbeit** (AGE-907): `session-handoff.md` geändert plus
+  untracked Archivdateien. **Nicht anfassen.** Sie bringt den `sync-main`-Hook
+  von `wt switch` zum Scheitern; der Weg daran vorbei ist
+  `wt switch --create <name> --base origin/main --no-hooks --no-cd`.
+* Der Worktree `stufen-v5` steht noch (AGE-903, gemergt) und kann mit
+  `wt remove` weg — Donald hat das nicht freigegeben, deshalb blieb er.
 
 ## Open questions
 
-* **FOCUS und IMPACT schalten im Gating nichts frei, was DISCOVER nicht hat** —
-  jede Clubschwelle lautet `has_level(4)`. Standard aus dem Issue, Rückfrage an
-  Detlev offen. Steht so im Lastenheft.
-* **Detlevs V5-Funktionsmatrix ist weiterhin nicht lesbar** (`~/Documents`,
-  macOS TCC, `EPERM`).
-* **Preise für BOOST (75 €) und CONNECT** — später, eigene Änderung.
-* Sichtbarer Fokusring auf den Seitenleisten-`NavLink`s (Befund aus AGE-929,
-  eigenes Issue, bewusst in keinem Diff).
-
-## Drei Notizen ins Gedächtnis geschrieben
-
-* **`delete from auth.users` räumt die Profilzeile NICHT mit weg** — dritte
-  unabhängige Entdeckung. Sonde: die Verteilung vorher/nachher, nicht die
-  Kontenzahl. In `kontoloeschung-was-wo-haengt`.
-* **Prozess- und Port-Zuordnung zwischen Sitzungen: messen, nicht erinnern.**
-  Dazu die Unterscheidung von `fbc-platform-61`: die *fragende* Seite muss die
-  Frageform reparieren („wem gehört der?"), die *antwortende* Seite muss vor der
-  Antwort messen — gerade wenn es um einen selbst geht. In
-  `chrome-devtools-profil-ist-einplaetzig`.
-* **Die Vorab-Sonde vor `openspec archive` hat wieder etwas gefunden** — drei
-  Fallen auf einmal (kein H1, keine `Linear:`-Zeile, `###` beendet
-  `## What Changes` nicht, also fünf Ausschlüsse als das Ausgelieferte). In
-  `archivieren-zieht-neuigkeiten-nach`.
+* **Teilausfall-Oberfläche** — die einzige inhaltlich offene Frage (gemini,
+  Runde 2).
+* **Was gilt, wenn das Konto entsteht und das Setzen von Name oder `tier` danach
+  scheitert?** Ein Konto ohne Stufe ist ein Zustand, den die Liste zeigen können
+  muss. Steht als Aufgabe, ist aber nicht entschieden.
+* **Schreibt GoTrue beim Admin-Anlegen selbst klein?** Zu messen, nicht
+  anzunehmen — davon hängt ab, ob die Normalisierung allein trägt.
