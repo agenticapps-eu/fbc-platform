@@ -58,51 +58,62 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 
 ## 2 · Migration (eine Datei, forward-only)
 
-- [ ] RED: pgTAP, der `p_status = 'angelegt'` und `'eingeladen'` erwartet — muss
-      rot sein, bevor die Migration steht
-- [ ] **Abwurfreihenfolge:** erst die beiden Aufrufer, dann
-      `member_state_matches`; Neuanlage in der umgekehrten Reihenfolge. Kein
-      `cascade` — es nähme Objekte mit, die diese Migration nicht kennt
-- [ ] `member_state_matches` abwerfen und mit fünftem Argument neu anlegen;
+- [x] RED: pgTAP, der `p_status = 'angelegt'` und `'eingeladen'` erwartet — war
+      rot mit `22023: unbekannter Status: angelegt`, also aus dem richtigen
+      Grund (`supabase/tests/admin_einladungsstand_test.sql`, 19 Zusagen)
+- [x] **Abwurfreihenfolge:** erst `admin_list_members`, dann
+      `member_state_matches`. Kein `cascade`. `admin_member_counts` wird gar
+      nicht abgeworfen — ihr Rückgabetyp bleibt gleich
+- [x] `member_state_matches` abwerfen und mit fünftem Argument neu anlegen;
       `angelegt` und `eingeladen` als Zweige, `offen` unverändert als Vereinigung
-- [ ] **`revoke execute ... from public, anon` wieder aussprechen** — ein `drop`
-      nimmt ihn mit, und `default privileges` wirken auf Funktionen nicht
-- [ ] `admin_list_members` abwerfen und mit `eingeladen_am` neu anlegen;
+- [x] **`revoke execute ... from public, anon` wieder aussprechen** — ein `drop`
+      nimmt ihn mit, und `default privileges` wirken auf Funktionen nicht.
+      **Beim ersten Anlauf für `admin_list_members` vergessen**, obwohl der
+      Migrationskopf davor warnt: zwei Zusagen des Bestandstests fielen sofort
+      (`anon darf nicht ausführen`, `PUBLIC hält kein EXECUTE`). Der Wächter
+      hat getan, wozu er da ist
+- [x] `admin_list_members` abwerfen und mit `eingeladen_am` neu anlegen;
       Ableitung als **ein** `left join lateral`, benutzt von Spalte und Filter
-- [ ] Grants, Kommentar und **alle vier Parameter-Vorgabewerte** wiederherstellen
+- [x] Grants, Kommentar und **alle vier Parameter-Vorgabewerte** wiederherstellen
 - [ ] `admin_member_counts` um die beiden Zustände erweitern, über dieselbe
       geteilte Bedingung — `create or replace` genügt (Rückgabeform gemessen,
       siehe §0). Ändert sich das wider Erwarten, bricht die Migration mitten im
       Lauf: dann erst den Grund messen, nicht blind `drop` nachschieben
-- [ ] Katalog-Kommentare aller drei Funktionen richtigstellen — sie nennen heute
+- [x] Katalog-Kommentare aller drei Funktionen richtigstellen — sie nannten
       „fuer alle|aktiviert|offen|deaktiviert|geloescht"
-- [ ] Migrationskopf trägt die Entscheidungen: warum abgeleitet statt
+- [x] Migrationskopf trägt die Entscheidungen: warum abgeleitet statt
       gespeichert, warum ein Argument statt eines `exists` im Rumpf, warum
-      `offen` bleibt
-- [ ] GREEN: derselbe pgTAP läuft durch
+      `offen` bleibt — und was `eingeladen_am` NICHT sagt
+- [x] GREEN: derselbe pgTAP läuft durch — 19/19
 
-## 3 · pgTAP
+## 3 · pgTAP — erledigt
 
-- [ ] `angelegt` und `eingeladen` teilen `offen` auf, und ihre Summe **ist**
+Gesamtlauf gegen die CI-Liste: **41 Dateien, 1411 Zusagen, alle grün.**
+
+
+- [x] `angelegt` und `eingeladen` teilen `offen` auf, und ihre Summe **ist**
       `offen` — als Zusage geprüft, nicht als Zufall einer Vorrichtung
-- [ ] Ein Token, das abgelaufen, benutzt oder entwertet ist, zählt weiter als
+- [x] Ein Token, das abgelaufen, benutzt oder entwertet ist, zählt weiter als
       Einladung — die Frage ist „wurde je eingeladen?"
-- [ ] `eingeladen_am` trägt bei zwei Token den **späteren**; bei keinem `null`
-- [ ] Ein unbekannter `p_status` bricht weiter mit `22023` ab
-- [ ] Ein argumentloser Aufruf durch einen Nicht-Admin bricht mit `42501` ab —
+- [x] `eingeladen_am` trägt bei zwei Token den **späteren**; bei keinem `null`
+- [x] Ein unbekannter `p_status` bricht weiter mit `22023` ab
+- [x] Ein argumentloser Aufruf durch einen Nicht-Admin bricht mit `42501` ab —
       die Probe auf die wiederhergestellten Vorgabewerte
-- [ ] Zähler und Liste stimmen für **jeden** der sieben Werte überein
-- [ ] **`activation_tokens` bleibt für `anon` und `authenticated` unerreichbar** —
+- [x] Zähler und Liste stimmen für **jeden** der sieben Werte überein
+- [x] **`activation_tokens` bleibt für `anon` und `authenticated` unerreichbar** —
       Positivkontrolle inbegriffen: die Funktion liefert den Wert, der direkte
       Zugriff scheitert
-- [ ] Die `::regprocedure`-Casts in `admin_member_list_test.sql` mitziehen und
-      belegen, dass sie noch greifen — ein Cast auf eine verschwundene Signatur
-      prüft nichts, statt rot zu werden
-- [ ] Spaltenvergleich gegen `search_directory` weiter grün; `eingeladen_am`
+- [x] **Drei Zusagen am Ende von `admin_member_list_test.sql` auf fünf Argumente
+      ziehen** — sie nennen `member_state_matches(text,timestamptz,timestamptz,
+      timestamptz)` zweimal als Zeichenkette in `has_function_privilege` und
+      einmal als `::regprocedure`. Ungezogen wirft die Datei `42883`, bevor sie
+      etwas prüft. Die Casts auf `admin_list_members` bleiben unberührt, dort
+      ändert sich die Parameterliste nicht
+- [x] Spaltenvergleich gegen `search_directory` weiter grün; `eingeladen_am`
       gehört NICHT zu den Verzeichnisspalten
-- [ ] `grants_test.sql` messen, nicht annehmen — es entsteht keine Tabelle, der
+- [x] `grants_test.sql` messen, nicht annehmen — es entsteht keine Tabelle, der
       Snapshot sollte unberührt bleiben
-- [ ] Neue Dateien in die Liste in `.github/workflows/ci.yml` eintragen;
+- [x] Neue Dateien in die Liste in `.github/workflows/ci.yml` eintragen;
       `scripts/pgtap-dateiliste.test.ts` prüft sie in beide Richtungen
 
 ## 4 · Edge Functions
@@ -162,7 +173,7 @@ eine Adresse besteht. Über sie ist der zugesagte Bericht nicht herstellbar.
 ## 5 · Frontend
 
 - [ ] RED: Vitest auf die Aufnahmestrecke — drei Schritte, Reihenfolge, Zahlen
-- [ ] `src/types/database.types.ts` von Hand nachziehen; **kein** `gen types`
+- [ ] `src/lib/database.types.ts` von Hand nachziehen; **kein** `gen types`
 - [ ] Aufnahmestrecke ①→②→③ über der bestehenden Reiterleiste; genau einer der
       sieben Filter gewählt, der Wert steht in der Adresse
 - [ ] `?tab=offen` fällt auf ① Angelegt
@@ -213,7 +224,7 @@ eine Adresse besteht. Über sie ist der zugesagte Bericht nicht herstellbar.
 
 ## Bewusst NICHT geändert, obwohl im Review benannt
 
-- **`src/types/database.types.ts` bleibt handgepflegt.** gemini hält das für
+- **`src/lib/database.types.ts` bleibt handgepflegt.** gemini hält das für
   fragil, und das stimmt. `supabase gen types` darüberlaufen zu lassen ist hier
   trotzdem verboten: die Datei trägt von Hand gepflegte Verengungen, die der
   Erzeuger plattmacht. Das zu ändern ist eine eigene Entscheidung mit eigenem

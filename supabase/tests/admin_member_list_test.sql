@@ -26,7 +26,7 @@
 --   * Rechte werden nicht vererbt (AGE-312) — deshalb der Grant-Block am Ende.
 
 begin;
-select plan(74);
+select plan(75);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -334,6 +334,11 @@ select ok(
 -- Und genau das ist am 24.08. passiert: `gebannt` kam dazu (Diff-Prüfung), die
 -- Zusage brach, und dieser Kommentar wurde zum zweiten Mal umgeschrieben. Sie
 -- tut also, wozu sie da ist.
+--
+-- Zum dritten Mal am 28.09. (AGE-927): `eingeladen_am` kam dazu. Es ist eine
+-- VERWALTUNGS-Spalte und ausdrücklich keine Verzeichnisspalte — was ein Admin
+-- über den Aufnahmestand eines Kontos weiss, geht die Mitgliedersicht nichts
+-- an. Deshalb steht es hier oben UND unten in der Ausschlussliste von 9.3.
 
 select is(
   (select array_agg(s order by s) from (
@@ -341,9 +346,9 @@ select is(
      except
      select unnest(pg_temp.rueckgabespalten(
        'public.search_directory(text,text,text,text,text,text,text[],text[])'::regprocedure))) x(s)),
-  array['bestaetigt', 'deaktiviert_seit', 'gebannt', 'geloescht_seit', 'login_email',
-        'member_since', 'paid_until', 'payment_type'],
-  'Die Admin-Liste hat genau die acht Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
+  array['bestaetigt', 'deaktiviert_seit', 'eingeladen_am', 'gebannt', 'geloescht_seit',
+        'login_email', 'member_since', 'paid_until', 'payment_type'],
+  'Die Admin-Liste hat genau die neun Verwaltungsspalten zusätzlich — jede weitere steht hier namentlich');
 
 select is(
   (select array_agg(s order by s) from (
@@ -370,7 +375,8 @@ select is(
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
     $q$select (to_jsonb(t) - 'login_email' - 'bestaetigt' - 'member_since'
                          - 'deaktiviert_seit' - 'geloescht_seit'
-                         - 'paid_until' - 'payment_type' - 'gebannt')::text
+                         - 'paid_until' - 'payment_type' - 'gebannt'
+                         - 'eingeladen_am')::text
          from public.admin_list_members(null, null, 1000) t
         where t.id = 'b1000000-0000-0000-0000-000000000005'$q$),
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000c0',
@@ -828,17 +834,35 @@ select is(
     $q$select string_agg(s || '=' || (select count(*)
                                         from public.admin_list_members(null, s, 1000000, 0)),
                          ',' order by s)
-         from unnest(array['aktiviert','alle','deaktiviert','geloescht','offen']) s$q$),
+         from unnest(array['aktiviert','alle','angelegt','deaktiviert','eingeladen',
+                           'geloescht','offen']) s$q$),
   'Zähler und Liste stimmen für jeden Zustand überein — sie fragen dieselbe Bedingung');
 
--- 13.2 Eine Zeile je Zustand, und zwar genau diese fünf. Ohne diese Zusage
+-- 13.2 Eine Zeile je Zustand, und zwar genau diese sieben. Ohne diese Zusage
 -- könnte die Funktion einen Zustand weglassen und 13.1 bliebe grün, weil
 -- `string_agg` über eine fehlende Zeile hinwegsieht — auf beiden Seiten.
+--
+-- Aus fünf wurden am 28.09. sieben (AGE-927): `angelegt` und `eingeladen`
+-- teilen `offen` auf. Die Zahl steht hier ausgeschrieben, damit ein
+-- weggefallener Zustand auffällt und nicht bloss eine kleinere Liste ergibt.
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
     $q$select string_agg(status, ',' order by status) from public.admin_member_counts()$q$),
-  'aktiviert,alle,deaktiviert,geloescht,offen',
-  'Die Funktion liefert genau fünf Zeilen, eine je Zustand');
+  'aktiviert,alle,angelegt,deaktiviert,eingeladen,geloescht,offen',
+  'Die Funktion liefert genau sieben Zeilen, eine je Zustand');
+
+-- 13.2a Und die beiden neuen TEILEN `offen`, sie ersetzen es nicht. Das ist
+-- keine Dopplung zu 13.1: dort stimmen Zahl und Liste je Zustand überein, hier
+-- stimmt das Verhältnis der Zustände UNTEREINANDER. Liefe die Bedingung für
+-- `angelegt` und `eingeladen` an `offen` vorbei, wären beide Seiten von 13.1
+-- gleich falsch und die Zusage bliebe grün.
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select ((select anzahl from public.admin_member_counts() where status = 'angelegt')
+             + (select anzahl from public.admin_member_counts() where status = 'eingeladen'))::text$q$),
+  pg_temp.text_as('a0000000-0000-0000-0000-0000000000ad',
+    $q$select (select anzahl from public.admin_member_counts() where status = 'offen')::text$q$),
+  'angelegt + eingeladen = offen — eine Folge der geteilten Bedingung');
 
 -- 13.3 Ein Zustand OHNE Mitglieder erscheint mit der Zahl null, nicht gar
 -- nicht. Der leere Zustand wird eigens hergestellt: im vorhandenen Bestand ist
@@ -889,14 +913,14 @@ select ok(
 -- `postgres`, und dort wird das Recht gegen den EIGENTÜMER geprüft, nicht gegen
 -- den Aufrufer — derselbe Weg, den `is_banned` in AGE-581 schon ging. Deshalb
 -- ist hier auch `authenticated` false, und das ist kein Versehen.
-select is(has_function_privilege('anon', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)', 'execute'),
+select is(has_function_privilege('anon', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz,timestamptz)', 'execute'),
   false, 'member_state_matches: anon darf nicht ausführen');
-select is(has_function_privilege('authenticated', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)', 'execute'),
+select is(has_function_privilege('authenticated', 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz,timestamptz)', 'execute'),
   false, 'member_state_matches: auch authenticated nicht — sie ist keine Fläche, sondern eine Bedingung');
 select ok(
   not exists (
     select 1 from aclexplode((select proacl from pg_proc
-                               where oid = 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz)'::regprocedure)) a
+                               where oid = 'public.member_state_matches(text,timestamptz,timestamptz,timestamptz,timestamptz)'::regprocedure)) a
      where a.grantee = 0),
   'member_state_matches: PUBLIC hält kein EXECUTE');
 

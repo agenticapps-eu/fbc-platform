@@ -331,16 +331,25 @@ Fremdreview hat es gefangen:** ein `regprocedure`-Cast auf eine nicht mehr
 bestehende Signatur wirft `42883`, die Datei wird also **rot** — die gewünschte
 Wächterwirkung, nur aus dem umgekehrten Grund.
 
-Praktisch trifft der Fall hier ohnehin nicht zu: die Casts nennen
+Für `admin_list_members` trifft der Fall nicht zu: die Casts nennen
 `admin_list_members(text,text,int,int)`, und die **Parameterliste bleibt
-Zeichen für Zeichen gleich**. Nur der Rückgabetyp wächst. Die Casts lösen sich
-danach unverändert auf; mitzuziehen ist allein die Zusage über den
-**Spaltensatz**, in dem `eingeladen_am` neu erscheint.
+Zeichen für Zeichen gleich**. Nur der Rückgabetyp wächst; mitzuziehen ist dort
+allein die Zusage über den **Spaltensatz**, in dem `eingeladen_am` neu
+erscheint.
+
+**Für `member_state_matches` trifft er sehr wohl zu**, und das ist beim Lesen
+der Testdatei herausgekommen, nicht beim Planen: drei Zusagen am Ende von
+`admin_member_list_test.sql` nennen sie mit **vier** Argumenten — zweimal als
+Zeichenkette in `has_function_privilege`, einmal als `::regprocedure`. Alle
+drei müssen auf fünf Argumente gezogen werden, sonst wirft die Datei `42883`,
+noch bevor sie etwas prüft. Sie prüfen, dass weder `anon` noch `authenticated`
+die Bedingung ausführen darf — genau die Zusage, die der wiederholte `revoke`
+hält.
 
 `grants_test.sql` hält einen Golden-Snapshot über **Tabellen**. Hier entsteht
 keine Tabelle; der Snapshot sollte unberührt bleiben. Das ist eine Erwartung,
 keine Zusage — sie wird gemessen, nicht angenommen.
 
-`src/types/database.types.ts` ist **handgepflegt**. `supabase gen types` darf
+`src/lib/database.types.ts` ist **handgepflegt**. `supabase gen types` darf
 nicht darüberlaufen; die neue Spalte und die beiden neuen Statuswerte werden von
 Hand nachgetragen.

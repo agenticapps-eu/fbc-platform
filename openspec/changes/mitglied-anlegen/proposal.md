@@ -124,7 +124,7 @@ Schutzriegel liegen ohnehin in `issue_activation_token` und werden nicht
 nachgebaut.
 
 **Frontend.** `src/pages/AdminMitgliederPage.tsx` (Reiter, Auswahl, „+"), eine
-neue Maske, `src/lib/admin-members.ts`, und `src/types/database.types.ts` —
+neue Maske, `src/lib/admin-members.ts`, und `src/lib/database.types.ts` —
 diese Datei ist **handgepflegt**, `gen types` darf nicht darüberlaufen.
 
 **Tests.** pgTAP für die drei Funktionen und für die Unerreichbarkeit von
