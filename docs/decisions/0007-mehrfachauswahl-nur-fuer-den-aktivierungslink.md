@@ -40,6 +40,12 @@ Eng gezogen heisst das:
   eine Wirkung, und die steht fest.
 * **Keine Übernahme der Menge** in eine andere Fläche, keinen Export, keine
   Zwischenablage.
+* **Kein „alle auf dieser Seite auswählen".** Nur Kontrollkästchen je Zeile.
+  Nachgetragen am 28.09. auf einen Befund des Plan-Reviews, der zutrifft: ein
+  Kopfkästchen über dem Filter ① wäre mit **einem** Klick deckungsgleich mit
+  „alle 35 einladen" — genau der Alternative, die weiter unten verworfen wird.
+  Die Unterscheidung „der Admin hat jede Zeile gesehen" wäre dann eine
+  Schutzschrift und keine Schutzbarriere.
 * **Kein Umgehen der Schutzriegel.** Die Massenaktion ruft dieselbe Kette wie
   der Einzelknopf und erbt alle drei Grenzen aus `issue_activation_token`: 60
   Sekunden je Profil, höchstens fünf pro Tag, und das 24-Stunden-Schutzfenster,
@@ -59,6 +65,13 @@ dieser Konten darf heute schon einzeln eingeladen werden, von derselben Person,
 **Eine Massenaktion „alle in Schritt ① einladen"** ohne Auswahl war der erste
 Vorschlag und wurde verworfen: sie ist genau das „an alle", das die Zusage
 nennt, und sie nimmt dem Admin die Entscheidung, wer diesmal dran ist.
+
+*Und sie kommt durch die Hintertür zurück, wenn man nicht aufpasst.* Der
+Plan-Review hat genau das gefunden: ein „alle auf dieser Seite auswählen" über
+einem Filter, der 35 Zeilen zeigt, **ist** diese Massenaktion, nur mit einem
+Klick mehr. Deshalb steht oben ausdrücklich, dass es kein Kopfkästchen gibt.
+Ohne diesen Satz hätte der Record eine Alternative verworfen und ihren
+Mechanismus behalten.
 
 **Den Zaun weiträumig öffnen** („Admin darf an Ausgewählte schreiben") wäre
 AGE-304 vorweggenommen, ohne das Rechtemodell, das AGE-304 dafür verlangt.

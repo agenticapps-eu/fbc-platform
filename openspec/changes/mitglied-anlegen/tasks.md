@@ -20,6 +20,32 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [x] Widerspruch zur geltenden Spec aufgedeckt („keine Mehrfachauswahl",
       AGE-304), Donald vorgelegt, entschieden, in **ADR-0007** festgehalten
 - [x] Nach einem bestehenden Branch gesehen — keiner, weder lokal noch gepusht
+- [x] **Vorflug am Katalog, weil der Plan-Review drei Annahmen benannt hat:**
+      `member_state_matches` ist `sql`, die beiden Aufrufer sind `plpgsql`;
+      `pg_depend` führt für alle drei **null** Referenten — der Abwurf gelingt
+      und bricht die Aufrufer nur still bis zur Neuanlage in derselben
+      Transaktion
+- [x] `admin_member_counts` liefert `TABLE(status text, anzahl bigint)` — Zeilen
+      je Zustand, **keine** Spalte je Zustand. Ihr Rückgabetyp ändert sich also
+      nicht, `create or replace` genügt
+- [x] `activation_tokens` trägt `activation_tokens_profil_zeit` auf
+      `(profile_id, created_at desc)` — genau der Index, den die Ableitung will.
+      Behauptet war er, jetzt ist er gemessen
+- [x] **Eindeutigkeit der Anmeldeadresse gemessen, und die Annahme war falsch:**
+      es gibt keinen Unique-Constraint auf `auth.users(email)`, sondern den
+      partiellen Unique-Index `users_email_partial_key` —
+      `btree (email) where (is_sso_user = false)`, also
+      **schreibungsempfindlich**. Der einzige Index über `lower(email)` ist
+      nicht unique. Die Normalisierung ist damit tragend, nicht bequem
+- [x] „Fünf pro Tag" gilt **je Profil**, nicht je Absender (`count(*) … where
+      t.profile_id = v_id`). Eine Auswahl aus 35 verschiedenen Mitgliedern läuft
+      nicht beim sechsten tot; das globale Stundenkontingent von 100 sitzt im
+      **Selbst**-Anforderungsweg und nicht hier
+- [x] `::regprocedure`-Casts nachgesehen: sie nennen
+      `admin_list_members(text,text,int,int)`, und die Parameterliste bleibt
+      gleich — sie lösen sich unverändert auf. Die frühere Behauptung im
+      Entwurf, ein Cast auf eine verschwundene Signatur „prüfe dann nichts",
+      war falsch: er wirft `42883`
 
 ## 1 · Plan-Review (Gate, vor jeder Codezeile)
 
@@ -34,6 +60,9 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 
 - [ ] RED: pgTAP, der `p_status = 'angelegt'` und `'eingeladen'` erwartet — muss
       rot sein, bevor die Migration steht
+- [ ] **Abwurfreihenfolge:** erst die beiden Aufrufer, dann
+      `member_state_matches`; Neuanlage in der umgekehrten Reihenfolge. Kein
+      `cascade` — es nähme Objekte mit, die diese Migration nicht kennt
 - [ ] `member_state_matches` abwerfen und mit fünftem Argument neu anlegen;
       `angelegt` und `eingeladen` als Zweige, `offen` unverändert als Vereinigung
 - [ ] **`revoke execute ... from public, anon` wieder aussprechen** — ein `drop`
@@ -42,7 +71,9 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
       Ableitung als **ein** `left join lateral`, benutzt von Spalte und Filter
 - [ ] Grants, Kommentar und **alle vier Parameter-Vorgabewerte** wiederherstellen
 - [ ] `admin_member_counts` um die beiden Zustände erweitern, über dieselbe
-      geteilte Bedingung
+      geteilte Bedingung — `create or replace` genügt (Rückgabeform gemessen,
+      siehe §0). Ändert sich das wider Erwarten, bricht die Migration mitten im
+      Lauf: dann erst den Grund messen, nicht blind `drop` nachschieben
 - [ ] Katalog-Kommentare aller drei Funktionen richtigstellen — sie nennen heute
       „fuer alle|aktiviert|offen|deaktiviert|geloescht"
 - [ ] Migrationskopf trägt die Entscheidungen: warum abgeleitet statt
@@ -81,8 +112,19 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
       **nicht** `getUser()` (ES256)
 - [ ] Konto mit `email_confirm: true` und **ohne Passwort** anlegen; Name und
       `tier` setzen; **nicht** `admin_activate_member` aufrufen
+- [ ] RED: Deno-Test je **Antwortzusage**, nicht nur für den 403 — doppelte
+      Adresse benennt den Bestand; scheitert der Versand, bleibt das Konto und
+      die Antwort sagt es; der `pending`-Ausgang kommt unverfälscht durch
 - [ ] Doppelte Adresse: kein zweites Konto, Antwort benennt das bestehende
-      Mitglied — und der Weg stimmt auch, wenn zwei Anlagen sich überholen
+      Mitglied — und der Weg stimmt auch, wenn zwei Anlagen sich überholen.
+      **Wahrheitsquelle ist `auth.users.email`**, nicht `profiles`
+- [ ] **Messen, ob GoTrue beim Admin-Anlegen selbst kleinschreibt.** Tut es das
+      nicht, ist `A@x.de` neben `a@x.de` ein zweites Konto — der partielle
+      Unique-Index ist schreibungsempfindlich (§0). Das Ergebnis gehört in den
+      Funktionskopf, nicht nur in einen Test
+- [ ] Festlegen und testen, was gilt, wenn das Konto entsteht und das Setzen von
+      Name oder `tier` danach scheitert — ein Konto ohne Stufe ist ein Zustand,
+      den die Liste zeigen können muss
 - [ ] Haken gesetzt → dieselbe Kette wie „Zugangslink schicken"
 - [ ] Scheitert der Versand, bleibt das Konto angelegt und die Antwort sagt es
 - [ ] `verify_jwt = true` in der Konfiguration — und der Wächter, der das pinnt,
@@ -98,7 +140,14 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [ ] „+"-Knopf und Maske; Plan nur DISCOVER · FOCUS · IMPACT; Haken
       vorausgewählt
 - [ ] Kontrollkästchen je Zeile, „Ausgewählte einladen" als **einzige** Handlung
-      der Auswahl; Auswahl gilt je Seite
+      der Auswahl; Auswahl gilt je Seite. **Kein Kopfkästchen „alle auswählen"** —
+      es wäre mit einem Klick deckungsgleich mit der Massenaktion, die ADR-0007
+      verwirft (Befund aus dem Plan-Review)
+- [ ] Die Aufrufe laufen nacheinander über die bestehende Einzel-Function; ein
+      Fehlschlag bricht die Reihe nicht ab. Vor dem Auslösen sagen, dass sich
+      Verschicktes nicht zurückdrehen lässt; danach zeigen, wie weit sie kam
+- [ ] Beim Sprung von `?tab=offen` auf ① einen einmaligen Hinweis zeigen — das
+      alte Lesezeichen meinte die Vereinigung (50), ① zeigt 35
 - [ ] Der Bericht trennt die Ausgänge: verschickt, übersprungen (gültiger Link),
       abgewiesen (Grenze), fehlgeschlagen. Keine Sammelzahl über gemischter Menge
 - [ ] Zugänglichkeit: „+" auf Desktop und Mobil mit Tastatur und Vorlesesoftware

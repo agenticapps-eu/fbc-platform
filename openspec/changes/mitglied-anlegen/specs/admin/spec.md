@@ -266,10 +266,16 @@ Platzhalterzeichen des Mustervergleichs SHALL die Funktion entschärfen.
 
 #### Scenario: Kein Profil fällt still durch die Verbindung
 
-- **WHEN** die Zahl der Zeilen in `profiles` gegen die Zahl der von
-  `admin_list_members` gelieferten Zeilen ohne Filter gehalten wird
+- **WHEN** die Zahl der Zeilen in `profiles` **ohne deaktivierte und ohne
+  gelöschte** gegen die Zahl der von `admin_list_members` ohne Filter
+  gelieferten Zeilen gehalten wird
 - **THEN** stimmen beide überein — und weichen sie ab, benennt die Prüfung die
   fehlenden Profile, statt eine kleinere Liste als vollständig auszugeben
+
+  *Die Einschränkung ist am 28.09. nachgetragen und keine Abschwächung.* Ohne
+  sie war das Szenario auf jedem Bestand unerfüllbar, der ein entferntes
+  Mitglied enthält — `alle` schliesst beide Gruppen ausdrücklich aus, und kein
+  `p_status` liefert sie zusammen. Gefunden im Plan-Review zu AGE-927.
 
 #### Scenario: Die neu angelegte Funktion trägt ihre Vorgabewerte wieder
 
@@ -619,6 +625,16 @@ weil eine Grenze griff; und fehlgeschlagen. Ein Sammelbericht „N verschickt"
 Die Auswahl SHALL sich auf die gerade sichtbare Seite beziehen und SHALL NOT
 stillschweigend Zeilen umfassen, die der Admin nie gesehen hat.
 
+**Ein „alle auf dieser Seite auswählen" SHALL NOT bestehen.** Nur
+Kontrollkästchen je Zeile. Ein Kopfkästchen über einem Filter, der die ganze
+Gruppe zeigt, wäre mit einem Klick deckungsgleich mit „an alle" — der Handlung,
+die ADR-0007 ausdrücklich verwirft.
+
+**Die Aufrufe SHALL nacheinander über die bestehende Einzel-Function laufen**,
+und ein Fehlschlag SHALL die Reihe nicht abbrechen. Was verschickt ist, ist
+verschickt: die Fläche SHALL vor dem Auslösen sagen, dass sich das nicht
+zurückdrehen lässt, und danach zeigen, wie weit sie kam.
+
 #### Scenario: Mehrere Einladungen mit einem Griff
 
 - **WHEN** ein Admin in Schritt ① drei Zeilen auswählt und „Ausgewählte einladen"
@@ -642,10 +658,21 @@ stillschweigend Zeilen umfassen, die der Admin nie gesehen hat.
 
 #### Scenario: Die Auswahl greift nicht über die Seite hinaus
 
-- **WHEN** ein Admin auf Seite 1 alle Zeilen auswählt und danach auf Seite 2
-  blättert
+- **WHEN** ein Admin auf Seite 1 Zeilen auswählt und danach auf Seite 2 blättert
 - **THEN** umfasst die Handlung nur, was er gesehen und gewählt hat, und keine
   Zeilen einer anderen Seite
+
+#### Scenario: Es gibt kein „alle auswählen"
+
+- **WHEN** ein Admin den Kopf der Liste betrachtet
+- **THEN** steht dort kein Kontrollkästchen, das die ganze Seite auf einmal
+  wählt — die Auswahl entsteht Zeile für Zeile
+
+#### Scenario: Ein Fehlschlag bricht die Reihe nicht ab
+
+- **WHEN** in einer Auswahl von fünf der dritte Aufruf fehlschlägt
+- **THEN** laufen der vierte und fünfte trotzdem, und der Bericht nennt den
+  dritten als fehlgeschlagen
 
 #### Scenario: Die Auswahl kann nichts anderes
 
