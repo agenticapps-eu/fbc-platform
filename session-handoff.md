@@ -5,13 +5,25 @@
 
 > ## ⚠ ZUERST
 >
-> **PR #440 ist offen.** Der Change ist **fertig gebaut, geprüft, archiviert
-> und gepusht** — es ist nichts mehr zu bauen.
+> **PR #440 ist GEMERGT** (Squash `560dcdf`, 29.09. 06:43 UTC), alle vier
+> Pflichtchecks grün. `migrate-dev` ist durchgelaufen — die beiden Migrationen
+> stehen auf **DEV**.
 >
-> Erste Handlung: `gh pr checks 440`. Grün → mergen (Freigabe steht).
+> **Offen ist genau eins: PROD.** `drift-gate` hat den Frontend-Deploy auf
+> `main` blockiert (Lauf `36532591224`), weil PROD die Migrationen noch nicht
+> kennt. Das ist der erwartete Zustand, kein Fehler.
 >
-> **Danach `migrate-prod` und den blockierten Deploy — dafür braucht es
-> Donalds AUSDRÜCKLICHE Freigabe.** Die Merge-Freigabe deckt es nicht.
+> 1. `migrate-prod` dispatchen
+> 2. den **neuesten** blockierten Deploy-Lauf wiederholen —
+>    `gh run list --workflow=deploy.yml --limit 5`, dann
+>    `gh run rerun --failed <id>`. **Nie einen älteren nehmen:** `rerun` baut
+>    den Commit *jenes* Laufs und rollte Fertiges zurück.
+>
+> **Beides braucht Donalds AUSDRÜCKLICHE Freigabe** — die Merge-Freigabe deckt
+> es nicht.
+>
+> Danach: AGE-927 in Linear von Hand auf Done (der Branch trug bewusst kein
+> Kürzel, der Merge hat nichts geschlossen).
 
 ## Accomplished
 
@@ -75,16 +87,21 @@ jener bringt `rounded-md` mit, und `cn()` ist ein blosser Join ohne
 
 ## Next session: start here
 
-**`gh pr checks 440`.** Ist er grün, mergen (`gh pr merge 440 --squash`) und
-**den Erfolg verifizieren** — `gh pr merge` kann still fehlschlagen.
+**Der Code ist auf `main`, DEV trägt die Migrationen, PROD noch nicht.** Erste
+Handlung ist keine Prüfung, sondern eine Frage an Donald: Freigabe für
+`migrate-prod` und das Wiederholen des blockierten Deploys (siehe ⚠ oben).
 
-Danach liegt genau ein Schritt an, und der braucht eine eigene Freigabe:
-`migrate-prod` auslösen, dann den **neuesten** blockierten Deploy-Lauf mit
-`gh run rerun --failed` wiederholen. `gh run list --workflow=deploy.yml --limit 5`
-— **nie** den ältesten nehmen, `rerun` baut den Commit *jenes* Laufs.
+Nach dem Ausrollen **auf vier Ebenen verifizieren**, nicht an grünen Haken:
 
-Zum Schluss: AGE-927 in Linear von Hand auf Done, und der Worktree
-`stufen-v5` (AGE-903, gemergt) darf mit `wt remove` weg.
+1. `admin_member_counts()` auf PROD lesen — `angelegt + eingeladen = offen`
+2. die Rechtematrix: `member_state_matches` für **niemanden**,
+   `admin_list_members` nur für `authenticated`
+3. `SENTRY_RELEASE.id` des ausgelieferten Assets gegen den Kopf von `main`
+4. eine Sichtprobe an der Fläche: Aufnahmestrecke mit echten Zahlen
+
+Zum Schluss: AGE-927 in Linear auf Done, und der Worktree `stufen-v5`
+(AGE-903, gemergt) darf mit `wt remove` weg — ebenso dieser hier, sobald PROD
+steht.
 
 ## Fallen, die diese Sitzung gekostet haben
 
