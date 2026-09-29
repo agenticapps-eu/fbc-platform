@@ -1,7 +1,12 @@
 import { FormatHero } from "../components/ui/FormatHero";
 import { FORMAT_HERO } from "../config/formatHero";
 import { useState } from "react";
-import { LEVELS, LEVEL_ORDER, LEVEL_RANK, type MembershipLevel } from "../config/levels";
+import {
+  GENANNTE_STUFEN,
+  LEVELS,
+  LEVEL_RANK,
+  type MembershipLevel,
+} from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../components/ui/toast-context";
@@ -85,7 +90,11 @@ export default function MitgliedschaftPage() {
 
       {zeigtPreise && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {LEVEL_ORDER.map((key) => (
+          {/* AGE-969: `GENANNTE_STUFEN`, obwohl diese Seite seit AGE-907 auf `/`
+              umgeleitet und damit unerreichbar ist. Eine Ausnahme im Wächter
+              wäre eine Zeitbombe: holt jemand die Route zurück (AGE-928), zeigte
+              sie wieder alle sechs. Befund des Diff-Reviews. */}
+          {GENANNTE_STUFEN.map((key) => (
             <PricingCard
               key={key}
               level={LEVELS[key]}

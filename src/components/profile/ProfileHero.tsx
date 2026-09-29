@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { bildUrl } from "../../lib/bild-url";
 import { Avatar } from "../ui/Avatar";
 import { CountUp } from "../ui/Motion";
-import { levelLabel } from "../../config/levels";
+import { genannterName } from "../../config/levels";
 import { Icon } from "../ui/icons";
 
 export interface ProfileHeroProps {
@@ -135,13 +135,20 @@ export function ProfileHero({
                 Ausrichtung an der Grundlinie — die gibt es mit `items-start`
                 nicht mehr. */}
             <div className="min-w-0 pt-2 sm:pt-3">
-              {tier && (
+              {/* AGE-969: `genannterName` statt `levelLabel` — unterhalb des
+                  Clubs entfaellt die Plakette ganz. Ein Kranz ohne Namen waere
+                  ein Abzeichen fuer nichts. */}
+              {tier && genannterName(tier) && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/60 bg-accent-soft/40 px-2.5 py-0.5 text-xs font-semibold tracking-wide text-accent-strong uppercase">
                   <Icon name="crown" className="h-3.5 w-3.5" />
-                  {levelLabel(tier)} Member
+                  {genannterName(tier)} Member
                 </span>
               )}
-              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
+              {/* AGE-969: der Abstand hängt an der Plakette. Entfällt sie,
+                  bliebe sonst eine Lücke über dem Namen stehen. */}
+              <h1
+                className={`${tier && genannterName(tier) ? "mt-3 " : ""}font-display text-3xl font-semibold tracking-tight text-ink`}
+              >
                 {name}
               </h1>
               {roles.length > 0 ? (

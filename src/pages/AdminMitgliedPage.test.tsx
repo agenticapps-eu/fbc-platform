@@ -283,18 +283,47 @@ describe("Die Stufe von Hand setzen (AGE-634)", () => {
     expect(screen.getByRole("button", { name: /Stufe setzen/ })).toBeDisabled();
   });
 
+  /**
+   * AGE-969: DIE STUFE IM TEST IST GEWECHSELT, nicht die Zusage. Sie wählte
+   * `connect` — das bietet dieses Feld seit AGE-969 nicht mehr an, und ein
+   * `fireEvent.change` auf einen Wert ohne Option tut nichts. Was geprüft wird,
+   * ist unverändert: Stufe und Begründung gehen an `admin_set_tier`.
+   */
   it("schickt Stufe und Begründung an admin_set_tier", async () => {
     renderPage();
     const auswahl = await screen.findByLabelText("Stufe");
-    fireEvent.change(auswahl, { target: { value: "connect" } });
+    fireEvent.change(auswahl, { target: { value: "discover" } });
     fireEvent.change(screen.getByLabelText("Begründung"), {
       target: { value: "Importfehler korrigiert" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Stufe setzen/ }));
 
     await waitFor(() =>
-      expect(setzeStufe).toHaveBeenCalledWith(ZIEL, "connect", "Importfehler korrigiert"),
+      expect(setzeStufe).toHaveBeenCalledWith(ZIEL, "discover", "Importfehler korrigiert"),
     );
+  });
+
+  it("bietet nur die drei Clubstufen an", async () => {
+    renderPage();
+    const auswahl = await screen.findByLabelText("Stufe");
+    const werte = Array.from(auswahl.querySelectorAll("option")).map((o) => o.value);
+    expect(werte).toEqual(["discover", "focus", "impact"]);
+  });
+
+  /**
+   * DIE WICHTIGERE HÄLFTE. Ohne sie fiele das Feld für ein Konto unterhalb des
+   * Clubs auf die erste angebotene Stufe zurück — und ein Speichern ohne
+   * Absicht höbe es still an. Dieselbe Regel trägt die Mitgliederliste seit
+   * AGE-903; seit AGE-969 steht sie in `levels.ts`, einmal.
+   */
+  it("lässt eine gesetzte Stufe unterhalb des Clubs stehen und gewählt", async () => {
+    vi.mocked(fetchAdminProfile).mockResolvedValue({ ...DATEN, tier: "active" });
+    renderPage();
+    const auswahl = (await screen.findByLabelText("Stufe")) as HTMLSelectElement;
+
+    const werte = Array.from(auswahl.querySelectorAll("option")).map((o) => o.value);
+    expect(werte).toContain("active");
+    expect(auswahl.value).toBe("active");
   });
 
   it("sagt, was ein späterer Stripe-Kauf damit tut", async () => {

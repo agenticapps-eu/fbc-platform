@@ -26,7 +26,7 @@ import {
   type AdminLegacy,
 } from "../lib/admin-profile";
 import { ZAHLUNGSARTEN, setzeStufe } from "../lib/admin-members";
-import { LEVELS, LEVEL_ORDER } from "../config/levels";
+import { levelLabel, waehlbareStufen } from "../config/levels";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
 
 /**
@@ -346,9 +346,13 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
             <Field label="Stufe">
               {({ id }) => (
                 <Select id={id} value={stufe} onChange={(e) => setStufe(e.target.value)}>
-                  {LEVEL_ORDER.map((key) => (
+                  {/* AGE-969: die drei Clubstufen, PLUS die am Konto gesetzte,
+                      falls sie darunter liegt. Ohne die zweite Hälfte höbe ein
+                      Speichern ohne Absicht das Konto still an — dieselbe
+                      Regel, die `AdminMitgliederPage` seit AGE-903 trägt. */}
+                  {waehlbareStufen(stufe).map((key) => (
                     <option key={key} value={key}>
-                      {LEVELS[key].label}
+                      {levelLabel(key)}
                     </option>
                   ))}
                 </Select>

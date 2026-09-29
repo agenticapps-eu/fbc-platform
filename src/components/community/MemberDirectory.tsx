@@ -13,7 +13,7 @@ import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { cn } from "../../lib/cn";
-import { CLUB_LEVEL, CLUB_RANK, levelLabel } from "../../config/levels";
+import { CLUB_LEVEL, CLUB_RANK, genannterName, levelLabel } from "../../config/levels";
 import {
   deriveFacets,
   DIRECTORY_QUERY_PARAM,
@@ -821,9 +821,11 @@ export function MemberCard({ member, to }: { member: DirectoryMember; to?: strin
               <h3 className="truncate font-display text-lg font-semibold text-ink">{name}</h3>
               {subtitle && <p className="truncate text-sm text-accent-strong">{subtitle}</p>}
               {meta && <p className="mt-0.5 truncate text-xs text-muted">{meta}</p>}
-              {member.tier && (
+              {/* AGE-969: unterhalb des Clubs keine Plakette. Ein Rahmen ohne
+                  Namen wäre ein Abzeichen für nichts. */}
+              {member.tier && genannterName(member.tier) && (
                 <span className="mt-1.5 inline-flex items-center rounded-full border border-accent/60 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-accent-strong uppercase">
-                  {levelLabel(member.tier)}
+                  {genannterName(member.tier)}
                 </span>
               )}
             </div>

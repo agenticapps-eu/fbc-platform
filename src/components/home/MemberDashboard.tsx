@@ -7,7 +7,7 @@ import { Card } from "../ui/Card";
 import { TierBadge } from "../ui/TierBadge";
 import { DashboardSkeleton } from "../ui/Skeleton";
 import { PageHero } from "../ui/PageHero";
-import { levelLabel } from "../../config/levels";
+import { CLUB_LEVEL, LEVELS, genannterName } from "../../config/levels";
 import { dashboardQueryKey, fetchDashboard } from "../../lib/dashboard";
 import { displayAuthor } from "../../lib/displayAuthor";
 import { eventsListKey, fetchEvents, formatEventDate, partitionEvents } from "../../lib/events";
@@ -176,11 +176,18 @@ export function MemberDashboard({ uid }: { uid: string }) {
             nicht mehr zum ruhenden Kaufweg. `DashTile` bewacht den Link mit
             `{to && …}`, deshalb bleibt `cta` stehen — die Event-Kachel darüber
             macht es ohne Event genauso. Zurückholen: diese eine Zeile. */}
+        {/* AGE-969: Unterhalb des Clubs trägt die Kachel keinen Stufennamen.
+            Ein Gedankenstrich statt eines Namens — und die Zeile darunter sagt,
+            was das bedeutet, statt es offenzulassen. */}
         <DashTile
           label="Mitgliedschaft"
-          value={levelLabel(profile.tier)}
+          value={genannterName(profile.tier) ?? "—"}
           valueClassName="text-2xl"
-          sub="Deine aktuelle Stufe"
+          sub={
+            genannterName(profile.tier) === null
+              ? `Clubzugang ab ${LEVELS[CLUB_LEVEL].label}`
+              : "Deine aktuelle Stufe"
+          }
           cta="Plan verwalten"
           ton="zustand"
         />
@@ -320,7 +327,9 @@ export function MemberDashboard({ uid }: { uid: string }) {
                           {m.name ?? "Mitglied"}
                         </span>
                         <span className="block truncate text-xs text-muted">
-                          {[m.region, m.company].filter(Boolean).join(" · ") || levelLabel(m.tier)}
+                          {[m.region, m.company].filter(Boolean).join(" · ") ||
+                            genannterName(m.tier) ||
+                            "Mitglied"}
                         </span>
                       </span>
                       <span aria-hidden="true" className="text-accent-strong">

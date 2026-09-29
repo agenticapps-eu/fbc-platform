@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
-import { LEVELS, LEVEL_ORDER } from "../config/levels";
+import { GENANNTE_STUFEN, LEVELS } from "../config/levels";
 import { extractFirstVideo, type FeedPost } from "../lib/feed";
 import { AuthFixture, fakeAuthValue } from "../test/auth-fixtures";
 import HomePage, { PostPreview } from "./HomePage";
@@ -128,13 +128,19 @@ describe("Öffentliche Startseite — Gästeansicht", () => {
     expect(screen.queryByText(/Stimmen aus dem Club/)).toBeNull();
   });
 
-  it("nennt in der Schiene alle Stufen aus der Anwendung, in ihrer Reihenfolge", () => {
+  /**
+   * AGE-969: DIESE ZUSAGE IST GEKIPPT. Sie las `LEVEL_ORDER` und verlangte
+   * damit **alle sechs** Stufen in der Schiene. Die Oberfläche nennt seither
+   * nur die drei Clubstufen; die Leiter selbst ist unverändert sechsteilig.
+   *
+   * Der Grundsatz dahinter bleibt: gegen die Liste aus der Anwendung geprüft,
+   * nicht gegen eine abgeschriebene — nur eben gegen die richtige.
+   */
+  it("nennt in der Schiene die genannten Stufen, in ihrer Reihenfolge", () => {
     zeigeGaesteseite();
 
-    // Gegen LEVEL_ORDER geprüft, nicht gegen eine abgeschriebene Liste: eine
-    // zweite Liste driftet von dem weg, was die Plattform tatsächlich verkauft.
-    const sichtbar = LEVEL_ORDER.map((key) => screen.getByText(LEVELS[key].label));
-    expect(sichtbar).toHaveLength(LEVEL_ORDER.length);
+    const sichtbar = GENANNTE_STUFEN.map((key) => screen.getByText(LEVELS[key].label));
+    expect(sichtbar).toHaveLength(GENANNTE_STUFEN.length);
 
     // Reihenfolge: jede Stufe steht im Dokument vor der nächsten.
     for (let i = 0; i < sichtbar.length - 1; i++) {
@@ -143,13 +149,25 @@ describe("Öffentliche Startseite — Gästeansicht", () => {
     }
   });
 
+  it("nennt die drei Stufen unterhalb des Clubs NICHT", () => {
+    // Die andere Hälfte. Ohne sie bestünde die Zusage darüber auch, wenn die
+    // Schiene weiterhin sechs Karten zeigte.
+    zeigeGaesteseite();
+
+    expect(screen.queryByText("Active")).toBeNull();
+    expect(screen.queryByText("Boost")).toBeNull();
+    expect(screen.queryByText("Connect")).toBeNull();
+    expect(screen.queryByText(/Sechs Stufen/)).toBeNull();
+  });
+
   it("nennt zu JEDER Stufe, was sie freischaltet und was sie kostet", () => {
     zeigeGaesteseite();
 
-    // Über alle sechs, nicht über eine Stichprobe: die erste Fassung dieses
-    // Tests prüfte eine Zusammenfassung und einen Preis und hätte fünf fehlende
-    // Stufen durchgelassen. Befund des Diff-Reviews.
-    for (const key of LEVEL_ORDER) {
+    // Über ALLE genannten, nicht über eine Stichprobe: die erste Fassung dieses
+    // Tests prüfte eine Zusammenfassung und einen Preis und hätte fehlende
+    // Stufen durchgelassen. Befund des Diff-Reviews. (AGE-969: aus „alle sechs"
+    // wurden „alle drei" — die Schiene nennt nur noch die Clubstufen.)
+    for (const key of GENANNTE_STUFEN) {
       const stufe = LEVELS[key];
       expect(screen.getByText(stufe.summary)).toBeInTheDocument();
 

@@ -5,6 +5,22 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-29-stufen-nur-club",
+    "datum": "2026-09-29",
+    "titel": "Die Fläche spricht nur noch von DISCOVER, FOCUS und IMPACT",
+    "linear": "AGE-969",
+    "aenderungen": [
+      "**Eine benannte Menge „die Stufen, über die wir sprechen\".** `LEVEL_ORDER` bleibt vollständig und wird nicht angefasst; daneben entsteht die Liste der Clubstufen, abgeleitet aus `CLUB_RANK` statt abgeschrieben. Alle aufzählenden Flächen lesen sie.",
+      "**Eine Stufe unterhalb des Clubs wird nicht benannt.** Die Plakette erscheint dort gar nicht, und wo heute „Active-Mitglied\" steht, steht künftig eine Aussage über den Zugang statt über einen Namen.",
+      "**Die öffentliche Startseite zeigt drei Stufen statt sechs**, und der Satz darüber sagt nicht mehr „Sechs Stufen, aufsteigend\".",
+      "**Die Admin-Einzelbearbeitung bietet dieselben drei zur Wahl** wie die Mitgliederliste seit AGE-903 — eine bestehende niedrigere Stufe bleibt sichtbar und wählbar, damit sie nicht stillschweigend hochgesetzt wird.",
+      "**„Nächster Schritt\" nennt keine verborgene Stufe**, sondern entfällt dort.",
+      "**Die AGB §3.2 nennt Discover, Focus und Impact.**",
+      "**Die Blog-Geschichte „Das Verzeichnis beginnt bei Connect\" nennt künftig Discover** — sie beschreibt eine Schwelle, die seit AGE-903 bei DISCOVER liegt.",
+      "**Die erzeugten Neuigkeiten verlieren die Namen nicht durch eine Umschrift des Archivs.** Das Archiv bleibt, wie es war; die Auslieferung bekommt einen Weg, einzelne Einträge zurückzuhalten."
+    ]
+  },
+  {
     "slug": "2026-09-29-mitglied-anlegen",
     "datum": "2026-09-29",
     "titel": "Detlev legt ein Mitglied an — und sieht, wer noch auf seine Einladung wartet",

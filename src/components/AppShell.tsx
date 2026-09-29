@@ -34,6 +34,7 @@ import { TierBadge } from "./ui/TierBadge";
 import { istOverlayOffen, schliesseOberstesOverlay, useOverlay } from "./ui/useOverlay";
 import { Icon } from "./ui/icons";
 import { LeistenPill } from "./LeistenPill";
+import { genannterName } from "../config/levels";
 
 // Bis AGE-499 war es umgekehrt: alles wurde auf 720 px gekappt, außer einer
 // Liste breiter Routen. Das hat die Fläche verschenkt — `MemberDashboard` trägt
@@ -214,7 +215,10 @@ function UserMenu({
         >
           <div className="border-b border-line px-4 py-3">
             <p className="truncate text-sm font-medium text-ink">{email}</p>
-            {tier && (
+            {/* AGE-969: `genannterName` mitprüfen, nicht nur `tier`. Sonst
+                bliebe für ein Konto unterhalb des Clubs eine leere Hülle mit
+                ihrem Aussenabstand stehen. */}
+            {tier && genannterName(tier) && (
               <span className="mt-1.5 inline-block">
                 <TierBadge tier={tier} />
               </span>
