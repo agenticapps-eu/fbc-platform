@@ -2059,11 +2059,16 @@ export type Database = {
           /** Sucht in `name` UND `login_email`, ohne Ruecksicht auf die
            *  Schreibung. Leer und null filtern nicht; Jokerzeichen sind Text. */
           p_query?: string | null;
-          /** `alle` | `aktiviert` | `offen` | `deaktiviert` | `geloescht`
-           *  (AGE-581). null wirkt wie `alle`; jeder andere Wert bricht mit
-           *  22023 ab, statt still alles zu zeigen. Die ersten drei schliessen
-           *  Deaktivierte und Geloeschte AUS — sie beantworten Fragen ueber die
-           *  Mitgliedschaft, nicht ueber den Tabelleninhalt. */
+          /** `alle` | `aktiviert` | `offen` | `angelegt` | `eingeladen` |
+           *  `deaktiviert` | `geloescht` (AGE-581, erweitert in AGE-927). null
+           *  wirkt wie `alle`; jeder andere Wert bricht mit 22023 ab, statt
+           *  still alles zu zeigen. Die ersten fuenf schliessen Deaktivierte und
+           *  Geloeschte AUS — sie beantworten Fragen ueber die Mitgliedschaft,
+           *  nicht ueber den Tabelleninhalt.
+           *
+           *  `angelegt` und `eingeladen` TEILEN `offen`, sie ersetzen es nicht:
+           *  angelegt + eingeladen = offen. `offen` bleibt aufrufbar und hat an
+           *  der Flaeche keinen Filter mehr — benannt statt verschwiegen. */
           p_status?: string | null;
           p_limit?: number | null;
           p_offset?: number | null;
@@ -2093,6 +2098,16 @@ export type Database = {
           /** `activated_at is not null` — damit die Flaeche den Zustand anzeigt,
            *  statt ihn zu erraten. */
           bestaetigt: boolean;
+          /** Wann zuletzt ein Aktivierungslink AUSGEGEBEN wurde (AGE-927) —
+           *  `max(created_at)` ueber `activation_tokens`, null heisst „noch nie
+           *  eingeladen". ABGELEITET, nicht gespeichert: die Wahrheit steht in
+           *  der Tokentabelle, eine zweite Ablage liefe auseinander.
+           *
+           *  Es ist der Zeitpunkt der AUSGABE, nicht der Zustellung. Ein Token,
+           *  das nach einer Ablehnung durch Resend entwertet wurde, zaehlt
+           *  weiterhin als Einladung — genau deshalb meldet der Bericht von
+           *  `admin-invite-members` diesen Fall ausdruecklich. */
+          eingeladen_am: string | null;
           member_since: string | null;
           /** Zeitpunkte, keine Wahrheitswerte (AGE-581): die Flaeche soll sagen
            *  koennen, SEIT WANN. Beide null heisst unversehrt. */
@@ -2196,9 +2211,11 @@ export type Database = {
       admin_member_counts: {
         Args: never;
         Returns: {
-          /** `alle` | `aktiviert` | `offen` | `deaktiviert` | `geloescht` —
-           *  dieselben Zustaende, die `admin_list_members.p_status` kennt, und
-           *  entschieden von derselben `member_state_matches`. */
+          /** `alle` | `aktiviert` | `offen` | `angelegt` | `eingeladen` |
+           *  `deaktiviert` | `geloescht` — dieselben Zustaende, die
+           *  `admin_list_members.p_status` kennt, und entschieden von derselben
+           *  `member_state_matches`. Die Zahl zu `angelegt` plus die zu
+           *  `eingeladen` ergibt die zu `offen`. */
           status: string;
           anzahl: number;
         }[];

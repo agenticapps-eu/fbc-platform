@@ -493,14 +493,35 @@ Anfang an.
 
 ### D.8.1 Mitgliederverwaltung — **Umgesetzt**
 
-Admins sehen eine Mitgliederliste in drei Sichten mit Anzahl je Reiter,
+Admins sehen eine Mitgliederliste in drei Sichten mit Anzahl je Filter,
 erreichen auch unbestätigte Profile, können Profile und die Login-Adresse
 ändern, die Stufe in beide Richtungen setzen, einen Zugangslink auslösen,
 ein Mitglied direkt aktivieren, es aus dem Verkehr nehmen oder entfernen —
 ohne die Zeile zu löschen. Privilegierte Änderungen hinterlassen eine Spur
 in einem Prüfprotokoll.
 
-**Bewusst nicht enthalten:** ein Massenversand-Werkzeug.
+**Die Aufnahme ist als Strecke dargestellt: ① Angelegt → ② Eingeladen →
+③ Bestätigt.** Sie beantwortet „wo steht dieses Mitglied auf dem Weg
+herein?"; die übrigen Filter (Alle, Deaktiviert, Gelöscht, Mitgliedschaft)
+beantworten „welcher Ausschnitt des Bestands?". Der Einladungsstand wird aus
+den ausgegebenen Aktivierungslinks abgeleitet und nicht gespeichert.
+
+**Ein Admin legt ein Mitglied selbst an** — Vorname, Nachname, Adresse und
+Plan, wahlweise mit Bestätigungsmail. Das Konto entsteht ohne Passwort und
+unbestätigt, genau wie ein importiertes; das Mitglied bestätigt selbst. Eine
+bereits vergebene Adresse erzeugt kein zweites Konto, und die Antwort führt
+zum bestehenden Mitglied. **Eine Stripe-Anbindung ist dafür nicht nötig.**
+
+**Mehrere ausgewählte Mitglieder lassen sich mit einem Griff einladen.**
+Danach steht ein Bericht, der die Ausgänge trennt und die Betroffenen
+namentlich nennt: verschickt, übersprungen (es liegt noch ein gültiger Link
+im Postfach), abgewiesen (eine Grenze griff), nicht einladbar, fehlgeschlagen.
+Eine Sammelzahl über einer gemischten Menge entsteht nicht.
+
+**Bewusst nicht enthalten:** ein Massenversand-Werkzeug. Die Mehrfachauswahl
+hat genau **eine** Wirkung — den bestehenden Aktivierungslink — und kennt
+weder Betreff noch Text noch Textbaustein, keinen Weg, die Menge zu
+übernehmen, und kein „alle auswählen" (ADR-0007).
 
 ### D.8.2 Qualitätsmanagement — **Umgesetzt**
 

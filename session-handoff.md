@@ -1,151 +1,136 @@
-# Session Handoff — 2026-09-26 (AGE-903 Zugangsleiter V5)
+# Session Handoff — 2026-09-29 (AGE-927 Mitglied anlegen)
 
-> **Scope dieser Übergabe: AGE-903.** Fremde offene Punkte stehen hier bewusst
-> NICHT. Die vorige Fassung (25.09., AGE-905) steht in
-> `git log -- session-handoff.md` und gehört der Sitzung, die daran arbeitet.
+> **Scope dieser Übergabe: AGE-927.** Fremde offene Punkte stehen hier bewusst
+> NICHT. AGE-903 ist abgeschlossen und auf PROD ausgeliefert.
 
 > ## ⚠ ZUERST
 >
-> **AGE-903 ist vollstaendig ausgeliefert.** PR #436/#437/#438 gemergt,
-> `migrate-prod` gelaufen (`36259620920`), Deploy freigegeben (`36257009989`,
-> alle vier Jobs gruen). Der ausgelieferte Chunk traegt
-> `SENTRY_RELEASE.id = 94b73ef148e9…` — der Kopf von `main`, kein Rueckfall.
+> **PR #440 ist offen.** Der Change ist **fertig gebaut, geprüft, archiviert
+> und gepusht** — es ist nichts mehr zu bauen.
 >
-> **Es ist nichts mehr offen, das eine Freigabe braucht.** Was bleibt, gehoert
-> in eigene Vorgaenge: `open_contact` (AGE-930), die Preise fuer BOOST und
-> CONNECT, und der Fokusring aus AGE-929.
+> Erste Handlung: `gh pr checks 440`. Grün → mergen (Freigabe steht).
 >
-> Naechster Handgriff: `wt remove` fuer den Worktree `stufen-v5`. Danach die
-> Schritte 3–5 des Auftrags: AGE-927, AGE-928, AGE-930.
+> **Danach `migrate-prod` und den blockierten Deploy — dafür braucht es
+> Donalds AUSDRÜCKLICHE Freigabe.** Die Merge-Freigabe deckt es nicht.
 
 ## Accomplished
 
-Der Change `stufen-v5` ist gebaut, gemergt und archiviert.
-
-Die Leiter danach: `active`(1, 0 €) · `boost`(2, 0 €) · `connect`(3, 0 €) ·
-**`discover`(4, 300 € — der Club beginnt hier)** · `focus`(5, 600 €) ·
-`impact`(6, 1200 €). `basic` und `exchange` entfallen.
-
 | Lauf | Ergebnis |
 |---|---|
-| pgTAP über `supabase test db` | 40 Dateien, 1391 Zusagen, PASS |
-| Vitest | 253 Dateien, 2928 Zusagen |
-| `tsc --noEmit` | sauber |
-| `pnpm lint` | 0 Fehler |
-| Deno (Kaufweg) | 15 Zusagen |
-| `openspec validate --all` | **35/0** (nach dem Falten) |
-| CI auf `main` (`36255511837`) | success |
+| pgTAP (CI-Liste, nicht `supabase test db` nackt) | **41 Dateien, 1422 Zusagen**, PASS |
+| Vitest | **254 Dateien, 2960 Zusagen** |
+| Deno (CI-Zeile, siehe Fallen) | **287 Zusagen** |
+| `tsc --noEmit` · `eslint` · `pnpm build` | sauber |
+| `openspec validate --all` | 35/0 |
 
-Zwei Reviewer-Runden (Plan und Diff, je gemini und opencode, alle vier
-REQUEST-CHANGES), zehn Befunde, jeder nachgemessen und in
-`openspec/changes/archive/2026-09-26-stufen-v5/REVIEWS.md` aufgelöst.
+**Gebaut:** das ganze Frontend (§5) — Aufnahmestrecke ①→②→③ über der
+Reiterleiste, Anlege-Maske hinter einem schwebenden Knopf, Kontrollkästchen je
+Zeile mit genau **einer** Handlung, Bericht mit fünf getrennten Ausgängen.
+Dazu 32 neue Zusagen in `AdminMitgliederPage.aufnahme.test.tsx`.
+
+**Geprüft:** Diff-Review mit zwei fremden Anbietern (gemini, opencode), beide
+REQUEST-CHANGES, elf Befunde aufgelöst, zwei begründet nicht geändert.
+Sichtprobe gegen den lokalen Stack mit vier weiteren Funden. Alles in
+`openspec/changes/archive/2026-09-29-mitglied-anlegen/REVIEWS.md`.
+
+**Archiviert:** zwei Anforderungen dazu, vier geändert; `pnpm release:entries`
+nachgezogen (90 Einträge).
 
 ## Decisions
 
-**CONNECT trägt 0 €, nicht 150 €** (Donald, 26.09.: „aktuell 0, wird ja später
-kommen"). *Warum:* ein Preis ohne Kaufweg ist eine Zusage ohne Gegenstand.
+**Die Schleife liegt in der FLÄCHE, ein Aufruf je Mitglied** — obwohl
+`admin-invite-members` eine Liste nimmt. *Warum:* „Fortschritt als Zahl" gibt es
+nur, wenn Antworten einzeln eintreffen, und „Wegnavigieren bricht ab" ist
+unmöglich, wenn die Schleife im Server läuft. Die Mengengrenze im Endpunkt
+bleibt richtig — sie schützt vor einem Aufruf, der nicht von der Fläche kommt.
 
-**Der Bestand zieht NICHT rangtreu um.** `connect`·`discover`·`exchange` →
-DISCOVER, `basic` → ACTIVE. *Warum:* rangtreu verlöre ein Konto auf altem
-`discover` seinen Clubzugang. „Niemand verliert, was er heute hat."
+**Der Bericht fällt mit dem Filter.** *Warum:* „bleibt stehen, bis der Admin ihn
+schliesst" heisst, er verschwindet nicht von selbst wie ein Ton. Über einer
+ANDEREN Liste stehen zu bleiben ist etwas anderes — in der Sichtprobe stand er
+über zwei Mitgliedern aus ② über der Liste von ①.
 
-**`regs_write_own` SPIEGELT `register_for_event`**, statt eine eigene Zahl zu
-tragen. *Warum:* der `public`-Zweig hat in einer pauschalen Rangprüfung keine
-Entsprechung.
+**Der schwebende Knopf ist ein eigener `<button>`, nicht `Button`.** *Warum:*
+jener bringt `rounded-md` mit, und `cn()` ist ein blosser Join ohne
+`tailwind-merge` — in der Sichtprobe war der Knopf deshalb eckig.
 
-**Die Admin-Beschränkung liegt in der Oberfläche, nicht in `admin_set_tier()`.**
-*Warum:* eine Korrektur nach unten muss möglich bleiben.
-
-**Nur ZWEI Zwischenränge (101, 102).** *Warum:* neu sind allein `active` und
-`boost`.
-
-## Das Store-Prüferkonto — erledigt, steht auf PROD
-
-Angelegt am 26.09. auf **ausdrückliche Freigabe Donalds**, weil die externe
-TestFlight-Gruppe Benutzername und Kennwort als Pflichtfeld verlangt.
-
-* Stufe **`exchange` (Rang 4)** — die unterste Clubstufe der HEUTIGEN Leiter.
-  Es wandert mit `migrate-prod` **ohne Sonderregel** nach `discover`.
-* Zugangsdaten: Infisical `prod`, `STORE_REVIEW_LOGIN` / `STORE_REVIEW_PASSWORD`.
-* `is_public = false`, `activated_at` gesetzt, abgenommen mit einer **echten
-  Anmeldung**: 28 Vollprofile, 27 Verzeichniszeilen, 7 Events, 40 Beiträge.
-
-**PROD-Verteilung, vorher und nachher gezaehlt** — 78 Profile, keines verloren:
-
-| Rang | vorher | n | nachher | n |
-|---|---|---|---|---|
-| 1 | `basic` 0 € | 3 | `active` 0 € | 3 |
-| 2 | `connect` 0 € | 0 | `boost` 0 € | 0 |
-| 3 | `discover` 150 € | 1 | `connect` 0 € | 0 |
-| 4 | `exchange` 300 € | 1 | `discover` 300 € | **2** |
-| 5 | `focus` 600 € | 0 | `focus` 600 € | 0 |
-| 6 | `impact` 1200 € | 73 | `impact` 1200 € | 73 |
-
-Das Prueferkonto steht danach auf `discover` / **Rang 4**, `is_public = false`,
-aktiviert — am Rang geprueft, nicht am Namen.
+**Der Branch trägt bewusst kein Kürzel.** *Folge:* der Merge schliesst AGE-927
+**nicht** von selbst; der Vorgang ist von Hand auf Done zu setzen.
 
 ## Files modified
 
-* `supabase/migrations/20260926120000_stufen_v5.sql` — neu. Leiter, sechs
-  Policies, drei RPCs, `handle_new_user`, sechs Katalog-Kommentare,
-  Schluss-Wächter über Rang UND Preis.
-* `supabase/tests/stufen_v5_leiter_test.sql`, `…_absage_test.sql` — neu.
-* `supabase/tests/kontaktanfrage_staffelung_test.sql` → `…_stufe_test.sql`.
-* `src/config/levels.ts` — neu `CLUB_LEVEL` / `CLUB_RANK`; die Zahl 4 steht im
-  Frontend an EINER Stelle.
-* `src/lib/contact-requests.ts` — der Staffelungs-Parameter ist WEG.
-* Neun `openspec/specs/*` — das Delta ist gefaltet, plus
-  `src/content/release-entries.generated.ts` (89 Einträge).
+* `src/pages/AdminMitgliederPage.tsx` — sieben Filter in zwei Gruppen, Maske,
+  Auswahl, Lauf, Bericht, schwebender Knopf.
+* `src/pages/AdminMitgliederPage.aufnahme.test.tsx` — neu, 32 Zusagen.
+* `src/pages/AdminMitgliederPage.test.tsx` — drei Bestandszusagen **benannt**
+  nachgezogen, Zählvorrichtung auf sieben Zustände.
+* `src/lib/admin-members.ts` — `createMember`, `ladeEin`, `Ausgang`;
+  `uebersetzeFehler` bekommt die Satztafel als Argument.
+* `src/lib/database.types.ts` — `eingeladen_am`, erweiterte `p_status`-Werte.
+  **Von Hand**, kein `gen types`.
+* `supabase/migrations/20260929090000_adresse_nachschlagen.sql` — `order by`.
+* `supabase/functions/admin-{create,invite}-member*/` — zwei Lint-Fehler, ein
+  toter Helfer, ein falscher Kommentar.
+* `docs/lastenheft.md` — D.8.1.
+* `openspec/specs/admin/spec.md` + Archiv.
 
 ## Next session: start here
 
-**AGE-903 ist fertig und ausgeliefert — hier ist nichts mehr aufzunehmen.** Der
-Worktree `/Users/donald/worktrees/fbc-platform/stufen-v5` kann mit `wt remove`
-weg; er steht auf einem gemergten Branch, der Arbeitsbaum ist sauber.
+**`gh pr checks 440`.** Ist er grün, mergen (`gh pr merge 440 --squash`) und
+**den Erfolg verifizieren** — `gh pr merge` kann still fehlschlagen.
 
-Danach die Schritte 3–5 des Fuenf-Punkte-Auftrags, in dieser Reihenfolge:
-**AGE-927** (Admin legt Mitglied an), **AGE-928** (Mitgliedschaft anzeigen),
-**AGE-930** (Selbstregistrierung schliessen — legt auch `open_contact` um).
+Danach liegt genau ein Schritt an, und der braucht eine eigene Freigabe:
+`migrate-prod` auslösen, dann den **neuesten** blockierten Deploy-Lauf mit
+`gh run rerun --failed` wiederholen. `gh run list --workflow=deploy.yml --limit 5`
+— **nie** den ältesten nehmen, `rerun` baut den Commit *jenes* Laufs.
+
+Zum Schluss: AGE-927 in Linear von Hand auf Done, und der Worktree
+`stufen-v5` (AGE-903, gemergt) darf mit `wt remove` weg.
+
+## Fallen, die diese Sitzung gekostet haben
+
+* **`waitFor` ist zufrieden, sobald die Zahl EINMAL stimmt.** Die Abbruch-Zusage
+  bestand deshalb auch ohne den Riegel: unmittelbar nach dem Abbau stimmt sie
+  immer. Eine echte Pause und eine harte Zusage — gemessen 1 mit Riegel, 2 ohne.
+* **`findByRole` löst auf dem ERSTEN Treffer auf.** Die Zusage zur vergebenen
+  Adresse fand die Zeile in der LISTE, nicht die Maske — gleicher Name, gleiches
+  Ziel. Jetzt `within(dialog)`. Beide Male half nur, die Zahl der Treffer zu
+  messen statt dem grünen Haken zu glauben.
+* **`openspec archive` meldet nur den ERSTEN fehlenden Szenariennamen.** Drei
+  Läufe für drei Funde. Das Vergleichsskript liegt im Scratchpad
+  (`szenarien.py`) und zeigt alle auf einmal.
+* **Ein umbenanntes Szenario ist ein gelöschtes.** „Der Filter überlebt ein
+  Neuladen" statt „Der Reiter …" hätte es aus der Spec geworfen.
+* **Ein Konto über die GoTrue-Admin-API zu löschen räumt `public.profiles`
+  NICHT mit ab** — acht verwaiste Zeilen blieben stehen.
+* **`deno test` ohne `--allow-read=supabase/functions`** lässt vier
+  Verdrahtungstests fallen. Immer die CI-Zeile fahren:
+  `deno test --frozen --allow-env --allow-net --allow-read=supabase/functions supabase/functions/`
+* **`supabase test db` ohne Argument** zieht die manuellen `probe_*.sql` ein →
+  „Bad plan". CI fährt die Liste aus `ci.yml`.
+* **`ls` ist ein eza-Alias**, `find` nehmen.
 
 ## Zustand der Umgebung
 
-* **Lokaler Stack: migriert** (Freigabe von `fbc-platform-61` eingeholt). 28
-  Profile: `active` 3 · `discover` 11 · `focus` 6 · `impact` 8. Null Waisen.
-  `open_contact` steht auf `true`, wie vorgefunden.
-* Der Stack hat **136 von 137** Migrationen plus meiner.
-  `20260925120000_release_backfill.sql` (AGE-905) fehlt und bricht lokal an
-  „Profile vorhanden, aber kein Admin in `staff_roles`". **Nicht anfassen**,
-  aber einrechnen: `db push --local` scheitert daran, nicht an AGE-903.
-* **EIN Rest bleibt, harmlos und benannt:** im geteilten chrome-devtools-Chrome
-  steht eine Seite auf `http://localhost:5217` — ein eigener Rest aus AGE-929,
-  nicht der einer Nachbarsitzung (von `fbc-platform-61` bestätigt). Der Server
-  dort ist tot (`curl` → 000). Die MCP-Schnittstelle antwortete dreimal leer;
-  den Chrome habe ich **nicht** blind abgeschossen. Wegräumen, wenn sie wieder
-  antwortet: Seite auf `about:blank`, `localStorage` leeren (dort steht ein
-  `sb-127-auth-token` eines gelöschten Kontos).
+* **Lokaler Stack:** zurückgesetzt auf 28 Profile, 0 Tokens, 0 Adminzeilen —
+  genau den Stand vor der Sichtprobe. `.env.local` gelöscht, vite und
+  `functions serve` beendet, Browser freigegeben und `localStorage` geleert.
+* `20260925120000_release_backfill.sql` (AGE-905) fehlt lokal und bricht ab —
+  **fremde Migration, nicht anfassen**, aber einrechnen.
+* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907). **Nicht
+  anfassen.** `wt switch` braucht deshalb
+  `--base origin/main --no-hooks --no-cd`.
+* Die Screenshots der Sichtprobe liegen unter `.gstack/age927/` (gitignored).
 
 ## Open questions
 
-* **FOCUS und IMPACT schalten im Gating nichts frei, was DISCOVER nicht hat** —
-  jede Clubschwelle lautet `has_level(4)`. Standard aus dem Issue, Rückfrage an
-  Detlev offen. Steht so im Lastenheft.
-* **Detlevs V5-Funktionsmatrix ist weiterhin nicht lesbar** (`~/Documents`,
-  macOS TCC, `EPERM`).
-* **Preise für BOOST (75 €) und CONNECT** — später, eigene Änderung.
-* Sichtbarer Fokusring auf den Seitenleisten-`NavLink`s (Befund aus AGE-929,
-  eigenes Issue, bewusst in keinem Diff).
-
-## Drei Notizen ins Gedächtnis geschrieben
-
-* **`delete from auth.users` räumt die Profilzeile NICHT mit weg** — dritte
-  unabhängige Entdeckung. Sonde: die Verteilung vorher/nachher, nicht die
-  Kontenzahl. In `kontoloeschung-was-wo-haengt`.
-* **Prozess- und Port-Zuordnung zwischen Sitzungen: messen, nicht erinnern.**
-  Dazu die Unterscheidung von `fbc-platform-61`: die *fragende* Seite muss die
-  Frageform reparieren („wem gehört der?"), die *antwortende* Seite muss vor der
-  Antwort messen — gerade wenn es um einen selbst geht. In
-  `chrome-devtools-profil-ist-einplaetzig`.
-* **Die Vorab-Sonde vor `openspec archive` hat wieder etwas gefunden** — drei
-  Fallen auf einmal (kein H1, keine `Linear:`-Zeile, `###` beendet
-  `## What Changes` nicht, also fünf Ausschlüsse als das Ausgelieferte). In
-  `archivieren-zieht-neuigkeiten-nach`.
+* **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen. Es zu
+  schliessen hiesse, einen Unique-Index über `lower(email)` in `auth.users`
+  anzulegen — fremdes Schema, eigene Entscheidung. Gemessen auf PROD: 0 von 78
+  Adressen mit Grossbuchstaben, 0 Paare, die sich nur in der Schreibung
+  unterscheiden.
+* **„Ohne Passwort" ist nicht am Feld ablesbar.** GoTrue schreibt auch ohne
+  übergebenes Passwort einen 60-Zeichen-bcrypt-Hash — wie bei allen 28
+  Bestandskonten. Belegt ist die Zusage durch den Anmeldeversuch: leer, Leerzeichen
+  und ein geratenes Wort geben alle `invalid_credentials`.
+* **`eingeladen_am` sagt „Link erzeugt", nicht „Mail zugestellt".** Eine
+  Zustellbestätigung wäre ein Resend-Webhook und ein eigener Change.

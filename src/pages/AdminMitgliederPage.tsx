@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { MemberCard } from "../components/community/MemberDirectory";
@@ -13,14 +13,17 @@ import { PageSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
-import { CLUB_RANK, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
+import { CLUB_LEVEL, CLUB_RANK, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
 import { requestActivationLink } from "../lib/activation";
 import {
   activateMember,
   adminMemberCountsQueryKey,
   adminMembersQueryKey,
+  AUSGAENGE,
+  createMember,
   fetchAdminMemberCounts,
   fetchAdminMembers,
+  ladeEin,
   SEITENGROESSE,
   setMemberBan,
   setzeStufe,
@@ -28,7 +31,10 @@ import {
   ZAHLUNGSARTEN,
   type AdminMember,
   type AdminMemberStatus,
+  type AnlageAusgang,
+  type Ausgang,
   type LebenszyklusAktion,
+  type NeuesMitglied,
 } from "../lib/admin-members";
 
 /**
@@ -57,42 +63,132 @@ type Sicht = "Tabelle" | "Karten" | "Verzeichnis";
 const SICHTEN: Sicht[] = ["Tabelle", "Karten", "Verzeichnis"];
 
 /**
- * Die fünf Reiter (AGE-581, Abschnitt 8) — und ihre Abbildung auf `p_status`
- * ist NICHT die Identität. Genau deshalb steht sie hier ausgeschrieben statt
- * aus dem Namen erraten zu werden:
+ * Die SIEBEN Filter (AGE-581 Abschnitt 8, erweitert in AGE-927) — und ihre
+ * Abbildung auf `p_status` ist NICHT die Identität. Genau deshalb steht sie
+ * hier ausgeschrieben statt aus dem Namen erraten zu werden:
  *
+ * - „Bestätigt" heisst in der Funktion `aktiviert`. Der Name an der Fläche
+ *   gehört zur Aufnahmestrecke, der in der Funktion zum Zustand.
  * - „Mitgliedschaft" ist ein **Darstellungsmodus über derselben Menge wie
  *   „Alle"**, kein eigener Filter — beide fragen `alle` ab. Was sie
  *   unterscheidet, ist die Darstellung, und die hängt an der Kennung des
- *   Reiters, nicht an einem zweiten Feld ohne Leser.
- * - `aktiviert` hat **keinen Reiter**. Der Wert bleibt in der Funktion und ist
- *   über sie erreichbar; diese Fläche benutzt ihn nicht. Benannt statt
- *   verschwiegen — ein Parameterwert ohne Aufrufer sieht sonst wie ein
- *   vergessener aus.
+ *   Filters, nicht an einem zweiten Feld ohne Leser.
+ * - `offen` hat **keinen Filter mehr**. Der Wert bleibt in der Funktion, und
+ *   `angelegt` und `eingeladen` TEILEN ihn: angelegt + eingeladen = offen.
+ *   Benannt statt verschwiegen — ein Parameterwert ohne Aufrufer sieht sonst
+ *   wie ein vergessener aus.
  * - „Alle" schliesst Deaktivierte und Gelöschte AUS. Das ist ein bewusster
  *   Bruch mit dem Wort: die Fläche beantwortet „wer ist Mitglied?", nicht „was
  *   steht in der Tabelle?". Die Auswahl trifft die Datenbank (`case p_status`
  *   in `admin_list_members`), nicht diese Liste.
  */
-type Reiter = "alle" | "offen" | "deaktiviert" | "geloescht" | "mitgliedschaft";
+type Reiter =
+  | "angelegt"
+  | "eingeladen"
+  | "bestaetigt"
+  | "alle"
+  | "deaktiviert"
+  | "geloescht"
+  | "mitgliedschaft";
 
-const REITER: { id: Reiter; label: string; status: AdminMemberStatus }[] = [
+interface Filterdefinition {
+  id: Reiter;
+  label: string;
+  status: AdminMemberStatus;
+}
+
+/**
+ * Die Aufnahmestrecke — eine FOLGE, keine Aufzählung.
+ *
+ * Sie beantwortet „wo steht dieses Mitglied auf dem Weg herein?", und die
+ * Reihenfolge ist die Aussage: ① angelegt, ② eingeladen, ③ bestätigt. Stünde
+ * „③ Bestätigt" flach neben „Gelöscht", wäre aus der Aussage blosse Anordnung
+ * geworden (Entwurf, „Die Oberfläche").
+ *
+ * `naechste` ist die nächste HANDLUNG des Schritts. ③ trägt keine — dort ist
+ * nichts mehr zu tun, und eine Handlung dort wäre eine Einladung zum Fehlklick.
+ */
+const STRECKE: (Filterdefinition & { ziffer: string; naechste?: string })[] = [
+  {
+    id: "angelegt",
+    ziffer: "①",
+    label: "Angelegt",
+    naechste: "Einladung schicken",
+    status: "angelegt",
+  },
+  {
+    id: "eingeladen",
+    ziffer: "②",
+    label: "Eingeladen",
+    naechste: "Erinnern",
+    status: "eingeladen",
+  },
+  { id: "bestaetigt", ziffer: "③", label: "Bestätigt", status: "aktiviert" },
+];
+
+/** Die übrigen Zustände. Sie beantworten „welcher Ausschnitt des Bestands?" —
+ *  eine andere Frage, deshalb eine eigene Gruppe. */
+const REITER: Filterdefinition[] = [
   { id: "alle", label: "Alle", status: "alle" },
-  { id: "offen", label: "Nicht aktiviert", status: "offen" },
   { id: "deaktiviert", label: "Deaktiviert", status: "deaktiviert" },
   { id: "geloescht", label: "Gelöscht", status: "geloescht" },
   { id: "mitgliedschaft", label: "Mitgliedschaft", status: "alle" },
 ];
 
-/** Der Reiter steht in der Adresse (`?tab=geloescht`), damit ein Neuladen ihn
+/** Beide Gruppen sind EINE Auswahl: genau einer der sieben ist gewählt. Die
+ *  Trennung ist Darstellung, nicht Abfrage. */
+const FILTER: Filterdefinition[] = [...STRECKE, ...REITER];
+
+/** Der Filter steht in der Adresse (`?tab=geloescht`), damit ein Neuladen ihn
  *  nicht verliert — auf einer Fläche, die beim Aufräumen oft neu geladen wird. */
 const REITER_PARAM = "tab";
 
-/** Ein unbekannter oder fehlender Wert fällt auf „Alle" zurück, statt eine leere
- *  Liste oder einen Fehler zu zeigen: die Adresszeile ist Eingabe von aussen. */
+/** Der Wert, den die Fläche bis AGE-927 unter „Nicht aktiviert" führte. Er
+ *  steht in Lesezeichen und meinte die Vereinigung aus ① und ②. */
+const ALTER_WERT = "offen";
+
+/**
+ * Ein unbekannter oder fehlender Wert fällt auf „Alle" zurück, statt eine leere
+ * Liste oder einen Fehler zu zeigen: die Adresszeile ist Eingabe von aussen.
+ *
+ * `offen` fällt dagegen auf ① Angelegt — dort beginnt die Arbeit, die der alte
+ * Reiter meinte. „Alle" wäre die stillste mögliche Antwort auf ein Lesezeichen,
+ * das etwas Bestimmtes suchte.
+ */
 function leseReiter(wert: string | null): Reiter {
-  return REITER.some((r) => r.id === wert) ? (wert as Reiter) : "alle";
+  if (wert === ALTER_WERT) return "angelegt";
+  return FILTER.some((r) => r.id === wert) ? (wert as Reiter) : "alle";
 }
+
+/** In welchen Schritten die Mehrfachauswahl etwas bewirken kann (ADR-0007).
+ *  In ③, „Alle", „Deaktiviert", „Gelöscht" und „Mitgliedschaft" gibt es weder
+ *  Kästchen noch Handlung — dort bewirkte sie nichts. */
+function auswahlErlaubt(reiter: Reiter): boolean {
+  return reiter === "angelegt" || reiter === "eingeladen";
+}
+
+/** Ein Ergebnis des Laufs, so wie die Fläche es festhält: die Kennung und der
+ *  Name kommen aus der LISTE, der Ausgang aus der Antwort. */
+interface Einladungsergebnis {
+  id: string;
+  name: string | null;
+  ausgang: Ausgang;
+}
+
+/** Wie der Bericht die fünf Ausgänge nennt — und warum. Der Grund steht dabei,
+ *  weil „übersprungen" ohne ihn wie ein Fehler aussieht. */
+const AUSGANG_TEXT: Record<Ausgang, string> = {
+  verschickt: "verschickt",
+  uebersprungen: "übersprungen — es liegt noch ein gültiger Link im Postfach",
+  abgewiesen: "abgewiesen — die Grenze von fünf Anforderungen am Tag griff",
+  nicht_einladbar: "nicht einladbar — das Konto ist deaktiviert, gelöscht oder fort",
+  // NICHT „abgelehnt". Der Ausgang entsteht an ZWEI Stellen im Endpunkt: bei
+  // einer Ablehnung durch Resend — dann ist das Token entwertet — und in dessen
+  // `catch`, wo der Versand UNBEKANNT ist: die Mail kann zugestellt sein, und
+  // das Token bleibt dort absichtlich gültig. „Abgelehnt" behauptete eine
+  // Ursache, die der Bericht nicht kennt. Befund des Diff-Reviews.
+  fehlgeschlagen: "fehlgeschlagen — kein Versand bestätigt",
+};
 
 /** Was im Zeilenmenü stehen kann. Nicht jede Aktion an jeder Zeile — was wo
  *  gilt, entscheidet `aktionenFuer`. */
@@ -161,7 +257,7 @@ export default function AdminMitgliederPage() {
    */
   const [suchparameter, setSuchparameter] = useSearchParams();
   const reiter = leseReiter(suchparameter.get(REITER_PARAM));
-  const status = REITER.find((r) => r.id === reiter)!.status;
+  const status = FILTER.find((r) => r.id === reiter)!.status;
   /** Ein Reiter und eine Tafel: alle fünf zeigen dieselbe Liste unter einem
    *  anderen Filter. Beschriftet wird sie deshalb vom GEWÄHLTEN Reiter. */
   const tafelId = "reiter-tafel";
@@ -204,6 +300,70 @@ export default function AdminMitgliederPage() {
   const [rueckfrage, setRueckfrage] = useState<OffeneRueckfrage | null>(null);
   /** Das Mitglied, für das der Stufen-Dialog offen ist (AGE-707). */
   const [stufenDialog, setStufenDialog] = useState<AdminMember | null>(null);
+
+  // ── Die Aufnahmestrecke, die Maske und der Lauf (AGE-927) ───────────────
+
+  /** Die gewählten Zeilen, als Kennungen. Sie gilt JE SEITE — siehe den
+   *  Rücksetzer darunter. */
+  const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
+  const [maskeOffen, setMaskeOffen] = useState(false);
+  /** Ob der Hinweis auf den geteilten Reiter noch steht. Einmalig heisst: bis
+   *  er weggeklickt wird oder ein anderer Filter gewählt ist. */
+  const [hinweisOffen, setHinweisOffen] = useState(true);
+  /** Die Rückfrage vor dem Lauf trägt die gewählten Mitglieder, nicht bloss ein
+   *  `true`: sie muss ihre ZAHL nennen, und die Schleife läuft danach über
+   *  genau diese Menge — auch wenn die Liste sich inzwischen änderte. */
+  const [einladefrage, setEinladefrage] = useState<AdminMember[] | null>(null);
+  const [fortschritt, setFortschritt] = useState<{ fertig: number; gesamt: number } | null>(null);
+  /** Der Bericht bleibt stehen, bis der Admin ihn schliesst. Ein Ton wäre hier
+   *  falsch: er verschwindet, und dieser Bericht ist das Einzige, was sagt, was
+   *  wirklich geschah. */
+  const [bericht, setBericht] = useState<Einladungsergebnis[] | null>(null);
+  /** Die Auskunft über eine Anlage, die nur zur Hälfte gelang. Aus demselben
+   *  Grund kein Ton: das Konto BESTEHT, und das muss stehen bleiben. */
+  const [anlageMeldung, setAnlageMeldung] = useState<{ name: string; schritt: string } | null>(
+    null,
+  );
+
+  /**
+   * DIE AUSWAHL GILT JE SEITE. Sie fällt, sobald Filter, Suchbegriff oder Seite
+   * wechseln — sonst löste „Ausgewählte einladen" Zeilen aus, die der Admin
+   * nicht mehr sieht, und genau das ist das „an alle", das ADR-0007 verwirft.
+   *
+   * WÄHREND DES AUFBAUS, aus demselben Grund wie beim Reiterwechsel darüber:
+   * ein Effekt liefe erst nach dem Zeichnen, und dazwischen stünde eine
+   * Handlung über einer Auswahl, die nicht mehr zur Liste passt.
+   */
+  const seitenschluessel = `${reiter}|${seite}|${query}`;
+  const [letzteSeite, setLetzteSeite] = useState(seitenschluessel);
+  if (letzteSeite !== seitenschluessel) {
+    setLetzteSeite(seitenschluessel);
+    setAuswahl(new Set());
+    // DER BERICHT FÄLLT MIT. „Er bleibt stehen, bis der Admin ihn schliesst"
+    // meint: er verschwindet nicht von selbst wie ein Ton. Über einer ANDEREN
+    // Liste stehen zu bleiben ist etwas anderes — in der Sichtprobe stand der
+    // Bericht über zwei Mitgliedern aus ② über der Liste von ①, und nichts
+    // sagte, dass er sie nicht meint. Den Filter zu wechseln ist die Handlung
+    // des Admins, mit der er ihn schliesst.
+    setBericht(null);
+  }
+
+  /**
+   * Ob die Seite noch da ist. Der Lauf ist eine Schleife über mehrere Aufrufe;
+   * verlässt der Admin die Fläche, sollen die restlichen NICHT mehr hinausgehen
+   * — und `setState` nach dem Abbau wäre ausserdem ein Fehler.
+   *
+   * Es gibt bewusst KEINE Browser-Rückfrage dazu: zwischen zwei Mitgliedern
+   * besteht kein Zwischenzustand, jede Einladung ist für sich abgeschlossen.
+   * Eine Warnung wäre eine Warnung vor einer Gefahr, die es nicht gibt.
+   */
+  const lebt = useRef(true);
+  useEffect(() => {
+    lebt.current = true;
+    return () => {
+      lebt.current = false;
+    };
+  }, []);
 
   const filter = { query, status, seite };
   const { data, isLoading, isError, error } = useQuery({
@@ -347,7 +507,13 @@ export default function AdminMitgliederPage() {
     },
   });
 
-  const laeuft = zugangslink.isPending || aktivieren.isPending || lebenszyklus.isPending;
+  // `fortschritt !== null` gehört dazu: während des Laufs darf sich an den
+  // Zeilen nichts ändern, sonst verschiebt sich die Auswahl unter der Hand.
+  const laeuft =
+    zugangslink.isPending ||
+    aktivieren.isPending ||
+    lebenszyklus.isPending ||
+    fortschritt !== null;
 
   /**
    * Der einzige Weg vom Menü in die Mutationen.
@@ -376,9 +542,105 @@ export default function AdminMitgliederPage() {
   }
 
   const members = data?.members ?? [];
+  const auswahlMoeglich = auswahlErlaubt(reiter);
+  /** In der REIHENFOLGE DER LISTE, nicht in der des Anklickens — der Bericht
+   *  liest sich sonst anders als die Fläche, aus der er entstand. */
+  const gewaehlte = auswahlMoeglich ? members.filter((m) => auswahl.has(m.id)) : [];
+  /** In ② heisst dieselbe Handlung erinnern. Es ist derselbe Vorgang: ein
+   *  zweiter Link ersetzt den ersten, sobald dessen Schutzfenster abgelaufen
+   *  ist — und tut er es nicht, meldet der Bericht „übersprungen". */
+  const einladeLabel = reiter === "eingeladen" ? "Ausgewählte erinnern" : "Ausgewählte einladen";
+
+  /** Der Filter GEHÖRT in die Adresse. `replace` wäre falsch — ein Wechsel ist
+   *  eine Navigation, und die Zurück-Taste soll ihn zurücknehmen. */
+  function waehleFilter(id: Reiter) {
+    const naechste = new URLSearchParams(suchparameter);
+    naechste.set(REITER_PARAM, id);
+    setSuchparameter(naechste);
+  }
+
+  function auswahlUmschalten(id: string) {
+    setAuswahl((alt) => {
+      const neu = new Set(alt);
+      if (neu.has(id)) neu.delete(id);
+      else neu.add(id);
+      return neu;
+    });
+  }
+
+  /**
+   * Der Lauf: ein Aufruf je Mitglied, nacheinander.
+   *
+   * Ein Fehlschlag bricht die Reihe NICHT ab — `ladeEin` wirft nicht, es meldet
+   * `fehlgeschlagen` als Ergebnis. Der Bericht entsteht dabei aus den ANTWORTEN
+   * und nicht aus einem Vorher-Nachher-Vergleich: was für ein Mitglied galt,
+   * als sein Aufruf lief, ist sein Ausgang, auch wenn sich der Bestand
+   * währenddessen ändert.
+   *
+   * Die Liste wird erst DANACH einmal neu geladen, mit demselben Schlüssel —
+   * also mit Filter, Suchbegriff und Seite. Ein Lauf, der den Admin zurück auf
+   * Seite 1 ohne Filter wirft, macht aus einer Auskunft eine Suchaufgabe.
+   */
+  async function einladungenSchicken(menge: AdminMember[]) {
+    setEinladefrage(null);
+    setBericht(null);
+    setFortschritt({ fertig: 0, gesamt: menge.length });
+
+    const ergebnisse: Einladungsergebnis[] = [];
+    for (const m of menge) {
+      if (!lebt.current) return;
+      const ausgang = await ladeEin(m.id);
+      ergebnisse.push({ id: m.id, name: m.name, ausgang });
+      if (!lebt.current) return;
+      setFortschritt({ fertig: ergebnisse.length, gesamt: menge.length });
+    }
+
+    setFortschritt(null);
+    setBericht(ergebnisse);
+    setAuswahl(new Set());
+    await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+  }
+
+  /** Der Name aus der letzten Eingabe — die Antwort der Function trägt ihn
+   *  nicht zurück, und die Meldung soll das Mitglied benennen. */
+  const letzterName = useRef("");
+
+  /**
+   * Das Anlegen. Drei der vier Ausgänge bleiben in der Maske stehen, weil der
+   * Admin dort weiterarbeitet: eine vergebene Adresse berichtigt er, einen
+   * Fehler versucht er erneut. Nur der Erfolg schliesst sie.
+   */
+  const anlegen = useMutation({
+    mutationFn: (w: NeuesMitglied) => createMember(w),
+    onSuccess: async (ergebnis) => {
+      if (ergebnis.art === "vergeben" || ergebnis.art === "fehler") return;
+      setMaskeOffen(false);
+      if (ergebnis.art === "teilweise") {
+        // KEIN Erfolgston. Das Konto besteht, aber nicht vollständig — und
+        // welcher Schritt fehlt, entscheidet, was zu tun ist.
+        setAnlageMeldung({ name: letzterName.current, schritt: ergebnis.schritt });
+      } else {
+        toast({
+          title: `${letzterName.current} ist angelegt`,
+          description:
+            ergebnis.schritt === "bestaetigungsmail_verschickt"
+              ? "Die Bestätigungsmail ist hinausgegangen — das Mitglied steht in ② Eingeladen."
+              : "Ohne Mail angelegt — das Mitglied steht in ① Angelegt.",
+          variant: "success",
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
+    },
+    onError: (e) =>
+      toast({ title: "Anlegen fehlgeschlagen", description: fehlerText(e), variant: "error" }),
+  });
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
+    // `pb-28` und nicht `py-8` unten: der schwebende Knopf liegt fest am
+    // Ansichtsfenster und deckte in der Sichtprobe auf einem Telefon den
+    // „Weiter"-Knopf der Blätterung zu. Platz darunter löst es, ein Wegrücken
+    // des Knopfes verschöbe nur das Problem.
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-8 pb-28">
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-ink">Mitglieder</h1>
         <p className="text-sm text-muted">
@@ -387,19 +649,90 @@ export default function AdminMitgliederPage() {
         </p>
       </header>
 
-      {/* Eigene Leiste statt `components/ui/Tabs`: die dortige Komponente hält
-          den gewählten Reiter in einem eigenen `useState` und verlangt je Reiter
-          einen eigenen Inhalt. Hier trägt die Adresse den Zustand, und alle fünf
-          Reiter zeigen dieselbe Liste unter einem anderen Filter — die Optik ist
-          übernommen, die Zustandsführung nicht. */}
-      {/* Die graue Linie sitzt am UMSCHLAG, nicht an der scrollbaren Leiste.
-          Beides in einem Element hiess `overflow-x-auto` — und das setzt
-          `overflow-y` implizit auf `auto`. Der 1px-Überstand des negativen
-          Aussenabstands genügte dann für einen VERTIKALEN Scrollbalken, der
-          15 px Breite frass (gemessen: clientWidth 1105 bei 1120 px Breite,
-          scrollHeight 34 bei clientHeight 33). Nur die Sichtprobe zeigte ihn. */}
-      <div className="border-b border-line">
-        <div role="tablist" aria-label="Zustand" className="flex gap-6 overflow-x-auto">
+      {/* ZWEI GRUPPEN, EINE AUSWAHL (AGE-927).
+
+          Die Aufnahmestrecke steht über der Reiterleiste; technisch ist beides
+          derselbe Wert in der Adresse. Ein EINZIGES `tablist` hält die sieben
+          zusammen — zwei nebeneinander läsen sich für eine Vorleseausgabe wie
+          zwei unabhängige Auswahlen, und genau das sind sie nicht. Die beiden
+          Gruppenkästen tragen deshalb `role="presentation"`: sie gruppieren
+          optisch und reichen die Reiter an die Leiste durch.
+
+          Eigene Leiste statt `components/ui/Tabs`: die dortige Komponente hält
+          den gewählten Reiter in einem eigenen `useState` und verlangt je
+          Reiter einen eigenen Inhalt. Hier trägt die Adresse den Zustand, und
+          alle sieben zeigen dieselbe Liste unter einem anderen Filter — die
+          Optik ist übernommen, die Zustandsführung nicht. */}
+      <div role="tablist" aria-label="Zustand" className="flex flex-col gap-4">
+        <div role="presentation" className="flex flex-wrap items-stretch gap-2">
+          {STRECKE.map((s, i) => {
+            const gewaehlt = s.id === reiter;
+            return (
+              <Fragment key={s.id}>
+                {/* Der Pfeil IST die Folge. Er trägt keine Auskunft, die nicht
+                    schon in „Schritt 1/2/3" stünde — deshalb verborgen. */}
+                {i > 0 && (
+                  <span aria-hidden="true" className="self-center text-muted">
+                    &rarr;
+                  </span>
+                )}
+                <button
+                  type="button"
+                  role="tab"
+                  id={`reiter-${s.id}`}
+                  aria-selected={gewaehlt}
+                  aria-controls={tafelId}
+                  // Auch die Filter sind während des Laufs gesperrt. Ohne das
+                  // wechselte der Admin auf „Alle", der Fortschrittsstreifen
+                  // verschwände mit der Auswahlleiste, und die Schleife liefe
+                  // unsichtbar weiter — „die Liste steht still" wäre ein
+                  // grösseres Versprechen als die Umsetzung. Diff-Review.
+                  disabled={fortschritt !== null}
+                  onClick={() => waehleFilter(s.id)}
+                  className={
+                    "flex flex-col gap-0.5 rounded-[var(--radius-card)] border px-4 py-2 text-left text-sm transition-colors " +
+                    (gewaehlt
+                      ? "border-accent bg-accent/[0.06] text-accent-strong"
+                      : "border-line text-muted hover:text-ink")
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    {/* „Schritt 1" statt der Kreisziffer für die Vorleseausgabe:
+                        `\u2460` liest sich je nach Ausgabe als „Kreisziffer eins"
+                        oder gar nicht. Die Ziffer bleibt sichtbar und verborgen
+                        zugleich — sie ist Bild, nicht Text. */}
+                    <span className="sr-only">Schritt {i + 1}</span>
+                    <span aria-hidden="true" className="text-base leading-none">
+                      {s.ziffer}
+                    </span>
+                    <span className="font-medium">{s.label}</span>
+                    {/* `aria-hidden` wie an den Reitern darunter, aus demselben
+                        Grund: die Zahl gehört nicht in den NAMEN eines
+                        Bedienelements, sonst änderte er sich bei jeder
+                        Einladung. */}
+                    {zahlen?.[s.status] !== undefined && (
+                      <span aria-hidden="true" className="text-xs tabular-nums">
+                        {zahlen[s.status]}
+                      </span>
+                    )}
+                  </span>
+                  {/* Die nächste Handlung des Schritts. ③ trägt keine — dort ist
+                      nichts mehr zu tun. */}
+                  {s.naechste && <span className="text-xs text-muted">{s.naechste}</span>}
+                </button>
+              </Fragment>
+            );
+          })}
+        </div>
+
+        {/* Die graue Linie sitzt am UMSCHLAG, nicht an der scrollbaren Leiste.
+            Beides in einem Element hiess `overflow-x-auto` — und das setzt
+            `overflow-y` implizit auf `auto`. Der 1px-Überstand des negativen
+            Aussenabstands genügte dann für einen VERTIKALEN Scrollbalken, der
+            15 px Breite frass (gemessen: clientWidth 1105 bei 1120 px Breite,
+            scrollHeight 34 bei clientHeight 33). Nur die Sichtprobe zeigte ihn. */}
+        <div role="presentation" className="border-b border-line">
+          <div role="presentation" className="flex gap-6 overflow-x-auto">
           {REITER.map((r) => {
             const gewaehlt = r.id === reiter;
             return (
@@ -410,14 +743,8 @@ export default function AdminMitgliederPage() {
                 id={`reiter-${r.id}`}
                 aria-selected={gewaehlt}
                 aria-controls={tafelId}
-                onClick={() => {
-                  // `setSuchparameter` und nicht `setStatus`: der Reiter GEHÖRT in
-                  // die Adresse. `replace` wäre hier falsch — ein Reiterwechsel ist
-                  // eine Navigation, und die Zurück-Taste soll ihn zurücknehmen.
-                  const naechste = new URLSearchParams(suchparameter);
-                  naechste.set(REITER_PARAM, r.id);
-                  setSuchparameter(naechste);
-                }}
+                disabled={fortschritt !== null}
+                onClick={() => waehleFilter(r.id)}
                 className={
                   "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
                   (gewaehlt
@@ -455,8 +782,35 @@ export default function AdminMitgliederPage() {
               </button>
             );
           })}
+          </div>
         </div>
       </div>
+
+      {/* DAS ALTE LESEZEICHEN. `?tab=offen` meinte die VEREINIGUNG aus ① und ②;
+          ① allein zeigt weniger. Ohne diesen Satz stünde dort eine kleinere
+          Zahl, und niemand erführe, warum. Er hängt am Wert in der ADRESSE und
+          verschwindet damit von selbst, sobald ein anderer Filter gewählt wird
+          — ein zweiter Zustand dafür wäre einer zu viel. */}
+      {suchparameter.get(REITER_PARAM) === ALTER_WERT && hinweisOffen && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-line bg-canvas p-4"
+        >
+          <p className="text-sm text-muted">
+            „Nicht aktiviert“ ist jetzt in zwei Schritte geteilt: ① Angelegt und ② Eingeladen.
+            Dieses Lesezeichen führt auf ①. Die Summe beider Schritte ist die alte Zahl.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            aria-label="Hinweis schliessen"
+            onClick={() => setHinweisOffen(false)}
+          >
+            Verstanden
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Suche" className="min-w-56 flex-1">
@@ -484,6 +838,124 @@ export default function AdminMitgliederPage() {
           ))}
         </div>
       </div>
+
+      {/* DIE EINZIGE HANDLUNG, die aus einer Mehrfachauswahl folgt (ADR-0007).
+          Kein Feld für Betreff, Text oder Textbaustein, kein Weg, die Menge zu
+          übernehmen oder auszuleiten — und sie erscheint nur in ① und ②, wo sie
+          etwas bewirken kann. */}
+      {auswahlMoeglich && (gewaehlte.length > 0 || fortschritt !== null) && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            size="sm"
+            disabled={fortschritt !== null || gewaehlte.length === 0}
+            onClick={() => setEinladefrage(gewaehlte)}
+          >
+            {einladeLabel}
+          </Button>
+          <span className="text-sm text-muted tabular-nums">{gewaehlte.length} ausgewählt</span>
+          {/* Fortschritt als ZAHL und kein Modal: der Admin soll die Liste
+              weiterlesen können, und „es passiert etwas" ist bei zwölf Aufrufen
+              keine Auskunft. Bewusst OHNE `role="status"` — der Bericht darunter
+              trägt ihn, und zwei Statusbereiche nebeneinander lesen sich wie
+              zwei Meldungen. */}
+          {fortschritt !== null && (
+            <p aria-live="polite" className="text-sm text-muted tabular-nums">
+              {fortschritt.fertig} von {fortschritt.gesamt} bearbeitet
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* DER BERICHT BLEIBT STEHEN, bis der Admin ihn schliesst. Kein Ton: ein
+          Ton verschwindet, und dieser Bericht ist das Einzige, was sagt, was
+          wirklich geschah. */}
+      {bericht && (
+        <Card role="status" className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <CardTitle>Was hinausging</CardTitle>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => setBericht(null)}
+            >
+              Bericht schliessen
+            </Button>
+          </div>
+          {/* ALLE fünf Ausgänge, auch die mit null — sonst sähen „0
+              übersprungen" und „nicht geprüft" gleich aus. Und es entsteht gar
+              keine Sammelzahl über der gemischten Menge: jede Zeile zählt ihren
+              eigenen Ausgang. */}
+          <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+            {AUSGAENGE.map((a) => {
+              const treffer = bericht.filter((e) => e.ausgang === a);
+              return (
+                <li key={a}>
+                  <span className="text-ink tabular-nums">
+                    {treffer.length} {AUSGANG_TEXT[a]}
+                  </span>
+                  {/* NAMENTLICH, nicht nur gezählt — und zwar in JEDEM Topf.
+                      Die erste Fassung liess die Verschickten aus, um Platz zu
+                      sparen; der Diff-Review hat benannt, was das kostet: der
+                      Admin muss die genannten Fehlschläge von seiner Auswahl
+                      abziehen, um zu wissen, wer die Mail hat. */}
+                  {treffer.length > 0 && (
+                    <span className="text-muted">
+                      : {treffer.map((e) => e.name ?? "Ohne Namen").join(", ")}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
+      {/* EIN HALB EINGERICHTETES KONTO. Auch hier kein Ton: das Konto BESTEHT,
+          und was fehlt, entscheidet, was zu tun ist. */}
+      {anlageMeldung && (
+        <Card role="status" className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <CardTitle>Nur zur Hälfte angelegt</CardTitle>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => setAnlageMeldung(null)}
+            >
+              Meldung schliessen
+            </Button>
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            {/* Drei Zweige und kein Sammelzweig — dieselbe Erlaubnisliste-Disziplin
+                wie in `ausgangFuer`: ein unbekannter Schritt entsteht, wenn
+                Function und Fläche auseinanderlaufen, und darf dann nicht die
+                Auskunft eines bekannten bekommen. */}
+            {anlageMeldung.schritt === "stufe_nicht_gesetzt" ? (
+              <>
+                <strong>{anlageMeldung.name}</strong> hat ein Konto, aber die Stufe wurde nicht
+                gesetzt. Das Mitglied steht in ① Angelegt auf der Vorgabestufe und ist über
+                „Stufe setzen“ im Zeilenmenü zu berichtigen. Ein zweites Anlegen hilft nicht —
+                die Adresse ist jetzt vergeben.
+              </>
+            ) : anlageMeldung.schritt === "mail_nicht_verschickt" ? (
+              <>
+                <strong>{anlageMeldung.name}</strong> ist angelegt, die Bestätigungsmail ging
+                aber nicht hinaus. Das Mitglied steht trotzdem in ② Eingeladen, weil ein Link
+                erzeugt wurde — dieser Link ist entwertet und hält das Schutzfenster NICHT.
+                „Ausgewählte erinnern“ schickt nach einer Minute einen neuen.
+              </>
+            ) : (
+              <>
+                <strong>{anlageMeldung.name}</strong> hat ein Konto, aber die Anlage ist nicht
+                vollständig durchgelaufen. Welcher Schritt fehlt, sagt die Antwort nicht — das
+                Mitglied steht in ① Angelegt und ist von dort aus zu prüfen.
+              </>
+            )}
+          </p>
+        </Card>
+      )}
 
       <div
         role="tabpanel"
@@ -533,6 +1005,15 @@ export default function AdminMitgliederPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-line text-xs tracking-wide text-muted uppercase">
                     <tr>
+                      {/* KEIN Kopfkästchen. Ein „alle auf dieser Seite" wäre mit
+                          EINEM Klick deckungsgleich mit „alle 35 einladen" —
+                          genau der Handlung, die ADR-0007 verwirft. Die Spalte
+                          bleibt trotzdem benannt, sonst ist sie namenlos. */}
+                      {auswahlMoeglich && (
+                        <th className="w-8 py-2 pr-2">
+                          <span className="sr-only">Auswahl</span>
+                        </th>
+                      )}
                       <th className="py-2 pr-4">Name</th>
                       <th className="py-2 pr-4">Anmeldeadresse</th>
                       <th className="py-2 pr-4">Zustand</th>
@@ -564,6 +1045,16 @@ export default function AdminMitgliederPage() {
                         data-testid={`mitglied-${m.id}`}
                         className="border-b border-line"
                       >
+                        {auswahlMoeglich && (
+                          <td className="py-2 pr-2">
+                            <Auswahlkasten
+                              member={m}
+                              gewaehlt={auswahl.has(m.id)}
+                              gesperrt={fortschritt !== null}
+                              onUmschalten={auswahlUmschalten}
+                            />
+                          </td>
+                        )}
                         <td className="py-2 pr-4">
                           <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
                             {m.name ?? "Ohne Namen"}
@@ -593,9 +1084,19 @@ export default function AdminMitgliederPage() {
                     className="flex flex-col gap-3 p-5"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
-                        {m.name ?? "Ohne Namen"}
-                      </Link>
+                      <div className="flex items-start gap-2">
+                        {auswahlMoeglich && (
+                          <Auswahlkasten
+                            member={m}
+                            gewaehlt={auswahl.has(m.id)}
+                            gesperrt={fortschritt !== null}
+                            onUmschalten={auswahlUmschalten}
+                          />
+                        )}
+                        <Link to={`/admin/mitglied/${m.id}`} className="font-medium text-ink">
+                          {m.name ?? "Ohne Namen"}
+                        </Link>
+                      </div>
                       <Zustand member={m} />
                     </div>
                     <p className="text-sm text-muted">{m.login_email}</p>
@@ -630,6 +1131,14 @@ export default function AdminMitgliederPage() {
                       riss letzteres „Nicht aktiviert" auf zwei Zeilen und
                       stapelte die Knöpfe. */}
                     <div className="flex flex-wrap items-center gap-2">
+                      {auswahlMoeglich && (
+                        <Auswahlkasten
+                          member={m}
+                          gewaehlt={auswahl.has(m.id)}
+                          gesperrt={fortschritt !== null}
+                          onUmschalten={auswahlUmschalten}
+                        />
+                      )}
                       <Zustand member={m} />
                       <Zeilenmenue member={m} laeuft={laeuft} onAktion={aktion} />
                     </div>
@@ -653,6 +1162,60 @@ export default function AdminMitgliederPage() {
           </>
         )}
       </div>
+
+      {/* DER EINSTIEG IN DIE MASKE — schwebend, damit er beim Blättern durch
+          fünfundzwanzig Zeilen nicht davonscrollt.
+
+          `z-40` liegt ÜBER der Chatfenster-Reihe (`z-30`), und das ist die
+          Entscheidung: ein Anlegen-Knopf, der hinter einem Chatfenster
+          verschwindet, ist unerreichbar. Die Abstände rechnen
+          `env(safe-area-inset-*)` mit ein, damit er auf einem Gerät ohne
+          Home-Knopf nicht im Wischstreifen liegt. */}
+      {/* EIN EIGENER KNOPF UND NICHT `Button`. Jener bringt `rounded-md` mit,
+          und `cn()` ist ein blosser Join ohne `tailwind-merge` — über den
+          Vorrang entscheidet dann die Reihenfolge im Stylesheet, nicht die im
+          Attribut. In der Sichtprobe war der Knopf deshalb ECKIG, obwohl
+          `rounded-full` danebenstand. Dieselbe Falle steht schon am Auslöser
+          des Zeilenmenüs im Kommentar. */}
+      <button
+        type="button"
+        aria-label="Mitglied anlegen"
+        onClick={() => setMaskeOffen(true)}
+        className="fixed z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-soft transition-colors hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
+        style={{
+          right: "calc(1.5rem + env(safe-area-inset-right))",
+          bottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+        }}
+      >
+        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+          <path d="M11 5h2v14h-2z" />
+          <path d="M5 11h14v2H5z" />
+        </svg>
+      </button>
+
+      {maskeOffen && (
+        <AnlageMaske
+          laeuft={anlegen.isPending}
+          ergebnis={anlegen.data}
+          onAbbrechen={() => {
+            setMaskeOffen(false);
+            anlegen.reset();
+          }}
+          onAnlegen={(w) => {
+            letzterName.current = `${w.vorname} ${w.nachname}`;
+            anlegen.mutate(w);
+          }}
+        />
+      )}
+
+      {einladefrage && (
+        <Einladefrage
+          menge={einladefrage}
+          erinnerung={reiter === "eingeladen"}
+          onAbbrechen={() => setEinladefrage(null)}
+          onBestaetigen={() => void einladungenSchicken(einladefrage)}
+        />
+      )}
 
       {stufenDialog && (
         <StufenDialog
@@ -1416,6 +1979,284 @@ function Blaetterung({
         >
           Weiter
         </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Das Kontrollkästchen einer Zeile (AGE-927, ADR-0007).
+ *
+ * Eigenes Bauteil, weil es in allen drei Sichten steht und in jeder denselben
+ * zugänglichen Namen braucht: auf einer Seite mit fünfundzwanzig Zeilen sind
+ * fünfundzwanzig Kästchen namens „Auswahl" für eine Vorleseausgabe nicht
+ * auseinanderzuhalten — dieselbe Begründung wie am Auslöser des Zeilenmenüs.
+ *
+ * Während eines Laufs GESPERRT: die Liste steht dann still, und eine Auswahl,
+ * die sich währenddessen ändert, passte nicht mehr zu der Menge, über die die
+ * Schleife läuft.
+ */
+function Auswahlkasten({
+  member,
+  gewaehlt,
+  gesperrt,
+  onUmschalten,
+}: {
+  member: AdminMember;
+  gewaehlt: boolean;
+  gesperrt: boolean;
+  onUmschalten: (id: string) => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={`${member.name ?? "Dieses Mitglied"} auswählen`}
+      checked={gewaehlt}
+      disabled={gesperrt}
+      onChange={() => onUmschalten(member.id)}
+      className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+    />
+  );
+}
+
+/**
+ * Die Rückfrage vor einem Lauf (AGE-927).
+ *
+ * Sie nennt die ZAHL und die Unumkehrbarkeit — nicht „Sind Sie sicher?". Die
+ * Zahl ist die Auskunft, und die Unumkehrbarkeit ist der Grund für die Frage.
+ *
+ * Sie nennt ausserdem das Übersprungene im Voraus: wer schon einen gültigen
+ * Link im Postfach hat, bekommt keinen zweiten. Ohne diesen Satz läse sich der
+ * Bericht danach wie ein Fehler.
+ */
+function Einladefrage({
+  menge,
+  erinnerung,
+  onAbbrechen,
+  onBestaetigen,
+}: {
+  menge: AdminMember[];
+  /** In ② heisst dieselbe Handlung erinnern. Die Rückfrage sagt das auch —
+   *  sonst fragt sie nach etwas anderem, als der Knopf verspricht. */
+  erinnerung: boolean;
+  onAbbrechen: () => void;
+  onBestaetigen: () => void;
+}) {
+  const overlay = useOverlay(true, onAbbrechen);
+
+  return (
+    <div
+      ref={overlay}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${erinnerung ? "Erinnerung" : "Einladung"} an ${menge.length} Mitglieder`}
+    >
+      <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={onAbbrechen} />
+      <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-6 shadow-soft">
+        <h2 className="font-display text-lg font-semibold text-ink">
+          An {menge.length} Mitglieder {erinnerung ? "eine Erinnerung" : "eine Einladung"}{" "}
+          schicken?
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          Verschickte Mails lassen sich nicht zurückholen.
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          Wer schon einen gültigen Link im Postfach hat, bekommt keinen zweiten — der Bericht
+          sagt danach, wen es betraf.
+        </p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onAbbrechen}>
+            Abbrechen
+          </Button>
+          <Button type="button" onClick={onBestaetigen}>
+            Einladen
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Bewusst GROB, und dieselbe Form wie in `admin-create-member/anlegen.ts`. Die
+ * Adresse wird nicht von uns bestätigt, sondern vom Anmeldedienst übernommen —
+ * eine strenge Prüfung gäbe eine Sicherheit vor, die sie nicht hat. Was sie
+ * abfängt, sind Tippfehler und leere Felder.
+ *
+ * Sie steht hier ZUSÄTZLICH und nicht STATT der Prüfung im Endpunkt: eine
+ * Prüfung, die nur die Fläche vornimmt, ist keine.
+ */
+const EMAIL_FORM = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Die Maske zum Anlegen eines einzelnen Mitglieds (AGE-927).
+ *
+ * WARUM SIE DREI VON VIER AUSGÄNGEN SELBST ZEIGT: eine vergebene Adresse
+ * berichtigt der Admin hier, einen Fehler versucht er hier erneut. Nur der
+ * Erfolg schliesst sie. Ein Ton statt dieser Zeilen hiesse, den Admin aus der
+ * Maske zu werfen und ihn alles noch einmal tippen zu lassen.
+ *
+ * DER PLAN BIETET NUR DIE DREI CLUBSTUFEN. Dieselbe Zusage wie im Stufen-Dialog
+ * und aus demselben Grund: ACTIVE, BOOST und CONNECT liegen ausserhalb des
+ * Clubs. Die Beschränkung liegt an der Fläche, nicht in der Datenbank — das ist
+ * eine Anzeigeentscheidung und ausdrücklich KEINE Rechtegrenze.
+ *
+ * DER HAKEN IST VORAUSGEWÄHLT: der Regelfall ist, dass das neue Mitglied auch
+ * erfährt, dass es eines ist.
+ */
+function AnlageMaske({
+  laeuft,
+  ergebnis,
+  onAbbrechen,
+  onAnlegen,
+}: {
+  laeuft: boolean;
+  ergebnis: AnlageAusgang | undefined;
+  onAbbrechen: () => void;
+  onAnlegen: (w: NeuesMitglied) => void;
+}) {
+  const overlay = useOverlay(true, onAbbrechen);
+  const [vorname, setVorname] = useState("");
+  const [nachname, setNachname] = useState("");
+  const [email, setEmail] = useState("");
+  const [plan, setPlan] = useState<string>(CLUB_LEVEL);
+  const [mailSenden, setMailSenden] = useState(true);
+  const [firma, setFirma] = useState("");
+  const [telefon, setTelefon] = useState("");
+  /** Was die Maske selbst beanstandet. Getrennt von `ergebnis`, das vom
+   *  Endpunkt kommt — sonst verdeckte das eine das andere. */
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  const waehlbar = LEVEL_ORDER.filter((key) => LEVELS[key].rank >= CLUB_RANK);
+
+  function absenden() {
+    const v = vorname.trim();
+    const n = nachname.trim();
+    const e = email.trim();
+    if (v === "" || n === "") {
+      setFehler("Vorname und Nachname sind Pflicht.");
+      return;
+    }
+    if (!EMAIL_FORM.test(e)) {
+      setFehler("Die E-Mail-Adresse hat keine gültige Form.");
+      return;
+    }
+    setFehler(null);
+    onAnlegen({
+      vorname: v,
+      nachname: n,
+      email: e,
+      plan,
+      mailSenden,
+      firma: firma.trim(),
+      telefon: telefon.trim(),
+    });
+  }
+
+  return (
+    <div
+      ref={overlay}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mitglied anlegen"
+    >
+      <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={onAbbrechen} />
+      <div className="relative w-full max-w-md overflow-y-auto rounded-[var(--radius-card)] bg-canvas p-6 shadow-soft">
+        <h2 className="font-display text-lg font-semibold text-ink">Mitglied anlegen</h2>
+        <p className="mt-2 text-sm text-muted">
+          Das Konto entsteht ohne Passwort und unbestätigt — genau wie ein importiertes. Das
+          Mitglied bestätigt selbst über den Link.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-4">
+          <Field label="Vorname">
+            {({ id }) => (
+              <Input id={id} value={vorname} onChange={(e) => setVorname(e.target.value)} />
+            )}
+          </Field>
+          <Field label="Nachname">
+            {({ id }) => (
+              <Input id={id} value={nachname} onChange={(e) => setNachname(e.target.value)} />
+            )}
+          </Field>
+          <Field label="E-Mail">
+            {({ id }) => (
+              <Input
+                id={id}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Plan">
+            {({ id }) => (
+              <Select id={id} value={plan} onChange={(e) => setPlan(e.target.value)}>
+                {waehlbar.map((key) => (
+                  <option key={key} value={key}>
+                    {levelLabel(key)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          {/* Freiwillig, und deshalb hinter den Pflichtfeldern. Sie stehen hier,
+              weil `admin_mitglied_einrichten` sie kennt — ein Feld ohne Aufrufer
+              wäre ein vergessenes. */}
+          <Field label="Firma (freiwillig)">
+            {({ id }) => (
+              <Input id={id} value={firma} onChange={(e) => setFirma(e.target.value)} />
+            )}
+          </Field>
+          <Field label="Telefon (freiwillig)">
+            {({ id }) => (
+              <Input id={id} value={telefon} onChange={(e) => setTelefon(e.target.value)} />
+            )}
+          </Field>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={mailSenden}
+              onChange={(e) => setMailSenden(e.target.checked)}
+              className="size-4 rounded border-line text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            />
+            <span>Bestätigungsmail senden</span>
+          </label>
+        </div>
+
+        {fehler && <p className="mt-4 text-sm text-danger">{fehler}</p>}
+
+        {/* Die Adresse gehört schon jemandem. NAMENTLICH und verlinkt — und mit
+            der Angabe, ob das Mitglied entfernt wurde: der wiederkehrende
+            Bewerber ist der erwartbare Fall, und ein Verweis auf jemanden, den
+            der Admin in keiner sichtbaren Liste findet, wäre eine Sackgasse. */}
+        {ergebnis?.art === "vergeben" && (
+          <p className="mt-4 text-sm text-danger">
+            Diese Adresse gehört bereits zu{" "}
+            <Link to={`/admin/mitglied/${ergebnis.mitglied.id}`} className="underline">
+              {ergebnis.mitglied.name ?? "einem Mitglied ohne Namen"}
+            </Link>
+            {ergebnis.mitglied.geloescht
+              ? " — dieses Mitglied ist gelöscht und steht nur im Filter „Gelöscht“."
+              : ergebnis.mitglied.deaktiviert
+                ? " — dieses Mitglied ist deaktiviert und steht nur im Filter „Deaktiviert“."
+                : "."}
+          </p>
+        )}
+        {ergebnis?.art === "fehler" && (
+          <p className="mt-4 text-sm text-danger">{ergebnis.text}</p>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onAbbrechen}>
+            Abbrechen
+          </Button>
+          <Button type="button" disabled={laeuft} onClick={absenden}>
+            {laeuft ? "Legt an …" : "Anlegen"}
+          </Button>
+        </div>
       </div>
     </div>
   );
