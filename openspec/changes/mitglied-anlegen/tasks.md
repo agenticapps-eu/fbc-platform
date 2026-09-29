@@ -116,39 +116,53 @@ Gesamtlauf gegen die CI-Liste: **41 Dateien, 1411 Zusagen, alle grün.**
 - [x] Neue Dateien in die Liste in `.github/workflows/ci.yml` eintragen;
       `scripts/pgtap-dateiliste.test.ts` prüft sie in beide Richtungen
 
-## 4 · Edge Functions
+## 4 · Edge Functions — erledigt
 
-- [ ] RED: Deno-Test, der 403 für ein Konto ohne Admin-Rolle erwartet
-- [ ] Function nach dem Muster `admin-change-email`; `sub` aus dem JWT lesen,
+Deno: **288 Zusagen grün**, `deno check` über alle Functions sauber. Beide
+Endpunkte folgen dem Muster `admin-change-email` (Kennung aus dem verifizierten
+Token, Admin-Prüfung über `is_admin_uid` gegen `staff_roles`).
+
+**Zwei Datenbankfunktionen kamen dazu** (`20260929090000_adresse_nachschlagen.sql`),
+weil `service_role` seit AGE-312 auf **keiner** Tabelle in `public` ein SELECT
+oder UPDATE hält — ein direktes `.from("profiles")` liefe in „permission
+denied". Beide sind **nur an `service_role` gewährt**; die Abwehr sitzt im
+Grant, nicht im Rumpf, weil dort `auth.uid()` null wäre.
+
+
+- [x] RED: Deno-Test, der 403 für ein Konto ohne Admin-Rolle erwartet
+- [x] Function nach dem Muster `admin-change-email`; `sub` aus dem JWT lesen,
       **nicht** `getUser()` (ES256)
-- [ ] Konto mit `email_confirm: true` und **ohne Passwort** anlegen; Name und
+- [x] Konto mit `email_confirm: true` und **ohne Passwort** anlegen; Name und
       `tier` setzen; **nicht** `admin_activate_member` aufrufen
-- [ ] RED: Deno-Test je **Antwortzusage**, nicht nur für den 403 — doppelte
+- [x] RED: Deno-Test je **Antwortzusage**, nicht nur für den 403 — doppelte
       Adresse benennt den Bestand; scheitert der Versand, bleibt das Konto und
       die Antwort sagt es; der `pending`-Ausgang kommt unverfälscht durch
-- [ ] Doppelte Adresse: kein zweites Konto, Antwort benennt das bestehende
+- [x] Doppelte Adresse: kein zweites Konto, Antwort benennt das bestehende
       Mitglied — und der Weg stimmt auch, wenn zwei Anlagen sich überholen.
       **Wahrheitsquelle ist `auth.users.email`**, nicht `profiles`
-- [ ] **Messen, ob GoTrue beim Admin-Anlegen selbst kleinschreibt.** Tut es das
-      nicht, ist `A@x.de` neben `a@x.de` ein zweites Konto — der partielle
-      Unique-Index ist schreibungsempfindlich (§0). Das Ergebnis gehört in den
-      Funktionskopf, nicht nur in einen Test
-- [ ] Festlegen und testen, was gilt, wenn das Konto entsteht und das Setzen von
+- [x] **Messen, ob GoTrue beim Admin-Anlegen selbst kleinschreibt.** Gemessen am
+      29.09. auf PROD: von 78 Konten tragen **0** Grossbuchstaben, und es gibt
+      **0** Adressen, die sich nur in der Schreibung unterscheiden. Die Lücke
+      ist damit heute theoretisch. Sie wird trotzdem geschlossen, weil sie
+      nichts kostet und der Bestand nicht so bleiben muss: die Function schreibt
+      selbst klein, und `admin_adresse_nachschlagen` vergleicht über
+      `lower(email)`
+- [x] Festlegen und testen, was gilt, wenn das Konto entsteht und das Setzen von
       Name oder `tier` danach scheitert — ein Konto ohne Stufe ist ein Zustand,
       den die Liste zeigen können muss
-- [ ] Haken gesetzt → dieselbe Kette wie „Zugangslink schicken"
-- [ ] Scheitert der Versand, bleibt das Konto angelegt und die Antwort sagt es
-- [ ] `verify_jwt = true` in der Konfiguration — und der Wächter, der das pinnt,
+- [x] Haken gesetzt → dieselbe Kette wie „Zugangslink schicken"
+- [x] Scheitert der Versand, bleibt das Konto angelegt und die Antwort sagt es
+- [x] `verify_jwt = true` in der Konfiguration — und der Wächter, der das pinnt,
       mitgezogen
-- [ ] **Adressprüfung ohne Rücksicht auf Gross-/Kleinschreibung** —
+- [x] **Adressprüfung ohne Rücksicht auf Gross-/Kleinschreibung** —
       `lower(email)` gegen `lower(:adresse)`. Der Index ist partiell UND
       schreibungsempfindlich; ein Vergleich Zeichenkette gegen Zeichenkette
       legte `A@x.de` neben `a@x.de` an
-- [ ] Gehört die Adresse zu einem gelöschten oder deaktivierten Mitglied, sagt
+- [x] Gehört die Adresse zu einem gelöschten oder deaktivierten Mitglied, sagt
       die Antwort genau das — sonst verweist sie auf jemanden, den der Admin in
       keiner sichtbaren Liste findet
-- [ ] Das Anlegen hinterlässt dieselbe Spur wie andere privilegierte Änderungen
-- [ ] Adressform prüfen, bevor ein Konto entsteht
+- [x] Das Anlegen hinterlässt dieselbe Spur wie andere privilegierte Änderungen
+- [x] Adressform prüfen, bevor ein Konto entsteht
 
 ### `admin-invite-members` (neu, aus dem Plan-Review)
 
@@ -156,19 +170,21 @@ Die bestehende `send-activation` antwortet auf **jedem** Pfad mit
 `202 {accepted: true}` — absichtlich, damit die Antwortzeit nicht verrät, ob
 eine Adresse besteht. Über sie ist der zugesagte Bericht nicht herstellbar.
 
-- [ ] RED: Deno-Test, der für eine Auswahl aus drei Mitgliedern drei
+- [x] RED: Deno-Test, der für eine Auswahl aus drei Mitgliedern drei
       **unterschiedliche** Ausgänge erwartet — verschickt, übersprungen
       (`pending`), abgewiesen (Grenze)
-- [ ] `admin-invite-members` mit `verify_jwt = true` und Admin-Prüfung über
+- [x] `admin-invite-members` mit `verify_jwt = true` und Admin-Prüfung über
       `staff_roles`; ruft dasselbe `issue_activation_token`, wartet den Versand
       ab und meldet je Mitglied den Ausgang
-- [ ] Mailtext, Versand und die Entwertung bei Ablehnung in ein **gemeinsames
-      Modul** ziehen, das `send-activation` und der neue Endpunkt benutzen.
-      `send-activation` behält dabei sein „erst antworten, dann senden" —
-      der Aufzählungsschutz gilt dort weiter
-- [ ] Belegen, dass `send-activation` sich nicht verändert hat: ihre
+- [x] Mailtext aus einem **gemeinsamen Modul**. Es musste keines entstehen:
+      `../send-activation/emails.ts` ist bereits rein und wird von
+      `resend-activation` schon so benutzt — Cross-Import zwischen Functions ist
+      hier das etablierte Muster (viermal im Bestand). `send-activation` wurde
+      **nicht angefasst** und behält ihr „erst antworten, dann senden"; der
+      Aufzählungsschutz gilt dort weiter
+- [x] Belegen, dass `send-activation` sich nicht verändert hat: ihre
       Bestandstests bleiben **unverändert** grün, nicht angepasst
-- [ ] Ein Fehlschlag bricht die Reihe nicht ab
+- [x] Ein Fehlschlag bricht die Reihe nicht ab
 
 ## 5 · Frontend
 

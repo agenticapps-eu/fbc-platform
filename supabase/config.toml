@@ -528,6 +528,34 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 
+# admin-create-member (AGE-927): legt ein einzelnes Mitglied von Hand an, nach
+# der Zahlung ueber Odoo. Das Konto muss in `auth.users` entstehen, und dorthin
+# reicht keine Policy — deshalb die Admin-API mit service_role.
+#
+# verify_jwt = true aus demselben Grund wie bei admin-change-email: das Gateway
+# verifiziert das ES256-Token vollstaendig, bevor der Handler laeuft, und der
+# Handler liest die Aufruferkennung aus genau diesem geprueften Token. Die
+# andere Haelfte ist die serverseitige Pruefung gegen staff_roles.
+[functions.admin-create-member]
+enabled = true
+verify_jwt = true
+
+# admin-invite-members (AGE-927): Einladungen fuer mehrere ausgewaehlte
+# Mitglieder, mit einem Bericht, der die Wahrheit sagt.
+#
+# WARUM NICHT send-activation: die antwortet auf JEDEM Pfad mit
+# `202 {accepted: true}`, damit ihre Antwortzeit nicht verraet, ob eine Adresse
+# besteht. Ueber sie ist kein wahrheitsgemaesser Bericht herstellbar. Der
+# Aufzaehlungsschutz entfaellt gegenueber einem Admin, der die Mitgliederliste
+# ohnehin sieht; die Schutzriegel entfallen NICHT, sie liegen in
+# `issue_activation_token` und werden gerufen statt nachgebaut.
+#
+# verify_jwt = true ist hier keine Formalie: ohne sie waere der Endpunkt ein
+# Weg, fremde Aktivierungslinks in Serie zu entwerten.
+[functions.admin-invite-members]
+enabled = true
+verify_jwt = true
+
 # admin-set-member-ban (AGE-581): die ZWEITE Haelfte der Sperre. `disabled_at`
 # allein haelt eine bestehende Sitzung nicht auf und hindert niemanden am
 # Anmelden; `auth.users.banned_until` tut beides. Diese Function ist der

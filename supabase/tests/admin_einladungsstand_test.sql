@@ -25,7 +25,7 @@
 --     für anon und authenticated NICHT offensteht.
 
 begin;
-select plan(19);
+select plan(30);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -217,6 +217,84 @@ select is(has_function_privilege('authenticated',
 select is(pg_temp.state_as('e1000000-0000-0000-0000-0000000000ad',
     'select * from public.admin_list_members(null, ''angelegtt'', 1, 0)'), '22023',
   'ein vertippter Status bricht weiter ab, statt still alles zu zeigen');
+
+-- ── 8. `admin_adresse_nachschlagen`: der GRANT ist die Sicherheitsgrenze ───
+-- Diese Funktion prüft im Rumpf KEINE Rechte — sie kann es nicht, weil ihr
+-- Aufrufer die Edge Function mit `service_role` ist und `auth.uid()` dort null
+-- wäre. Die Abwehr sitzt allein im Grant. Offen wäre sie ein Orakel für
+-- Mitgliedsadressen, also genau das, was `send-activation` an anderer Stelle
+-- mit „erst antworten, dann senden" teuer verhindert.
+--
+-- Deshalb steht hier BEIDES: dass sie tut, was sie soll (Positivkontrolle),
+-- und dass drei Rollen sie nicht ausführen dürfen. Ohne die Positivkontrolle
+-- wäre „niemand darf" auch von einer Funktion erfüllt, die nichts findet.
+
+select is(
+  (select anzeigename from public.admin_adresse_nachschlagen('EINLADUNG1@TEST.FBC')),
+  'Nie eingeladen',
+  'admin_adresse_nachschlagen findet ohne Rücksicht auf die Schreibung — der '
+  'Unique-Index auf auth.users(email) tut das NICHT');
+
+select ok(
+  not exists (select 1 from public.admin_adresse_nachschlagen('gibtesnicht@test.fbc')),
+  'eine unbekannte Adresse liefert keine Zeile, keinen Fehler');
+
+select is(has_function_privilege('anon', 'public.admin_adresse_nachschlagen(text)', 'execute'),
+  false, 'admin_adresse_nachschlagen: anon darf nicht ausführen');
+select is(has_function_privilege('authenticated', 'public.admin_adresse_nachschlagen(text)', 'execute'),
+  false, 'admin_adresse_nachschlagen: AUCH authenticated nicht — ein Mitglied '
+         'duerfte sonst Adressen abfragen');
+select is(has_function_privilege('service_role', 'public.admin_adresse_nachschlagen(text)', 'execute'),
+  true, 'admin_adresse_nachschlagen: service_role darf — sonst kaeme die Edge '
+        'Function nicht an ihre Auskunft');
+
+-- ── 9. `admin_mitglied_einrichten`: Stufe, Spur, Grant ─────────────────────
+-- Auch hier sitzt die Abwehr im Grant, und auch hier steht die
+-- Positivkontrolle daneben: ohne sie wäre „niemand darf" von einer Funktion
+-- erfüllt, die gar nichts tut.
+
+select lives_ok(
+  $$ select public.admin_mitglied_einrichten(
+       'e1000000-0000-0000-0000-0000000000ad',
+       'e1000000-0000-0000-0000-000000000001',
+       'Neu Eingerichtet', 'focus', 'Berg GmbH', '+49 89 1') $$,
+  'admin_mitglied_einrichten richtet ein Konto ein');
+
+select is(
+  (select p.name || '|' || p.tier || '|' || coalesce(p.company, '(null)')
+     from public.profiles p where p.id = 'e1000000-0000-0000-0000-000000000001'),
+  'Neu Eingerichtet|focus|Berg GmbH',
+  '… und Name, Stufe und Firma stehen danach wirklich da');
+
+select is(
+  (select c.phone from public.profile_contacts c
+    where c.profile_id = 'e1000000-0000-0000-0000-000000000001'),
+  '+49 89 1',
+  '… und die Telefonnummer landet in profile_contacts, das es vorher gar nicht gab');
+
+-- Die Spur entsteht in DERSELBEN Transaktion wie die Änderung. An die Edge
+-- Function gehängt könnte sie fehlen, ohne dass es auffällt.
+select is(
+  (select a.action || '|' || (a.payload->>'tier')
+     from public.admin_audit a
+    where a.target = 'e1000000-0000-0000-0000-000000000001'
+    order by a.at desc limit 1),
+  'create_member|focus',
+  '… und die Spur steht in admin_audit, mit der gesetzten Stufe');
+
+-- Die drei Stufen ausserhalb des Clubs sind auch hier keine Wahl — die Zusage
+-- steht nicht nur in der Oberfläche.
+select is(pg_temp.state_as('e1000000-0000-0000-0000-0000000000ad',
+    'select 1'), 'OK', 'Vorprobe: der Helfer meldet OK, wenn nichts scheitert');
+
+select throws_ok(
+  $$ select public.admin_mitglied_einrichten(
+       'e1000000-0000-0000-0000-0000000000ad',
+       'e1000000-0000-0000-0000-000000000002',
+       'Falsche Stufe', 'connect') $$,
+  '22023',
+  null,
+  'admin_mitglied_einrichten lässt keine Stufe ausserhalb des Clubs zu');
 
 select * from finish();
 rollback;
