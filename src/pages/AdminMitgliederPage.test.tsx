@@ -66,6 +66,9 @@ function member(overrides: Partial<AdminMember> = {}): AdminMember {
     need_categories: [],
     login_email: "anna@test.fbc",
     bestaetigt: true,
+    // AGE-927: abgeleitet aus `activation_tokens`. Vorgabe „noch nie
+    // eingeladen" — das ist der Zustand, in dem ein Import steht.
+    eingeladen_am: null,
     member_since: null,
     deaktiviert_seit: null,
     geloescht_seit: null,
@@ -108,14 +111,19 @@ function listCalls(): number {
   return rpc.mock.calls.filter((c) => c[0] === "admin_list_members").length;
 }
 
-/** Die Zahlen für die Reiter (AGE-587) — bewusst PAARWEISE VERSCHIEDEN, damit
- *  eine vertauschte Zuordnung Reiter → Zustand auffällt. */
+/** Die Zahlen für die Filter (AGE-587, erweitert in AGE-927) — bewusst
+ *  PAARWEISE VERSCHIEDEN, damit eine vertauschte Zuordnung Filter → Zustand
+ *  auffällt. `angelegt` plus `eingeladen` ergibt `offen`; die Datenbank sagt
+ *  das zu, und eine Vorrichtung, die es verletzte, prüfte eine Fläche, die es
+ *  nie gibt. */
 const ZAEHLER = [
   { status: "alle", anzahl: 12 },
   { status: "aktiviert", anzahl: 10 },
-  { status: "offen", anzahl: 2 },
+  { status: "offen", anzahl: 5 },
+  { status: "angelegt", anzahl: 2 },
+  { status: "eingeladen", anzahl: 3 },
   { status: "deaktiviert", anzahl: 1 },
-  { status: "geloescht", anzahl: 3 },
+  { status: "geloescht", anzahl: 4 },
 ];
 
 function countCalls(): number {
@@ -174,9 +182,11 @@ describe("Filter, Suche und Blätterung gehen an die Datenbank (5.7)", () => {
     renderPage();
     await screen.findByText("Bodo Unbestaetigt");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Nicht aktiviert" }));
+    // AGE-927: „Nicht aktiviert" ist in ① Angelegt und ② Eingeladen geteilt.
+    // Die Zusage selbst bleibt dieselbe — gefiltert wird in der Datenbank.
+    fireEvent.click(screen.getByRole("tab", { name: /Angelegt/ }));
 
-    await waitFor(() => expect(lastListArgs().p_status).toBe("offen"));
+    await waitFor(() => expect(lastListArgs().p_status).toBe("angelegt"));
   });
 
   it("reicht den Suchbegriff durch", async () => {
@@ -1425,13 +1435,18 @@ describe("Zähler an den Reitern (AGE-587)", () => {
     await waitFor(() => {
       expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument();
     });
+    // AGE-927: aus dem einen Reiter „Nicht aktiviert" sind die Schritte ① und
+    // ② geworden. Beide tragen ihre eigene Zahl.
     expect(
-      within(screen.getByRole("tab", { name: "Nicht aktiviert" })).getByText("2"),
+      within(screen.getByRole("tab", { name: /Angelegt/ })).getByText("2"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tab", { name: /Eingeladen/ })).getByText("3"),
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole("tab", { name: "Deaktiviert" })).getByText("1"),
     ).toBeInTheDocument();
-    expect(within(screen.getByRole("tab", { name: "Gelöscht" })).getByText("3")).toBeInTheDocument();
+    expect(within(screen.getByRole("tab", { name: "Gelöscht" })).getByText("4")).toBeInTheDocument();
   });
 
   it("gibt „Alle“ und „Mitgliedschaft“ dieselbe Zahl — es ist dieselbe Menge", async () => {
@@ -1446,19 +1461,21 @@ describe("Zähler an den Reitern (AGE-587)", () => {
   });
 
   /**
-   * Der Name des Bedienelements bleibt der NAME des Reiters. Stünde die Zahl im
-   * zugänglichen Namen, läse eine Vorleseausgabe „Nicht aktiviert 2" als
+   * Der Name des Bedienelements bleibt der NAME des Filters. Stünde die Zahl im
+   * zugänglichen Namen, läse eine Vorleseausgabe „Deaktiviert 1" als
    * Bezeichnung eines Knopfes vor — und der Name änderte sich bei jeder
    * Aktivierung.
    */
-  it("mischt die Zahl NICHT in den zugänglichen Namen des Reiters", async () => {
+  it("mischt die Zahl NICHT in den zugänglichen Namen des Filters", async () => {
     renderPage();
     await waitFor(() =>
       expect(within(screen.getByRole("tab", { name: "Alle" })).getByText("12")).toBeInTheDocument(),
     );
 
-    expect(screen.getByRole("tab", { name: "Nicht aktiviert" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /Nicht aktiviert\s*2/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Deaktiviert" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Deaktiviert\s*1/ })).not.toBeInTheDocument();
+    // Dasselbe für die Aufnahmestrecke, deren Zahlen AGE-927 hinzufügt.
+    expect(screen.queryByRole("tab", { name: /Angelegt\s*2/ })).not.toBeInTheDocument();
   });
 
   /**

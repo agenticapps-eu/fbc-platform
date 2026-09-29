@@ -130,7 +130,6 @@ Deno.serve(async (req) => {
   // liefen die Aufrufe nur in dieselbe Sperre. Und der 60-Sekunden-Riegel gilt
   // je Profil, nicht global — verschiedene Mitglieder behindern sich nicht.
   for (const id of eingabe.ids) {
-    let ausgang: Ausgang = "fehlgeschlagen";
     let name: string | null = null;
 
     try {
@@ -166,7 +165,7 @@ Deno.serve(async (req) => {
 
       // Kein Versand — der Ausgang steht damit schon fest.
       if (status !== "issued" && status !== "issued_reset") {
-        ausgang = ausgangFuer(status, false);
+        const ausgang: Ausgang = ausgangFuer(status, false);
         if (ausgang === "fehlgeschlagen") {
           // Ein Status, den diese Function nicht kennt, ist ein Betriebsfehler
           // und kein Normalfall: er entsteht, wenn Function und Migration

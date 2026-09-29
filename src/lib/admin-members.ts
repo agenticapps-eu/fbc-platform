@@ -19,14 +19,26 @@ import type { Database } from "./database.types";
 export type AdminMember = Database["public"]["Functions"]["admin_list_members"]["Returns"][number];
 
 /**
- * Die fünf Werte, die `p_status` kennt. Ein sechster bricht in der Datenbank
+ * Die sieben Werte, die `p_status` kennt. Ein achter bricht in der Datenbank
  * mit `22023` ab.
  *
- * Es sind NICHT die fünf Reiter der Fläche: `aktiviert` hat keinen, und
- * „Mitgliedschaft" ist ein Darstellungsmodus über `alle`. Die Abbildung steht
- * in `AdminMitgliederPage.tsx` und ist dort ausgeschrieben, nicht vermutet.
+ * Es sind NICHT die sieben Filter der Fläche: `offen` hat seit AGE-927 keinen
+ * mehr, „Bestätigt" heisst in der Funktion `aktiviert`, und „Mitgliedschaft"
+ * ist ein Darstellungsmodus über `alle`. Die Abbildung steht in
+ * `AdminMitgliederPage.tsx` und ist dort ausgeschrieben, nicht vermutet.
+ *
+ * `angelegt` und `eingeladen` TEILEN `offen`, sie ersetzen es nicht:
+ * angelegt + eingeladen = offen. Deshalb bleibt `offen` hier stehen, obwohl
+ * kein Filter ihn mehr wählt — benannt statt verschwiegen.
  */
-export type AdminMemberStatus = "alle" | "aktiviert" | "offen" | "deaktiviert" | "geloescht";
+export type AdminMemberStatus =
+  | "alle"
+  | "aktiviert"
+  | "offen"
+  | "angelegt"
+  | "eingeladen"
+  | "deaktiviert"
+  | "geloescht";
 
 export interface AdminMemberFilters {
   query: string;
@@ -192,29 +204,39 @@ export async function setMemberBan(
   const { data, error } = await supabase.functions.invoke("admin-set-member-ban", {
     body: { action, target },
   });
-  if (error) throw new Error(await uebersetzeFehler(error));
+  if (error) throw new Error(await uebersetzeFehler(error, BAN_SAETZE));
 
   const rumpf = (data ?? {}) as { hidden?: boolean; banned?: boolean };
   return { halb: rumpf.hidden !== rumpf.banned, verborgen: rumpf.hidden === true };
 }
 
 /**
- * Macht aus dem Statuscode der Function einen Satz, den ein Admin lesen kann.
+ * Die Sätze für `admin-set-member-ban`.
  *
  * `409` ist der häufigste Ausgang und der einzige, der kein Fehler im
  * eigentlichen Sinn ist: die Zeile war schon in dem Zustand, in den sie
  * gebracht werden sollte — meist, weil jemand anderes schneller war.
  */
-async function uebersetzeFehler(error: unknown): Promise<string> {
+const BAN_SAETZE: Record<number, string> = {
+  400: "Die Anfrage war unbrauchbar. Das ist ein Fehler dieser Fläche, nicht deiner.",
+  403: "Dafür fehlt die Berechtigung — oder das eigene Konto ist nicht mehr freigeschaltet.",
+  404: "Dieses Mitglied gibt es nicht mehr.",
+  409: "Die Zeile ist schon in diesem Zustand. Die Liste zeigt ihn gleich neu.",
+  502: "Der Anmeldedienst antwortet nicht. Es hat sich nichts geändert — noch einmal versuchen.",
+};
+
+/**
+ * Macht aus dem Statuscode einer Function einen Satz, den ein Admin lesen kann.
+ *
+ * DIE SATZTAFEL IST EIN ARGUMENT, seit es zwei Aufrufer gibt (AGE-927):
+ * derselbe Code heisst an zwei Endpunkten Verschiedenes — `409` meldet bei
+ * `admin-set-member-ban` „ist schon so" und bei `admin-create-member` „die
+ * Adresse ist vergeben". Eine feste Tafel hier hätte den zweiten Aufrufer
+ * gezwungen, diese Funktion zu kopieren.
+ */
+async function uebersetzeFehler(error: unknown, satz: Record<number, string>): Promise<string> {
   const context = (error as { context?: Response }).context;
   const status = context?.status;
-  const satz: Record<number, string> = {
-    400: "Die Anfrage war unbrauchbar. Das ist ein Fehler dieser Fläche, nicht deiner.",
-    403: "Dafür fehlt die Berechtigung — oder das eigene Konto ist nicht mehr freigeschaltet.",
-    404: "Dieses Mitglied gibt es nicht mehr.",
-    409: "Die Zeile ist schon in diesem Zustand. Die Liste zeigt ihn gleich neu.",
-    502: "Der Anmeldedienst antwortet nicht. Es hat sich nichts geändert — noch einmal versuchen.",
-  };
   if (status !== undefined && satz[status]) return satz[status];
 
   // Kein bekannter Status: den Rumpf lesen, bevor die generische Meldung von
@@ -303,4 +325,153 @@ export async function setzeStufe(id: string, tier: string, grund: string): Promi
     p_grund: grund,
   });
   if (error) throw error;
+}
+
+// ── Anlegen und Einladen (AGE-927) ─────────────────────────────────────────
+
+/** Was die Maske eingibt. Firma und Telefon sind freiwillig; leer heisst hier
+ *  der leere Text, und `parseCreateRequest` macht daraus `null`. */
+export interface NeuesMitglied {
+  vorname: string;
+  nachname: string;
+  email: string;
+  plan: string;
+  mailSenden: boolean;
+  firma: string;
+  telefon: string;
+}
+
+/** Das Mitglied, dem die eingetragene Adresse schon gehört. `deaktiviert` und
+ *  `geloescht` sind dabei nicht Beiwerk: ohne sie verwiese die Meldung auf
+ *  jemanden, den der Admin in keiner sichtbaren Liste findet. */
+export interface VergebenesMitglied {
+  id: string;
+  name: string | null;
+  deaktiviert: boolean;
+  geloescht: boolean;
+}
+
+/**
+ * Was beim Anlegen herauskommen kann — ein Vereinigungstyp und KEIN Wurf.
+ *
+ * Zwei der vier Ausgänge sind keine Fehler, sondern Antworten, die die Fläche
+ * ausgestalten muss: `vergeben` trägt das bestehende Mitglied samt Kennung,
+ * damit die Meldung es benennen und dorthin führen kann, und `teilweise` sagt,
+ * dass das Konto BESTEHT, obwohl ein späterer Schritt scheiterte. Beides in
+ * einen geworfenen `Error` zu pressen hiesse, diese Auskunft in einen Satz zu
+ * falten und an der Fläche wieder auseinanderzunehmen.
+ */
+export type AnlageAusgang =
+  | { art: "ok"; schritt: string; id: string }
+  | { art: "teilweise"; schritt: string; id: string }
+  | { art: "vergeben"; mitglied: VergebenesMitglied }
+  | { art: "fehler"; text: string };
+
+/**
+ * Die Sätze für `admin-create-member`. `409` heisst hier etwas ganz anderes als
+ * bei `admin-set-member-ban` — und wird vorher abgefangen, weil die Antwort
+ * mehr trägt als einen Satz.
+ */
+const ANLAGE_SAETZE: Record<number, string> = {
+  400: "Die Angaben sind unvollständig oder die Adresse hat keine gültige Form.",
+  403: "Dafür fehlt die Berechtigung — nur Admins können Mitglieder anlegen.",
+  502: "Das Konto konnte nicht angelegt werden. Es ist nichts entstanden.",
+};
+
+/**
+ * Legt ein einzelnes Mitglied an (AGE-927).
+ *
+ * Über die Edge Function und NICHT über eine RPC: das Konto muss in
+ * `auth.users` entstehen, und dorthin reicht keine Policy — nur der
+ * `service_role`-Schlüssel, und der gehört nicht in einen Browser.
+ *
+ * Die Adresse wird hier NICHT kleingeschrieben. Das tut `parseCreateRequest` in
+ * der Function, und dort gehört es hin: eine Normalisierung, die nur die Fläche
+ * vornimmt, schützt den schreibungsempfindlichen Unique-Index nicht vor einem
+ * Aufruf, der an ihr vorbeigeht.
+ */
+export async function createMember(w: NeuesMitglied): Promise<AnlageAusgang> {
+  const { data, error } = await supabase.functions.invoke("admin-create-member", {
+    body: {
+      vorname: w.vorname,
+      nachname: w.nachname,
+      email: w.email,
+      plan: w.plan,
+      mailSenden: w.mailSenden,
+      firma: w.firma,
+      telefon: w.telefon,
+    },
+  });
+
+  if (!error) {
+    // 201 und 207 sind beide 2xx, supabase-js meldet beide als Erfolg. Was sie
+    // unterscheidet, steht im Rumpf — dieselbe Falle wie beim Teilzustand von
+    // `admin-set-member-ban`.
+    const rumpf = (data ?? {}) as { status?: string; schritt?: string; id?: string };
+    return {
+      art: rumpf.status === "ok" ? "ok" : "teilweise",
+      schritt: rumpf.schritt ?? "unbekannt",
+      id: rumpf.id ?? "",
+    };
+  }
+
+  const context = (error as { context?: Response }).context;
+  if (context?.status === 409) {
+    const rumpf = (await context.json().catch(() => null)) as {
+      mitglied?: VergebenesMitglied;
+    } | null;
+    if (rumpf?.mitglied) return { art: "vergeben", mitglied: rumpf.mitglied };
+  }
+  return { art: "fehler", text: await uebersetzeFehler(error, ANLAGE_SAETZE) };
+}
+
+/**
+ * Die fünf Ausgänge einer Einladung, in der Reihenfolge, in der der Bericht sie
+ * nennt. Dieselbe Aufzählung wie in
+ * `supabase/functions/admin-invite-members/einladung.ts` — sie steht zweimal,
+ * weil Deno und der Browser keinen Modulweg teilen, und nicht, weil zwei
+ * Wahrheiten gemeint wären.
+ */
+export type Ausgang =
+  | "verschickt"
+  | "uebersprungen"
+  | "abgewiesen"
+  | "nicht_einladbar"
+  | "fehlgeschlagen";
+
+export const AUSGAENGE: Ausgang[] = [
+  "verschickt",
+  "uebersprungen",
+  "abgewiesen",
+  "nicht_einladbar",
+  "fehlgeschlagen",
+];
+
+/**
+ * Lädt EIN Mitglied ein und meldet, was dabei herauskam.
+ *
+ * WARUM JE AUFRUF EIN MITGLIED, obwohl der Endpunkt eine Liste nimmt: die
+ * Fläche schuldet zwei Dinge, die eine einzige Sammelanfrage nicht liefern
+ * kann. Erstens den Fortschritt als Zahl — „3 von 12" gibt es nur, wenn drei
+ * Antworten da sind. Zweitens den Abbruch durch Wegnavigieren: liefe die
+ * Schleife im Server, gingen die restlichen Einladungen hinaus, nachdem der
+ * Admin die Seite verlassen hat. Die Mengengrenze im Endpunkt bleibt trotzdem
+ * richtig — sie schützt vor einem Aufruf, der gar nicht von hier kommt.
+ *
+ * WIRFT NICHT. Ein Fehlschlag ist hier ein ERGEBNIS und kein Abbruch: „Ein
+ * Fehlschlag bricht die Reihe nicht ab" ist die Zusage, und ein Wurf machte aus
+ * dem dritten von fünf Mitgliedern das Ende des Laufs.
+ */
+export async function ladeEin(id: string): Promise<Ausgang> {
+  const { data, error } = await supabase.functions.invoke("admin-invite-members", {
+    body: { ids: [id] },
+  });
+  if (error) return "fehlgeschlagen";
+
+  // Der Endpunkt antwortet mit dem Bericht über die ganze Menge — bei einer
+  // Kennung also mit genau einem gefüllten Topf. Ein unbekannter Rumpf ist
+  // `fehlgeschlagen` und nicht „verschickt": eine halbe Auslieferung darf nicht
+  // wie Normalbetrieb aussehen.
+  const bericht = (data ?? {}) as Partial<Record<Ausgang, unknown[]>>;
+  return AUSGAENGE.find((a) => (bericht[a]?.length ?? 0) > 0) ?? "fehlgeschlagen";
 }

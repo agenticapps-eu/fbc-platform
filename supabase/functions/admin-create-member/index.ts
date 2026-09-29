@@ -22,7 +22,7 @@
 // Secrets: RESEND_API_KEY, FROM_EMAIL, APP_URL;
 //          SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY spritzt die Plattform ein.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.108.1";
 import { jwtSub } from "../create-checkout-session/checkout.ts";
 import { activationUrl, renderActivation } from "../send-activation/emails.ts";
 import { parseCreateRequest, zusammenfassen } from "./anlegen.ts";
@@ -185,8 +185,7 @@ Deno.serve(async (req) => {
  * sagen, was wirklich geschah.
  */
 async function bestaetigungsmail(
-  // deno-lint-ignore no-explicit-any
-  admin: any,
+  admin: SupabaseClient,
   email: string,
   name: string,
 ): Promise<boolean> {

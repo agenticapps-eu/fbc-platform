@@ -49,10 +49,10 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 
 ## 1 · Plan-Review (Gate, vor jeder Codezeile)
 
-- [ ] `openspec validate --all` grün
-- [ ] `openspec-change-review` mit **zwei** Modellen anderer Anbieter auf das
+- [x] `openspec validate --all` grün
+- [x] `openspec-change-review` mit **zwei** Modellen anderer Anbieter auf das
       Delta; `REVIEWS.md` mit signiertem Trailer
-- [ ] Fremdreviewer ausdrücklich auf Migration und Rechte ansetzen (Regel
+- [x] Fremdreviewer ausdrücklich auf Migration und Rechte ansetzen (Regel
       26.08.: Schema, Rechte, Sicherheit) — besonders auf die Frage, ob die
       Ableitung wirklich ohne Policy auf `activation_tokens` auskommt
 
@@ -75,7 +75,7 @@ müssen beide Aufrufer in **derselben** Migration neu deklariert werden.
 - [x] `admin_list_members` abwerfen und mit `eingeladen_am` neu anlegen;
       Ableitung als **ein** `left join lateral`, benutzt von Spalte und Filter
 - [x] Grants, Kommentar und **alle vier Parameter-Vorgabewerte** wiederherstellen
-- [ ] `admin_member_counts` um die beiden Zustände erweitern, über dieselbe
+- [x] `admin_member_counts` um die beiden Zustände erweitern, über dieselbe
       geteilte Bedingung — `create or replace` genügt (Rückgabeform gemessen,
       siehe §0). Ändert sich das wider Erwarten, bricht die Migration mitten im
       Lauf: dann erst den Grund messen, nicht blind `drop` nachschieben
@@ -186,39 +186,58 @@ eine Adresse besteht. Über sie ist der zugesagte Bericht nicht herstellbar.
       Bestandstests bleiben **unverändert** grün, nicht angepasst
 - [x] Ein Fehlschlag bricht die Reihe nicht ab
 
-## 5 · Frontend
+## 5 · Frontend — erledigt
 
-- [ ] RED: Vitest auf die Aufnahmestrecke — drei Schritte, Reihenfolge, Zahlen
-- [ ] `src/lib/database.types.ts` von Hand nachziehen; **kein** `gen types`
-- [ ] Aufnahmestrecke ①→②→③ über der bestehenden Reiterleiste; genau einer der
+Vitest: **28 neue Zusagen** in `AdminMitgliederPage.aufnahme.test.tsx`, die
+Gesamtmenge 254 Dateien / 2955 Zusagen grün, `tsc --noEmit` und `eslint` sauber.
+Drei Bestandszusagen wurden **benannt** nachgezogen, weil „Nicht aktiviert" in
+① und ② geteilt ist — nicht abgeschaltet.
+
+**Die Schleife läuft in der FLÄCHE, ein Aufruf je Mitglied** — und nicht als
+eine Sammelanfrage an `admin-invite-members`, obwohl der Endpunkt eine Liste
+nimmt. Zwei Zusagen verlangen es: „Fortschritt als Zahl" gibt es nur, wenn
+Antworten einzeln eintreffen, und „Wegnavigieren bricht ab, es gehen keine
+weiteren Einladungen hinaus" ist unmöglich, wenn die Schleife im Server läuft.
+Die Mengengrenze im Endpunkt bleibt trotzdem richtig — sie schützt vor einem
+Aufruf, der gar nicht von der Fläche kommt.
+
+
+- [x] RED: Vitest auf die Aufnahmestrecke — drei Schritte, Reihenfolge, Zahlen
+- [x] `src/lib/database.types.ts` von Hand nachziehen; **kein** `gen types`
+- [x] Aufnahmestrecke ①→②→③ über der bestehenden Reiterleiste; genau einer der
       sieben Filter gewählt, der Wert steht in der Adresse
-- [ ] `?tab=offen` fällt auf ① Angelegt
-- [ ] „+"-Knopf und Maske; Plan nur DISCOVER · FOCUS · IMPACT; Haken
+- [x] `?tab=offen` fällt auf ① Angelegt
+- [x] „+"-Knopf und Maske; Plan nur DISCOVER · FOCUS · IMPACT; Haken
       vorausgewählt
-- [ ] Kontrollkästchen je Zeile, „Ausgewählte einladen" als **einzige** Handlung
+- [x] Kontrollkästchen je Zeile, „Ausgewählte einladen" als **einzige** Handlung
       der Auswahl; Auswahl gilt je Seite. **Kein Kopfkästchen „alle auswählen"** —
       es wäre mit einem Klick deckungsgleich mit der Massenaktion, die ADR-0007
       verwirft (Befund aus dem Plan-Review)
-- [ ] Die Aufrufe laufen nacheinander über die bestehende Einzel-Function; ein
-      Fehlschlag bricht die Reihe nicht ab. Vor dem Auslösen sagen, dass sich
-      Verschicktes nicht zurückdrehen lässt; danach zeigen, wie weit sie kam
-- [ ] Beim Sprung von `?tab=offen` auf ① einen einmaligen Hinweis zeigen — das
+- [x] Die Aufrufe laufen nacheinander, **über `admin-invite-members` und nicht
+      über die bestehende Einzel-Function**: `send-activation` antwortet auf
+      jedem Pfad mit `202 {accepted: true}`, über sie ist kein
+      wahrheitsgemässer Bericht herstellbar (Plan-Review Runde 2, Donald
+      28.09.). Die Schleife liegt in der Fläche, ein Aufruf je Mitglied; ein
+      Fehlschlag bricht die Reihe nicht ab — `ladeEin` wirft nicht, sondern
+      meldet `fehlgeschlagen` als Ergebnis. Vor dem Auslösen steht die
+      Unumkehrbarkeit, danach der Bericht
+- [x] Beim Sprung von `?tab=offen` auf ① einen einmaligen Hinweis zeigen — das
       alte Lesezeichen meinte die Vereinigung (50), ① zeigt 35
-- [ ] Der Bericht trennt die Ausgänge: verschickt, übersprungen (gültiger Link),
+- [x] Der Bericht trennt die Ausgänge: verschickt, übersprungen (gültiger Link),
       abgewiesen (Grenze), fehlgeschlagen. Keine Sammelzahl über gemischter Menge.
       Er entsteht aus den **Antworten**, nicht aus einem Vorher-Nachher-Vergleich
-- [ ] Übersprungene und abgewiesene Mitglieder namentlich, nicht nur gezählt;
+- [x] Übersprungene und abgewiesene Mitglieder namentlich, nicht nur gezählt;
       der Bericht bleibt stehen, bis der Admin ihn schliesst
-- [ ] Vorher eine Rückfrage, die die **Zahl** nennt und die Unumkehrbarkeit;
+- [x] Vorher eine Rückfrage, die die **Zahl** nennt und die Unumkehrbarkeit;
       währenddessen Fortschritt als Zahl, kein Modal
-- [ ] Die Liste bewegt sich während des Laufs nicht und lädt erst danach einmal
+- [x] Die Liste bewegt sich während des Laufs nicht und lädt erst danach einmal
       neu — **mit** Filter, Suchbegriff und Seite
-- [ ] Wegnavigieren bricht ab, ohne Browser-Rückfrage: es gibt keinen
+- [x] Wegnavigieren bricht ab, ohne Browser-Rückfrage: es gibt keinen
       Zwischenzustand zwischen zwei Mitgliedern
-- [ ] „Ausgewählte einladen" nur in den Schritten ① und ②
-- [ ] Zugänglichkeit: „+" auf Desktop und Mobil mit Tastatur und Vorlesesoftware
+- [x] „Ausgewählte einladen" nur in den Schritten ① und ②
+- [x] Zugänglichkeit: „+" auf Desktop und Mobil mit Tastatur und Vorlesesoftware
       bedienbar, auf Mobil nicht von Feedback- oder Chat-Fläche verdeckt
-- [ ] `pnpm build`, danach `git checkout -- src/content/release-entries.generated.ts`
+- [x] `pnpm build`, danach `git checkout -- src/content/release-entries.generated.ts`
 
 ## 6 · Abnahme
 
