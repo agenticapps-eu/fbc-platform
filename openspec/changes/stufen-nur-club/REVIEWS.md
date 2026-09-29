@@ -148,3 +148,97 @@ Der Trailer, den der Erzeuger sonst setzt, fehlt: dieses Review ist mit
 Eine zweite Runde ist **nicht** gelaufen; die Änderungen folgen der Richtung,
 die beide Reviewer benannt haben, und der einzige strukturelle Umbau — der
 Wächter — macht die Zusage schwächer und einlösbar statt stärker.
+
+---
+
+## Diff-Review (Stufe 2, 29.09.) — auf dem fertigen Code
+
+Gegenstand: `git diff origin/main...HEAD -- src`, 1863 Zeilen.
+
+| Reviewer | Verdikt |
+|---|---|
+| gemini | REQUEST-CHANGES |
+| **opencode** | **nicht gezählt** — „Too Many Requests: You've exceeded your subscription rate limits" |
+| codex (`gpt-6-sol`) | REQUEST-CHANGES |
+
+opencode ist ins Rate-Limit gelaufen und **zählt nicht**. Ersetzt durch codex —
+der bei AGE-927 noch zurückdelegiert hatte, bei diesem kleineren Artefaktsatz
+aber durchlief.
+
+## Der Befund, der die Wächter widerlegt hat
+
+**[HIGH, codex] `PublicProfilePage.tsx:316` rendert `profile.tier` roh.** Ein
+Mitglied unterhalb des Clubs sah auf seinem eigenen öffentlichen Profil den
+**Schlüssel** — also `active`, klein geschrieben. Schlimmer als ein Label.
+
+**Beide Wächter blieben grün**, und das ist der eigentliche Wert dieses
+Befundes: es war weder eine Zeichenkette noch `LEVEL_ORDER`, sondern ein
+Ausdruck. Genau die Blindstelle, die der Plan-Review beim Bündel-Wächter
+vorhergesagt hatte, nur an anderer Stelle.
+
+**Aufgelöst:** die Zeile entfällt unterhalb des Clubs und trägt darin den
+Anzeigenamen. **Und der Wächter hat eine dritte Regel bekommen** — „ein `tier`
+gehört nicht ungefiltert in JSX". Sie hat sofort eine **zweite** Fundstelle
+geliefert, die niemand gesucht hatte: `MemberLookup.tsx:84`, dieselbe Sorte.
+
+Das ist der Beleg, dass die Regel trägt: sie hat etwas gefunden, das weder ich
+noch drei Reviewer beim Lesen gesehen haben.
+
+## Was sonst geändert wurde
+
+**[HIGH, gemini] Die Ausnahme für `MitgliedschaftPage` war eine Zeitbombe.** Die
+Seite ist seit AGE-907 umgeleitet, also unerreichbar — ich hatte sie im Wächter
+ausgenommen. Holt AGE-928 die Route zurück, zeigte sie wieder alle sechs
+Stufen. **Aufgelöst:** die Seite liest jetzt selbst `GENANNTE_STUFEN`, die
+Ausnahme ist weg. Drei Bestandszusagen dort sind benannt gekippt; eine davon
+ist dabei **stärker** geworden — sie prüfte, dass die Karten ausserhalb des
+Clubs keinen Kaufweg anbieten, und jetzt gibt es die Karten gar nicht mehr.
+
+**[MEDIUM, codex] `waehlbareStufen()` verlor einen unbekannten Schlüssel.** Das
+Auswahlfeld zeigte dann „Discover", während der Wert des Formulars der
+unbekannte Schlüssel blieb — „Stufe setzen" hätte etwas anderes abgeschickt, als
+dasteht. **Aufgelöst:** auch ein unbekannter Wert bleibt als Option stehen.
+
+**[MEDIUM, beide] Der Kommentarfilter des Wächters war unzuverlässig.** Er warf
+ganze Zeilen weg, die mit einem Kommentarzeichen *beginnen* — `code(); //
+Active` erzeugte einen Fehlalarm. **Aufgelöst:** Blockkommentare und
+Zeilenreste werden herausgeschnitten statt Zeilen verworfen. Der Rest steht im
+Testkopf: ein `//` innerhalb einer Zeichenkette schneidet den Zeilenrest mit
+weg — das macht den Wächter dort **blind, nicht laut**.
+
+**[MEDIUM, codex] Die Ausnahme `src/content/` war zu grob.** Dort liegen auch
+Texte, die ein Mitglied liest. **Aufgelöst:** ausgenommen sind jetzt genau zwei
+Dateien, jede mit ihrem Grund.
+
+**[LOW, codex] Abstände, die ohne Plakette stehen blieben.** `ProfileHero` hielt
+`mt-3` über dem Namen, und im Profilmenü der `AppShell` blieb eine leere Hülle
+mit `mt-1.5`. Beide hängen jetzt an der tatsächlich gerenderten Plakette.
+
+## Bewusst NICHT geändert
+
+**[HIGH, gemini] „Die AGB-Änderung muss von einer Kanzlei geprüft werden."** Der
+Einwand ist berechtigt und steht deshalb hier — aber die Entscheidung ist
+Donalds, und er hat sie am 29.09. ausdrücklich getroffen, im Wissen, dass es die
+AGB sind. Meine Aufgabe ist, sie sichtbar zu machen, nicht sie zu überstimmen.
+**Sie steht im PR-Text an erster Stelle**, samt dem Angebot, genau diese eine
+Datei zurückzunehmen, falls eine Kanzlei zuerst schauen soll. Der Dateikopf
+benennt die Änderung, ihren Umfang und dass die Einschätzung von einem
+Nichtjuristen stammt.
+
+**[MEDIUM, codex] „Zugestellte Neuigkeiten könnten den Namen zurückbringen."**
+Stimmt — aber nur, wenn ein Admin einen Archiveintrag *unredigiert* in eine
+Mitteilung übernimmt. Das ist ein Mensch, der Text schreibt, und dagegen hilft
+kein Test. Der Entwurf benennt es als Grenze; die Markierung
+`release_entry_skips` (AGE-636) besteht für genau diesen Fall.
+
+## Die Annahmen, die die Reviewer benannt haben
+
+codex: *„Er setzt voraus, dass sichtbare Stufennamen nur aus den sechs
+umgestellten Aufrufstellen stammen; die öffentliche Profilseite widerlegt
+das."* — Richtig, und die Lehre steckt jetzt in der dritten Wächterregel statt
+in einer Zusicherung.
+
+gemini: *„Die neue Darstellung ist für Mitglieder verständlich und kein
+Rückschritt."* — Nicht gemessen, sondern in der Sichtprobe angesehen: die Karte
+sagt, wo der Club beginnt, dass sich nichts selbst buchen lässt, und wohin man
+schreibt. Ob das genügt, weiss erst das erste Mitglied, das sie liest.

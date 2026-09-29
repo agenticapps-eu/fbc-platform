@@ -26,7 +26,7 @@ import {
   type AdminLegacy,
 } from "../lib/admin-profile";
 import { ZAHLUNGSARTEN, setzeStufe } from "../lib/admin-members";
-import { LEVELS, waehlbareStufen } from "../config/levels";
+import { levelLabel, waehlbareStufen } from "../config/levels";
 import { EMPTY_PROFILE_FORM, profileFormSchema, type ProfileFormValues } from "../lib/profile";
 
 /**
@@ -352,7 +352,7 @@ function AdminProfileEditor({ targetId }: { targetId: string }) {
                       Regel, die `AdminMitgliederPage` seit AGE-903 trägt. */}
                   {waehlbareStufen(stufe).map((key) => (
                     <option key={key} value={key}>
-                      {LEVELS[key].label}
+                      {levelLabel(key)}
                     </option>
                   ))}
                 </Select>

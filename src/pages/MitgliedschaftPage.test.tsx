@@ -32,10 +32,28 @@ describe("MitgliedschaftPage", () => {
     auth = { tier: "discover", levelRank: 4 };
   });
 
-  it("zeigt alle 6 Stufen als Karten", () => {
+  /**
+   * AGE-969: GEKIPPT. Die Seite zeigte alle sechs Karten; sie zeigt jetzt die
+   * drei genannten Stufen.
+   *
+   * Diese Seite ist seit AGE-907 auf `/` umgeleitet und damit unerreichbar —
+   * geändert wurde sie trotzdem, statt sie im Wächter auszunehmen: eine
+   * Ausnahme für eine unerreichbare Seite ist eine Zeitbombe, denn holt
+   * AGE-928 die Route zurück, zeigte sie wieder alle sechs. Befund des
+   * Diff-Reviews.
+   */
+  it("zeigt die drei genannten Stufen als Karten", () => {
     renderPage();
-    for (const key of ["active", "boost", "connect", "discover", "focus", "impact"])
+    for (const key of ["discover", "focus", "impact"])
       expect(screen.getByTestId(`level-${key}`)).toBeInTheDocument();
+  });
+
+  it("zeigt keine Karte für eine Stufe ausserhalb des Clubs", () => {
+    // Die andere Hälfte — ohne sie bestünde die Zusage darüber auch, wenn
+    // weiterhin sechs Karten dastünden.
+    renderPage();
+    for (const key of ["active", "boost", "connect"])
+      expect(screen.queryByTestId(`level-${key}`)).toBeNull();
   });
 
   it("zeigt das 'Deine Mitgliedschaft'-Panel mit der aktuellen Stufe", () => {
@@ -62,23 +80,36 @@ describe("MitgliedschaftPage", () => {
     expect(
       within(screen.getByTestId("level-discover")).queryByRole("button", { name: /upgrade/i }),
     ).toBeNull();
-    expect(
-      within(screen.getByTestId("level-connect")).queryByRole("button", { name: /upgrade/i }),
-    ).toBeNull();
+    // AGE-969: hier stand `level-connect`. Die Karte gibt es nicht mehr — die
+    // Aussage „niedriger → kein Upgrade-Knopf" trägt jetzt `level-discover`
+    // eine Zeile höher, und die Abwesenheit der Karte selbst prüft die Zusage
+    // „zeigt keine Karte für eine Stufe ausserhalb des Clubs".
   });
 
   // AGE-903 — die Stufen ausserhalb des Clubs tragen 0 € und KEINEN Kaufweg.
   // `PAID` nennt seit AGE-903 nur die drei Clubstufen; ein Kaufknopf an einer
   // Stufe ohne Funktion wäre ein Angebot ohne Gegenstand. Die Karte bleibt
   // sichtbar — sie erklärt die Leiter —, nur der Knopf fehlt.
-  it("bietet für die drei Stufen ausserhalb des Clubs keinen Kaufweg", () => {
+  /**
+   * AGE-969: GEKIPPT, und die Zusage ist dabei STÄRKER geworden. Sie prüfte,
+   * dass die drei Karten ausserhalb des Clubs keinen Kaufweg anbieten — jetzt
+   * gibt es die Karten gar nicht mehr, was die Zusage von AGE-903 („kein Preis
+   * ohne Kaufweg") vollständig einlöst statt nur den Knopf zu verstecken.
+   *
+   * Die Abwesenheit der Karten prüft die Zusage „zeigt keine Karte für eine
+   * Stufe ausserhalb des Clubs" weiter oben. Was hier bleibt, ist die
+   * Gegenprobe: die Karten, die es GIBT, tragen den Kaufweg nur dort, wo er
+   * hingehört.
+   */
+  it("bietet einen Kaufweg nur auf einer höheren zahlenden Stufe", () => {
     renderPage();
-    for (const key of ["active", "boost", "connect"]) {
-      const karte = screen.getByTestId(`level-${key}`);
-      expect(karte).toBeInTheDocument();
-      expect(within(karte).queryByRole("button", { name: /upgrade/i })).toBeNull();
-      expect(within(karte).queryByRole("link", { name: /upgrade/i })).toBeNull();
-    }
+    // Aktuelle Stufe: kein Knopf. Höhere zahlende: Knopf.
+    expect(
+      within(screen.getByTestId("level-discover")).queryByRole("button", { name: /upgrade/i }),
+    ).toBeNull();
+    expect(
+      within(screen.getByTestId("level-impact")).getByRole("button", { name: /upgrade/i }),
+    ).toBeEnabled();
   });
 
   it("zeigt den Testzahlung-Hinweis", () => {

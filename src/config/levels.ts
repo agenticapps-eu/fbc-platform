@@ -204,9 +204,11 @@ export const KEIN_CLUBZUGANG_SATZ =
  * weiterhin alle sechs Schlüssel und setzt in beide Richtungen — eine Korrektur
  * nach unten muss möglich bleiben.
  */
-export function waehlbareStufen(gesetzt: string): readonly MembershipLevel[] {
+export function waehlbareStufen(gesetzt: string): readonly string[] {
   if (GENANNTE_STUFEN.includes(gesetzt as MembershipLevel)) return GENANNTE_STUFEN;
-  return isMembershipLevel(gesetzt)
-    ? [gesetzt, ...GENANNTE_STUFEN]
-    : GENANNTE_STUFEN;
+  // AUCH EIN UNBEKANNTER SCHLÜSSEL BLEIBT STEHEN. Fiele er heraus, zeigte das
+  // Auswahlfeld die erste Option, während der Wert des Formulars weiterhin der
+  // unbekannte Schlüssel wäre — „Stufe setzen" schickte dann etwas anderes ab,
+  // als dasteht. Befund des Diff-Reviews (codex).
+  return gesetzt === "" ? GENANNTE_STUFEN : [gesetzt, ...GENANNTE_STUFEN];
 }

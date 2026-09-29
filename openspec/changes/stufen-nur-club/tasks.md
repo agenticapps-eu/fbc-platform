@@ -38,66 +38,66 @@
       Phantom-Abstraktion" — die Begründung war allerdings falsch und ist
       berichtigt
 
-## 2 · Die Festlegung
+## 2 · Die Festlegung — erledigt
 
-- [ ] RED: Zusage, dass `levels.ts` **sechs** Einträge führt und dass die
+- [x] RED: Zusage, dass `levels.ts` **sechs** Einträge führt und dass die
       genannte Menge genau `discover, focus, impact` ist
-- [ ] `GENANNTE_STUFEN` in `src/config/levels.ts` — eigene Liste, nicht aus
+- [x] `GENANNTE_STUFEN` in `src/config/levels.ts` — eigene Liste, nicht aus
       `CLUB_RANK` abgeleitet, mit der Begründung im Kopf
-- [ ] Zusage, die die heutige Deckungsgleichheit mit den Clubstufen als
+- [x] Zusage, die die heutige Deckungsgleichheit mit den Clubstufen als
       **Stand** festhält, nicht als Gesetz. Sie SOLL fallen, wenn jemand die
       Liste ändert — und ihre Fehlermeldung muss den nächsten Bearbeiter
       anleiten: was sie festhält, warum sie fällt, was zu tun ist. Ohne diese
       Meldung wäre sie ein Stolperdraht, der in sechs Monaten stillschweigend
       gelöscht wird (Befund opencode)
-- [ ] Ein Helfer „wird diese Stufe genannt?" — eine Stelle, nicht sechs
+- [x] Ein Helfer „wird diese Stufe genannt?" — eine Stelle, nicht sechs
       Bedingungen
 
-## 3 · Die eigene Stufe eines Mitglieds
+## 3 · Die eigene Stufe eines Mitglieds — erledigt
 
-- [ ] RED je Aufrufstelle: unterhalb des Clubs keine Plakette, im Club eine —
+- [x] RED je Aufrufstelle: unterhalb des Clubs keine Plakette, im Club eine —
       beide Hälften
-- [ ] `TierBadge` liefert `null` statt einer leeren Plakette
-- [ ] **Je Aufrufstelle prüfen, dass das Layout ohne Plakette trägt**
+- [x] `TierBadge` liefert `null` statt einer leeren Plakette
+- [x] **Je Aufrufstelle prüfen, dass das Layout ohne Plakette trägt**
       (`ProfileHero`, `MemberDirectory`, `MemberDashboard`, Einstellungen,
       `AdminMitgliederPage`, `AdminMitgliedPage`) — nicht annehmen
-- [ ] **Der Zugangssatz, ausgeschrieben** (Wortlaut in der Spec): „Dein Konto
+- [x] **Der Zugangssatz, ausgeschrieben** (Wortlaut in der Spec): „Dein Konto
       ist bestätigt. Der Clubzugang beginnt bei Discover. Eine Stufe lässt sich
       hier zurzeit nicht selbst buchen — schreib uns über Support › Feedback,
       dann melden wir uns." Er steht an EINER Stelle im Code, nicht an dreien
-- [ ] Einstellungen: `{levelLabel(tier)}-Mitglied` → der Zugangssatz
-- [ ] `ProfileHero`: `{levelLabel(tier)} Member` → nichts
-- [ ] `MemberDashboard`: die Kachel „Stufe" und der Rückfall in der
+- [x] Einstellungen: `{levelLabel(tier)}-Mitglied` → der Zugangssatz
+- [x] `ProfileHero`: `{levelLabel(tier)} Member` → nichts
+- [x] `MemberDashboard`: die Kachel „Stufe" und der Rückfall in der
       Mitgliederspalte
-- [ ] `MembershipSummary`: kein Stufenname, kein „Nächster Schritt" auf eine
+- [x] `MembershipSummary`: kein Stufenname, kein „Nächster Schritt" auf eine
       verborgene Stufe
 
-## 4 · Aufzählende Flächen
+## 4 · Aufzählende Flächen — erledigt
 
-- [ ] RED: die Startseite zeigt drei Karten, und der Text nennt keine Sechs
-- [ ] `HomePage`: Stufenschiene über `GENANNTE_STUFEN`, Satz „Sechs Stufen,
+- [x] RED: die Startseite zeigt drei Karten, und der Text nennt keine Sechs
+- [x] `HomePage`: Stufenschiene über `GENANNTE_STUFEN`, Satz „Sechs Stufen,
       aufsteigend" ersetzt. **Preise bleiben unberührt** — ob sie dort stehen
       dürfen, ist die Apple-Frage aus AGE-928
-- [ ] RED: die Admin-Einzelbearbeitung bietet drei Stufen **plus** die am Konto
+- [x] RED: die Admin-Einzelbearbeitung bietet drei Stufen **plus** die am Konto
       gesetzte, falls sie darunter liegt
-- [ ] `AdminMitgliedPage`: dieselbe Regel wie in `AdminMitgliederPage` seit
+- [x] `AdminMitgliedPage`: dieselbe Regel wie in `AdminMitgliederPage` seit
       AGE-903 — und die Regel steht dann an **einer** Stelle, nicht an zweien
 
-## 5 · Texte
+## 5 · Texte — erledigt
 
-- [ ] AGB §3.2: Aufzählung auf Discover · Focus · Impact. **Keine andere Zeile
+- [x] AGB §3.2: Aufzählung auf Discover · Focus · Impact. **Keine andere Zeile
       der Datei anfassen**; der Kopf hält fest, dass der Text von einer Kanzlei
       stammt
-- [ ] Im Dateikopf der AGB festhalten, was geändert wurde und auf wessen
+- [x] Im Dateikopf der AGB festhalten, was geändert wurde und auf wessen
       Entscheidung — der Kopf behauptet heute, §3.2 sei aktuell. **Beides
       nennen:** es ist eine Kürzung auf die angebotenen Stufen UND die
       Berichtigung zweier Namen, die es seit AGE-903 nicht mehr gibt. Und als
       Annahme benennen, dass eine Kürzung ohne Rückfrage bei der Kanzlei
       vertretbar ist — das ist die Einschätzung eines Nichtjuristen
-- [ ] `release-geschichten.ts`: „Das Verzeichnis beginnt bei Connect" → Discover,
+- [x] `release-geschichten.ts`: „Das Verzeichnis beginnt bei Connect" → Discover,
       in Titel und Text
 
-## 6 · Der Wächter über den GERENDERTEN Ansichten
+## 6 · Die Wächter — erledigt, und es wurden zwei
 
 *Neu gefasst nach dem Plan-Review.* Die erste Fassung wollte das gebaute Bündel
 durchsuchen — und wäre ab dem ersten Bau rot gewesen: `levels.ts` behält alle
@@ -105,40 +105,73 @@ sechs Labels, die Admin-Auswahl braucht sie, und die erzeugte
 Neuigkeitenliste behält ihre Vorkommen absichtlich. Ein Wächter über dem
 Artefakt kann diese drei nicht von einer echten Fundstelle trennen.
 
-- [ ] RED: ein Test, der die betroffenen Flächen mit einem Konto **unterhalb**
+- [x] RED: ein Test, der die betroffenen Flächen mit einem Konto **unterhalb**
       des Clubs rendert und keinen der drei Namen finden darf
-- [ ] Die Gegenprobe im selben Test: dieselbe Fläche mit einem Konto **im**
+- [x] Die Gegenprobe im selben Test: dieselbe Fläche mit einem Konto **im**
       Club trägt ihre Plakette. Ohne sie bestünde die Zusage auch mit einer
       Plakette, die es nie gibt
-- [ ] Der Zugangssatz steht da, mit Kontaktweg — nicht nur die Abwesenheit
-- [ ] **Im Testkopf benennen, was diese Messung nicht sieht**: Inhalte, die ein
+- [x] Der Zugangssatz steht da, mit Kontaktweg — nicht nur die Abwesenheit
+- [x] **Im Testkopf benennen, was diese Messung nicht sieht**: Inhalte, die ein
       Admin zur Laufzeit pflegt
 
-## 7 · Abnahme
+**Dazu kam ein ZWEITER Wächter über dem Quelltext** (`stufen-nennung.guard.test.ts`),
+weil die gerenderten Ansichten die aufzählenden Flächen nicht abdecken. Er hält
+drei Regeln, und **jede fällt nachweislich** an einem gepflanzten Verstoss:
 
-- [ ] Code-Review auf den **Diff** (zwei Anbieter, in `REVIEWS.md` aufgelöst)
-- [ ] Sichtprobe gegen den lokalen Stack: ein Konto auf `active` und eines auf
+1. `LEVEL_ORDER` nur mit benanntem Grund — geprüft mit `LEVEL_ORDER` zurück in
+   der Stufenschiene.
+2. Kein Stufenname wörtlich in einer Zeichenkette — geprüft mit `"Boost"` in
+   `Badge.tsx`.
+3. **Kein `tier` ungefiltert in JSX** — diese Regel kam erst aus dem
+   Diff-Review und hat sofort eine **zweite**, ungesuchte Fundstelle geliefert
+   (`MemberLookup.tsx`). Geprüft mit `{profile.tier}` zurück in
+   `PublicProfilePage`.
+
+## 7 · Abnahme — erledigt
+
+**Belege:** Vitest 256 Dateien / **2996 Zusagen**, `tsc --noEmit` und `eslint`
+sauber, `pnpm build` durch, `openspec validate --all` 36/0.
+
+**Die Sichtprobe hat beide Hälften gezeigt** (lokaler Stack, zwei Konten):
+
+| | Konto auf `active` | Konto auf `discover` |
+|---|---|---|
+| Einstellungen | *„Der Clubzugang beginnt bei Discover. Eine Stufe lässt sich hier zurzeit nicht selbst buchen — schreib uns über Support › Feedback."* | „Discover" + „Discover-Mitglied" |
+| Profil | keine Plakette | „Discover Member" |
+| Startseite (ohne Konto) | drei Karten, kein „Sechs Stufen", keiner der drei Namen | — |
+
+Auf keiner der besuchten Flächen kam eines der Wörter Active, Boost oder
+Connect vor — gemessen im gerenderten Text, nicht angesehen.
+
+
+
+- [x] Code-Review auf den **Diff** (zwei Anbieter, in `REVIEWS.md` aufgelöst)
+- [x] Sichtprobe gegen den lokalen Stack: ein Konto auf `active` und eines auf
       `discover` nebeneinander, in Profil, Verzeichnis, Dashboard und
       Einstellungen
-- [ ] Sichtprobe der Startseite **ohne Konto**
-- [ ] `pnpm build`, **danach** `git checkout -- src/content/release-entries.generated.ts`
+- [x] Sichtprobe der Startseite **ohne Konto**
+- [x] `pnpm build`, **danach** `git checkout -- src/content/release-entries.generated.ts`
       — in dieser Reihenfolge, und die Wächter laufen davor: der Bau beschreibt
       eine getrackte Datei, und ein Test nach dem Checkout misst etwas anderes
       als einer davor (Befund opencode)
-- [ ] pgTAP unverändert grün — das Gating ist nicht berührt, und genau das soll
+- [x] pgTAP unverändert grün — das Gating ist nicht berührt, und genau das soll
       die Zusage zeigen
-- [ ] `docs/lastenheft.md` nachziehen
+- [x] `docs/lastenheft.md` nachziehen
 
 ## 8 · Nach dem Merge
 
-- [ ] Kein `migrate-prod` nötig — dieser Change trägt keine Migration
-- [ ] Der Neuigkeiten-Eintrag dieses Change ist **für Mitglieder gedacht**: die
+- [x] Kein `migrate-prod` nötig — dieser Change trägt keine Migration
+- [x] Der Neuigkeiten-Eintrag dieses Change ist **für Mitglieder gedacht**: die
       Stufen heissen an der Oberfläche anders, das merkt jeder. Er gehört in den
       nächsten Beitrag (siehe die Entwürfe vom 29.09.)
 
 ## Bewusst NICHT in diesem Change
 
-- [ ] `/mitgliedschaft` — gehört zu AGE-928, Route ist umgeleitet
+- [x] `/mitgliedschaft` — **doch angefasst**, aber nur die eine Zeile: die Seite
+      liest `GENANNTE_STUFEN` statt `LEVEL_ORDER`. Der Diff-Review hat die
+      geplante Ausnahme im Wächter als Zeitbombe benannt: holt AGE-928 die
+      Route zurück, zeigte sie sonst wieder alle sechs. Die NEUGESTALTUNG der
+      Seite bleibt bei AGE-928
 - [ ] Preise, Kaufweg, Stripe — ruhend (AGE-907, AGE-908)
 - [ ] Die Selbstregistrierung schliessen — eigene Produktfrage
 - [ ] `profiles.tier` auf einen anderen Vorgabewert setzen — eine Migration für

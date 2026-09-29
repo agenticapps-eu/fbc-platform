@@ -36,16 +36,29 @@ const DARF_DIE_GANZE_LEITER_LESEN: Record<string, string> = {
   "components/membership/MembershipSummary.tsx":
     "sucht die nächste Stufe — liest aber GENANNTE_STUFEN, nicht die Leiter; " +
     "steht hier, falls die Einfuhr zurückkommt",
-  "pages/MitgliedschaftPage.tsx":
-    "seit AGE-907 auf / umgeleitet, also nicht erreichbar; AGE-928 baut die " +
-    "Seite neu und liest dann GENANNTE_STUFEN",
   "pages/StyleguidePage.tsx": "hinter import.meta.env.DEV, nie im Bündel",
 };
 
-/** Die Zeilen einer Datei ohne Kommentarzeilen. Grob, und das genuegt: ein
- *  Bezeichner mitten in einem Satz ist Prosa, kein Aufruf. */
+/**
+ * Die Zeilen einer Datei, aus denen die Kommentare herausgeschnitten sind.
+ *
+ * Die erste Fassung warf ganze Zeilen weg, die mit einem Kommentarzeichen
+ * BEGINNEN. Der Diff-Review hat beide Fehler daran benannt: `code(); // Active`
+ * wurde gemeldet, obwohl der Name im Kommentar steht, und ` * Frueher: Active`
+ * wurde uebersehen, obwohl … nun ja, dort steht er auch nur im Kommentar.
+ * Letzteres ist also harmlos, Ersteres ein Fehlalarm.
+ *
+ * Jetzt werden Blockkommentare und Zeilenreste entfernt, statt Zeilen zu
+ * verwerfen. WAS BLEIBT, und das ist der ehrliche Rest: ein `//` INNERHALB
+ * einer Zeichenkette (etwa in einer URL) schneidet den Zeilenrest mit weg. Das
+ * macht den Waechter an dieser Stelle blind, nicht laut — und eine URL, die
+ * einen Stufennamen traegt, waere ein eigener Befund.
+ */
 function ohneKommentare(text: string): string[] {
-  return text.split("\n").filter((z) => !/^\s*(\/\/|\*|\/\*)/.test(z));
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .map((z) => z.replace(/\/\/.*$/, ""));
 }
 
 function alleQuellen(wurzel: string, gesammelt: string[] = []): string[] {
@@ -86,6 +99,46 @@ describe("Wer die ganze Stufenleiter aufzählen darf (AGE-969)", () => {
     ).toEqual([]);
   });
 
+  /**
+   * Die Blindstelle, die der Diff-Review gefunden hat (codex, HIGH).
+   *
+   * `PublicProfilePage` rannte `{profile.tier}` roh in den Text — ein Mitglied
+   * unterhalb des Clubs sah dort den SCHLÜSSEL, also „active" statt „Active".
+   * Beide Wächter blieben grün: es war weder eine Zeichenkette noch
+   * `LEVEL_ORDER`, sondern ein Ausdruck.
+   *
+   * Diese Zusage schliesst genau das: ein `tier` gehört nicht ungefiltert in
+   * JSX. Der Weg dorthin ist `genannterName()` oder `TierBadge`.
+   */
+  it("rendert keinen tier-Wert roh in JSX", () => {
+    const roh = quellen
+      .filter((p) => !/\.test\.tsx?$/.test(p))
+      .filter((p) => !p.startsWith("src/vision/"))
+      .map((p) => ({ pfad: p, zeilen: ohneKommentare(readFileSync(p, "utf8")) }))
+      .filter(({ zeilen }) =>
+        // `{…tier}` als JSX-INHALT, nicht als Attributwert: vor der Klammer
+        // darf kein `=` stehen, sonst traefe die Regel auch `tier={tier}` —
+        // und das ist die richtige Verwendung, denn `TierBadge` filtert
+        // selbst. `{levelLabel(tier)}` und `{genannterName(tier)}` fallen
+        // ebenfalls nicht darunter, sie tragen eine Klammer.
+        // OHNE Leerzeichen innerhalb der Klammern: `{ tier }` mit Leerzeichen
+        // ist eine Destrukturierung in einer Parameterliste, `{profile.tier}`
+        // ohne ist JSX-Inhalt. Prettier setzt das in diesem Baum so, und die
+        // Unterscheidung kostet nichts — schreibt jemand JSX mit Leerzeichen,
+        // ist der Waechter dort blind und nicht laut.
+        zeilen.some((z) => /(^|[^=])\{[\w.]*\btier\}/.test(z)),
+      )
+      .map(({ pfad }) => pfad)
+      .sort();
+
+    expect(
+      roh,
+      "Hier steht ein `tier` ungefiltert in JSX — das rendert den rohen " +
+        "Schlüssel (klein geschrieben), und unterhalb des Clubs soll überhaupt " +
+        "erscheinen. Nimm `genannterName()` oder `TierBadge`.",
+    ).toEqual([]);
+  });
+
   it("nennt die drei Stufen ausserhalb des Clubs in keiner Fläche wörtlich", () => {
     // Gegen die Fläche, die den Namen von Hand hinschreibt statt eine Liste zu
     // lesen. Case-sensitiv und mit Wortgrenzen — `connect` klein ist ein
@@ -93,7 +146,20 @@ describe("Wer die ganze Stufenleiter aufzählen darf (AGE-969)", () => {
     const verdaechtig = quellen
       .filter((p) => !/\.test\.tsx?$/.test(p))
       .filter((p) => !p.startsWith("src/config/levels"))
-      .filter((p) => !p.startsWith("src/content/"))
+      // Eng statt pauschal: genau die beiden Dateien, die einen Stufennamen
+      // tragen DÜRFEN, mit ihrem Grund. `src/content/` als Ganzes
+      // auszunehmen war zu grob — dort liegen auch Texte, die ein Mitglied
+      // liest. Befund des Diff-Reviews (codex).
+      .filter(
+        (p) =>
+          // Erzeugt aus dem Archiv, erreicht KEIN Mitglied: gelesen wird sie
+          // nur von `AdminNeuigkeitenPage` und `lib/release-notes.ts`. Was ein
+          // Admin daraus in eine Mitteilung übernimmt, redigiert er selbst.
+          p !== "src/content/release-entries.generated.ts" &&
+          // Rechtstext: nennt die alten Namen nur noch in der Kopf-Notiz, die
+          // erklärt, was geändert wurde.
+          p !== "src/content/legal/agb.ts",
+      )
       .filter((p) => !p.startsWith("src/vision/"))
       .map((p) => ({ pfad: p, text: readFileSync(p, "utf8") }))
       // Nur JSX-Text und Zeichenketten, nicht Kommentare: der Kommentar in

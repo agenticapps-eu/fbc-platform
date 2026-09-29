@@ -144,7 +144,11 @@ export function ProfileHero({
                   {genannterName(tier)} Member
                 </span>
               )}
-              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-ink">
+              {/* AGE-969: der Abstand hängt an der Plakette. Entfällt sie,
+                  bliebe sonst eine Lücke über dem Namen stehen. */}
+              <h1
+                className={`${tier && genannterName(tier) ? "mt-3 " : ""}font-display text-3xl font-semibold tracking-tight text-ink`}
+              >
                 {name}
               </h1>
               {roles.length > 0 ? (

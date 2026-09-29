@@ -26,7 +26,7 @@ import {
 } from "../lib/public-profile";
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
 import { kompassAnzeige, type KompassAnzeige } from "../lib/kompass-anzeige";
-import { CLUB_LEVEL, LEVELS } from "../config/levels";
+import { CLUB_LEVEL, LEVELS, genannterName } from "../config/levels";
 import { cn } from "../lib/cn";
 import { istGeplant } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
@@ -313,10 +313,15 @@ function ExtendedSections({
               </dd>
             </div>
           )}
-          {profile.tier && (
+          {/* AGE-969: Hier stand `{profile.tier}` — der ROHE Schlüssel, also
+              „active" statt „Active". Unterhalb des Clubs entfällt die Zeile
+              ganz, darin trägt sie den Anzeigenamen. Befund des Diff-Reviews
+              (codex): beide Wächter blieben grün, weil weder eine Zeichenkette
+              noch `LEVEL_ORDER` im Spiel war. */}
+          {profile.tier && genannterName(profile.tier) && (
             <div className="flex gap-2">
               <dt className="text-muted">Stufe</dt>
-              <dd className="text-ink">{profile.tier}</dd>
+              <dd className="text-ink">{genannterName(profile.tier)}</dd>
             </div>
           )}
           {profile.region && (

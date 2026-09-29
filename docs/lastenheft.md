@@ -217,6 +217,27 @@ Modell ist im Repository als verbindliche Spezifikation hinterlegt
 **Der FBC beginnt erst bei DISCOVER.** ACTIVE, BOOST und CONNECT liegen
 ausserhalb des Clubs und werden nur technisch vorgehalten.
 
+> **Seit dem 29.09.2026 nennt die Oberfläche sie nicht mehr** (AGE-969, Donald).
+> Gesprochen wird nur noch über DISCOVER, FOCUS und IMPACT — in der Anwendung,
+> in der mobilen Hülle und im Blog. Die Tabelle oben bleibt gültig: die
+> Datenbank führt weiterhin sechs Stufen, das Gating ist unverändert
+> `has_level(4)`, und **gelöscht wurde nichts**. Die drei kommen später wieder.
+>
+> Ein Konto unterhalb des Clubs trägt deshalb **keine Plakette** und bekommt
+> auch keinen Ersatznamen — an die Stelle der Stufe tritt eine Aussage über den
+> Zugang, samt Weg: *„Der Clubzugang beginnt bei Discover. Eine Stufe lässt sich
+> hier zurzeit nicht selbst buchen — schreib uns über Support › Feedback."*
+>
+> Das ist die einzige Gruppe, die wächst: Selbstregistrierungen landen weiter
+> auf ACTIVE, und der Kaufweg ruht. Ein Satz, der nur sagt, wo der Club
+> beginnt, verschwiege genau das, was dieses Mitglied wissen muss.
+>
+> **Die AGB sind mitgezogen.** § 3.2 zählte die Stufen namentlich auf und führte
+> dabei noch die Namen von vor AGE-903 (Basic, Exchange). Die Aufzählung nennt
+> jetzt Discover, Focus und Impact — eine Berichtigung und eine Kürzung
+> zugleich. Der Text trägt sie selbst: er leitet mit „derzeit insbesondere
+> folgende" ein und behält das Einführen weiterer Stufen ausdrücklich vor.
+
 > **Die Namensfrage BOOST/Basic ist damit entschieden.** Das Konzeptpapier vom
 > 18.07.2026 nannte die erste Stufe durchgehend **BOOST**, während Datenbank und
 > Oberfläche **Basic** sagten; das war bis AGE-903 eine offene Entscheidung.

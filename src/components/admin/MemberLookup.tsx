@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { genannterName } from "../../config/levels";
 import { Link } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Card, CardDescription, CardTitle } from "../ui/Card";
@@ -81,7 +82,13 @@ export function MemberLookup() {
                 <div className="truncate font-medium text-ink">{t.name ?? "Ohne Namen"}</div>
                 <div className="truncate text-sm text-muted">
                   {t.login_email}
-                  {t.tier && <> · {t.tier}</>}
+                  {/* AGE-969: `genannterName` statt des rohen Schlüssels. Hier
+                      stand `{t.tier}`, also „active" statt „Active" — und
+                      unterhalb des Clubs soll gar kein Name erscheinen. Zweite
+                      Fundstelle derselben Sorte; die erste war
+                      `PublicProfilePage`. Beide hat erst der Quelltext-Wächter
+                      gefunden, nicht das Durchsehen. */}
+                  {genannterName(t.tier ?? "") && <> · {genannterName(t.tier ?? "")}</>}
                   {!t.bestaetigt && <> · nicht bestätigt</>}
                 </div>
               </div>
