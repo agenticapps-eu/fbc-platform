@@ -1,153 +1,130 @@
 # Session Handoff — 2026-09-29 (AGE-927 Mitglied anlegen)
 
 > **Scope dieser Übergabe: AGE-927.** Fremde offene Punkte stehen hier bewusst
-> NICHT. AGE-903 ist abgeschlossen und auf PROD ausgeliefert.
+> NICHT. AGE-903 ist ebenfalls abgeschlossen und auf PROD.
 
-> ## ⚠ ZUERST
+> ## ✅ ABGESCHLOSSEN UND AUF PROD
 >
-> **PR #440 ist GEMERGT** (Squash `560dcdf`, 29.09. 06:43 UTC), alle vier
-> Pflichtchecks grün. `migrate-dev` ist durchgelaufen — die beiden Migrationen
-> stehen auf **DEV**.
+> PR #440 gemergt (`560dcdf`), `migrate-prod` gelaufen, Deploy grün, AGE-927 in
+> Linear auf **Done**. **Es ist nichts offen.**
 >
-> **Offen ist genau eins: PROD.** `drift-gate` hat den Frontend-Deploy auf
-> `main` blockiert (Lauf `36532591224`), weil PROD die Migrationen noch nicht
-> kennt. Das ist der erwartete Zustand, kein Fehler.
->
-> 1. `migrate-prod` dispatchen
-> 2. den **neuesten** blockierten Deploy-Lauf wiederholen —
->    `gh run list --workflow=deploy.yml --limit 5`, dann
->    `gh run rerun --failed <id>`. **Nie einen älteren nehmen:** `rerun` baut
->    den Commit *jenes* Laufs und rollte Fertiges zurück.
->
-> **Beides braucht Donalds AUSDRÜCKLICHE Freigabe** — die Merge-Freigabe deckt
-> es nicht.
->
-> Danach: AGE-927 in Linear von Hand auf Done (der Branch trug bewusst kein
-> Kürzel, der Merge hat nichts geschlossen).
+> Wer hier weiterarbeitet, fängt bei einem neuen Vorgang an — und darf diesen
+> Worktree mit `wt remove` abräumen, ebenso `stufen-v5` (AGE-903).
 
 ## Accomplished
 
-| Lauf | Ergebnis |
+**Detlev kann ein Mitglied selbst anlegen** — ohne Stripe, ohne Odoo-API — und
+sieht danach, wer noch auf seine Einladung wartet.
+
+| Ebene | Beleg |
 |---|---|
-| pgTAP (CI-Liste, nicht `supabase test db` nackt) | **41 Dateien, 1422 Zusagen**, PASS |
-| Vitest | **254 Dateien, 2960 Zusagen** |
-| Deno (CI-Zeile, siehe Fallen) | **287 Zusagen** |
-| `tsc --noEmit` · `eslint` · `pnpm build` | sauber |
+| pgTAP (CI-Liste) | 41 Dateien, 1422 Zusagen |
+| Vitest | 254 Dateien, 2960 Zusagen |
+| Deno (CI-Zeile) | 287 Zusagen |
 | `openspec validate --all` | 35/0 |
+| CI auf `33454c7` | `verify`, `migrations`, `edge-functions`, `pr-title` grün |
+| PROD-Deploy `36532591224` | `drift-gate`, `migrate-dev`, `deploy`, `functions` grün |
 
-**Gebaut:** das ganze Frontend (§5) — Aufnahmestrecke ①→②→③ über der
-Reiterleiste, Anlege-Maske hinter einem schwebenden Knopf, Kontrollkästchen je
-Zeile mit genau **einer** Handlung, Bericht mit fünf getrennten Ausgängen.
-Dazu 32 neue Zusagen in `AdminMitgliederPage.aufnahme.test.tsx`.
+**Auf PROD nachgemessen, durch die echten Funktionen** (nicht an grünen Haken):
 
-**Geprüft:** Diff-Review mit zwei fremden Anbietern (gemini, opencode), beide
-REQUEST-CHANGES, elf Befunde aufgelöst, zwei begründet nicht geändert.
-Sichtprobe gegen den lokalen Stack mit vier weiteren Funden. Alles in
-`openspec/changes/archive/2026-09-29-mitglied-anlegen/REVIEWS.md`.
+| | |
+|---|---|
+| `admin_member_counts()` | angelegt **22** + eingeladen **14** = offen **36**; aktiviert 28; alle 64; deaktiviert 14; gelöscht 0 |
+| `admin_list_members(…, 'eingeladen')` | 14 Zeilen, **alle 14** mit `eingeladen_am` |
+| `admin_list_members(…, 'angelegt')` | 22 Zeilen, **0** mit `eingeladen_am` |
+| Rechte | `member_state_matches` niemand · `admin_list_members` nur `authenticated` · beide neuen nur `service_role` |
+| Ausgeliefertes Bündel | `SENTRY_RELEASE.id` = `560dcdf…` = Kopf von `main` |
+| Seiten-Chunk live | trägt „Mitglied anlegen", „Ausgewählte einladen/erinnern", „kein Versand bestätigt" |
+| Beide Edge Functions | antworten unauthentifiziert **401**, nicht 404 |
+| `open_contact` | **`true`**, unverändert — nur gelesen |
 
-**Archiviert:** zwei Anforderungen dazu, vier geändert; `pnpm release:entries`
-nachgezogen (90 Einträge).
+**Die 22 sind der Punkt:** der alte Reiter „Nicht aktiviert" zeigte 36 als einen
+Klumpen. Jetzt steht da, dass 22 davon noch **nie** eine Einladung bekommen
+haben.
 
 ## Decisions
 
-**Die Schleife liegt in der FLÄCHE, ein Aufruf je Mitglied** — obwohl
-`admin-invite-members` eine Liste nimmt. *Warum:* „Fortschritt als Zahl" gibt es
-nur, wenn Antworten einzeln eintreffen, und „Wegnavigieren bricht ab" ist
-unmöglich, wenn die Schleife im Server läuft. Die Mengengrenze im Endpunkt
-bleibt richtig — sie schützt vor einem Aufruf, der nicht von der Fläche kommt.
+**Der Einladungsstand wird ABGELEITET, nicht gespeichert** — keine Spalte, kein
+Flag, kein Trigger, keine Policy auf `activation_tokens`. *Warum:* die Wahrheit
+steht in der Tokentabelle; eine zweite Ablage liefe auseinander.
 
-**Der Bericht fällt mit dem Filter.** *Warum:* „bleibt stehen, bis der Admin ihn
-schliesst" heisst, er verschwindet nicht von selbst wie ein Ton. Über einer
-ANDEREN Liste stehen zu bleiben ist etwas anderes — in der Sichtprobe stand er
-über zwei Mitgliedern aus ② über der Liste von ①.
+**Eigener Endpunkt `admin-invite-members`.** *Warum:* `send-activation`
+antwortet auf **jedem** Pfad mit `202 {accepted: true}` — über sie ist kein
+wahrheitsgemässer Bericht herstellbar. Die Schutzriegel bleiben unverändert in
+`issue_activation_token`.
 
-**Der schwebende Knopf ist ein eigener `<button>`, nicht `Button`.** *Warum:*
-jener bringt `rounded-md` mit, und `cn()` ist ein blosser Join ohne
-`tailwind-merge` — in der Sichtprobe war der Knopf deshalb eckig.
+**Die Schleife liegt in der FLÄCHE, ein Aufruf je Mitglied.** *Warum:*
+„Fortschritt als Zahl" und „Wegnavigieren bricht ab" sind beide unmöglich, wenn
+der Server schleift.
 
-**Der Branch trägt bewusst kein Kürzel.** *Folge:* der Merge schliesst AGE-927
-**nicht** von selbst; der Vorgang ist von Hand auf Done zu setzen.
+**Kein Kopfkästchen „alle auswählen"** (ADR-0007). *Warum:* ein Klick,
+deckungsgleich mit der Massenaktion, die der Record verwirft.
 
 ## Files modified
 
-* `src/pages/AdminMitgliederPage.tsx` — sieben Filter in zwei Gruppen, Maske,
-  Auswahl, Lauf, Bericht, schwebender Knopf.
-* `src/pages/AdminMitgliederPage.aufnahme.test.tsx` — neu, 32 Zusagen.
-* `src/pages/AdminMitgliederPage.test.tsx` — drei Bestandszusagen **benannt**
-  nachgezogen, Zählvorrichtung auf sieben Zustände.
-* `src/lib/admin-members.ts` — `createMember`, `ladeEin`, `Ausgang`;
-  `uebersetzeFehler` bekommt die Satztafel als Argument.
-* `src/lib/database.types.ts` — `eingeladen_am`, erweiterte `p_status`-Werte.
-  **Von Hand**, kein `gen types`.
-* `supabase/migrations/20260929090000_adresse_nachschlagen.sql` — `order by`.
-* `supabase/functions/admin-{create,invite}-member*/` — zwei Lint-Fehler, ein
-  toter Helfer, ein falscher Kommentar.
-* `docs/lastenheft.md` — D.8.1.
-* `openspec/specs/admin/spec.md` + Archiv.
+`src/pages/AdminMitgliederPage.tsx` · `…aufnahme.test.tsx` (neu, 32 Zusagen) ·
+`…test.tsx` · `src/lib/admin-members.ts` · `src/lib/database.types.ts` (von
+Hand) · zwei Migrationen · zwei Edge Functions · `docs/lastenheft.md` ·
+`openspec/specs/admin/spec.md` + Archiv.
 
 ## Next session: start here
 
-**Der Code ist auf `main`, DEV trägt die Migrationen, PROD noch nicht.** Erste
-Handlung ist keine Prüfung, sondern eine Frage an Donald: Freigabe für
-`migrate-prod` und das Wiederholen des blockierten Deploys (siehe ⚠ oben).
+**Nichts aus AGE-927.** Wer hier landet, sollte den Worktree abräumen und mit
+einem neuen Vorgang anfangen.
 
-Nach dem Ausrollen **auf vier Ebenen verifizieren**, nicht an grünen Haken:
-
-1. `admin_member_counts()` auf PROD lesen — `angelegt + eingeladen = offen`
-2. die Rechtematrix: `member_state_matches` für **niemanden**,
-   `admin_list_members` nur für `authenticated`
-3. `SENTRY_RELEASE.id` des ausgelieferten Assets gegen den Kopf von `main`
-4. eine Sichtprobe an der Fläche: Aufnahmestrecke mit echten Zahlen
-
-Zum Schluss: AGE-927 in Linear auf Done, und der Worktree `stufen-v5`
-(AGE-903, gemergt) darf mit `wt remove` weg — ebenso dieser hier, sobald PROD
-steht.
+Einzige noch offene Zeile in `tasks.md` §7 ist bewusst so: der
+Neuigkeiten-Eintrag dieses Change ist **für Mitglieder nicht gedacht** — er
+beschreibt eine reine Adminfläche und gehört in keine Release-Note.
 
 ## Fallen, die diese Sitzung gekostet haben
 
-* **`waitFor` ist zufrieden, sobald die Zahl EINMAL stimmt.** Die Abbruch-Zusage
-  bestand deshalb auch ohne den Riegel: unmittelbar nach dem Abbau stimmt sie
-  immer. Eine echte Pause und eine harte Zusage — gemessen 1 mit Riegel, 2 ohne.
-* **`findByRole` löst auf dem ERSTEN Treffer auf.** Die Zusage zur vergebenen
-  Adresse fand die Zeile in der LISTE, nicht die Maske — gleicher Name, gleiches
-  Ziel. Jetzt `within(dialog)`. Beide Male half nur, die Zahl der Treffer zu
-  messen statt dem grünen Haken zu glauben.
-* **`openspec archive` meldet nur den ERSTEN fehlenden Szenariennamen.** Drei
-  Läufe für drei Funde. Das Vergleichsskript liegt im Scratchpad
-  (`szenarien.py`) und zeigt alle auf einmal.
-* **Ein umbenanntes Szenario ist ein gelöschtes.** „Der Filter überlebt ein
-  Neuladen" statt „Der Reiter …" hätte es aus der Spec geworfen.
-* **Ein Konto über die GoTrue-Admin-API zu löschen räumt `public.profiles`
-  NICHT mit ab** — acht verwaiste Zeilen blieben stehen.
-* **`deno test` ohne `--allow-read=supabase/functions`** lässt vier
-  Verdrahtungstests fallen. Immer die CI-Zeile fahren:
-  `deno test --frozen --allow-env --allow-net --allow-read=supabase/functions supabase/functions/`
-* **`supabase test db` ohne Argument** zieht die manuellen `probe_*.sql` ein →
-  „Bad plan". CI fährt die Liste aus `ci.yml`.
-* **`ls` ist ein eza-Alias**, `find` nehmen.
+* **Ein Entzug, den nur eine FRISCHE Instanz messen kann.** `revoke … from
+  public, anon` ist auf einem gewachsenen Stack vollständig und auf einer neu
+  angelegten Instanz nicht — die vergibt rollen-eigen. Lokal 1422 Zusagen grün,
+  in der CI zwei rot. Der Befund stand seit dem 27.08. im Kopf von
+  `20260827070000_entzuege_nennen_alle_rollen.sql`; ich bin in dieselbe
+  beschriftete Grube gefallen. **Immer alle vier Rollen nennen**, dann genau
+  eine zurückgeben.
+* **`waitFor` ist zufrieden, sobald die Zahl EINMAL stimmt.** Die
+  Abbruch-Zusage bestand auch ohne den Riegel. Für „es passiert NICHTS mehr"
+  braucht es eine echte Pause und eine harte Zusage.
+* **`findByRole` löst auf dem ERSTEN Treffer auf** — die Zusage zur vergebenen
+  Adresse prüfte die Liste statt der Maske. Beide Male half nur, die Zahl der
+  Treffer zu messen.
+* **`openspec archive` meldet nur den ERSTEN fehlenden Szenariennamen**, und ein
+  umbenanntes Szenario ist ein gelöschtes.
+* **Der PR-TITEL schliesst den Linear-Vorgang**, auch wenn der Branch kein
+  Kürzel trägt. Ich hatte das Gegenteil angekündigt; `get_issue` hat es
+  widerlegt.
+* **GoTrue-Löschen räumt `public.profiles` nicht mit ab** — acht verwaiste
+  Zeilen nach der Sichtprobe.
+* **`cn()` ist ein Join ohne `tailwind-merge`** — `rounded-full` über
+  `rounded-md` verlor, der schwebende Knopf war eckig. Nur im Browser sichtbar.
 
 ## Zustand der Umgebung
 
-* **Lokaler Stack:** zurückgesetzt auf 28 Profile, 0 Tokens, 0 Adminzeilen —
-  genau den Stand vor der Sichtprobe. `.env.local` gelöscht, vite und
-  `functions serve` beendet, Browser freigegeben und `localStorage` geleert.
+* **Lokaler Stack:** auf dem Stand vor der Sichtprobe — 28 Profile, 0 Tokens,
+  0 Adminzeilen. `.env.local` gelöscht, vite und `functions serve` beendet,
+  Browser freigegeben, `localStorage` geleert, Sonden-Skript entfernt.
 * `20260925120000_release_backfill.sql` (AGE-905) fehlt lokal und bricht ab —
-  **fremde Migration, nicht anfassen**, aber einrechnen.
+  **fremde Migration, nicht anfassen**.
 * Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907). **Nicht
-  anfassen.** `wt switch` braucht deshalb
-  `--base origin/main --no-hooks --no-cd`.
-* Die Screenshots der Sichtprobe liegen unter `.gstack/age927/` (gitignored).
+  anfassen.**
+* Screenshots der Sichtprobe: `.gstack/age927/` (gitignored).
 
 ## Open questions
 
-* **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen. Es zu
+* **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen — es zu
   schliessen hiesse, einen Unique-Index über `lower(email)` in `auth.users`
-  anzulegen — fremdes Schema, eigene Entscheidung. Gemessen auf PROD: 0 von 78
+  anzulegen, also in fremdes Schema zu schreiben. Auf PROD gemessen: 0 von 78
   Adressen mit Grossbuchstaben, 0 Paare, die sich nur in der Schreibung
   unterscheiden.
 * **„Ohne Passwort" ist nicht am Feld ablesbar.** GoTrue schreibt auch ohne
-  übergebenes Passwort einen 60-Zeichen-bcrypt-Hash — wie bei allen 28
-  Bestandskonten. Belegt ist die Zusage durch den Anmeldeversuch: leer, Leerzeichen
-  und ein geratenes Wort geben alle `invalid_credentials`.
+  übergebenes Passwort einen 60-Zeichen-bcrypt-Hash — wie bei allen
+  Bestandskonten. Belegt ist die Zusage durch den Anmeldeversuch: leer,
+  Leerzeichen und ein geratenes Wort geben alle `invalid_credentials`.
 * **`eingeladen_am` sagt „Link erzeugt", nicht „Mail zugestellt".** Eine
   Zustellbestätigung wäre ein Resend-Webhook und ein eigener Change.
+* **`service_role` hat auf PROD sein Ausführungsrecht an `admin_list_members`
+  verloren** — beabsichtigt, kein Aufrufer im Repo, keine Zusage fordert es.
+  Vorher gemessen `true`, nachher `false`. Benannt, falls es je jemand sucht.
