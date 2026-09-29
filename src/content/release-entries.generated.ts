@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-09-29-mitglied-anlegen",
+    "datum": "2026-09-29",
+    "titel": "Detlev legt ein Mitglied an — und sieht, wer noch auf seine Einladung wartet",
+    "linear": "AGE-927",
+    "aenderungen": [
+      "**Ein Admin legt ein einzelnes Mitglied an.** Ein „+\"-Knopf in der Mitgliederliste öffnet eine Maske: Vorname, Nachname, E-Mail und Plan (DISCOVER, FOCUS oder IMPACT), dazu ein Haken „Bestätigungsmail senden\". Das Konto entsteht **ohne Passwort**, in genau derselben Form wie ein importiertes — das Mitglied setzt sein Passwort selbst über den Link.",
+      "**Die Mitgliederliste zeigt den Aufnahmeprozess statt einer flachen Zustandsliste.** Aus dem einen Reiter „Nicht aktiviert\" werden zwei: **① Angelegt** (noch nie eingeladen) und **② Eingeladen** (wartet auf Bestätigung). Dahinter steht **③ Bestätigt**. Jeder Schritt trägt seine Anzahl und die nächste Handlung.",
+      "**Ein Admin lädt mehrere ausgewählte Mitglieder auf einmal ein.** Ein Kontrollkästchen je Zeile, ein Knopf „Ausgewählte einladen\". Das ist die einzige Handlung, die die Auswahl auslöst.",
+      "**Der Bericht sagt die Wahrheit, auch wenn nichts verschickt wurde.** Liegt ein noch gültiger Link im Postfach, schickt die Kette absichtlich nichts. Die Rückmeldung nennt das beim Namen, statt einen Versand zu behaupten — und dafür braucht es einen eigenen Admin-Endpunkt, weil der bestehende Weg grundsätzlich nur „angenommen\" antwortet.",
+      "**Eine doppelte Adresse legt kein zweites Konto an**, sondern führt zum bestehenden Mitglied."
+    ]
+  },
+  {
     "slug": "2026-09-26-stufen-v5",
     "datum": "2026-09-26",
     "titel": "Die Mitgliedsstufen heissen neu — der Club beginnt bei DISCOVER",

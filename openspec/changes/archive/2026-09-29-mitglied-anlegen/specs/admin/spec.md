@@ -60,6 +60,18 @@ Mustern, nicht mehr vor dem Aufzählen.
   Mitglieds, die Mitgliederliste samt Anlegen und die Release-Notes-Fläche sind
   verfügbar
 
+#### Scenario: Die Liste ist keine Empfängerauswahl
+
+*Neu gefasst für AGE-927.* Die frühere Fassung schloss jede Mehrfachauswahl
+aus. ADR-0007 öffnet sie eng — der Satzkern bleibt: die Liste stellt keine
+Zielgruppen zusammen.
+
+- **WHEN** ein Admin die Mitgliederliste öffnet
+- **THEN** bietet sie Filtern, Blättern, die Handlungen je **einzelnem**
+  Mitglied und **eine** Mehrfachauswahl, deren einzige Wirkung der bestehende
+  Aktivierungslink ist — kein „an alle", kein Kopfkästchen über der Seite,
+  keine Übernahme der Treffermenge in eine andere Fläche
+
 #### Scenario: Die Auswahl löst genau eine Handlung aus
 
 - **WHEN** ein Admin in der Mitgliederliste mehrere Zeilen auswählt
@@ -395,7 +407,13 @@ teilen und nicht ersetzen.
 - **WHEN** an ordinary member or a matching manager calls the counting RPC
 - **THEN** it raises, and does not return a row of zeroes
 
-#### Scenario: Die Signatur ändert sich nur, wenn eine Anforderung es verlangt
+#### Scenario: The listing function keeps its signature and its columns
+
+*Geändert für AGE-927.* Die frühere Fassung verlangte, dass sich **nichts**
+ändert — sie war für eine Änderung geschrieben, die nur die Entscheidung der
+geteilten Bedingung betraf. AGE-927 braucht eine Spalte. Was bleibt, ist der
+Kern: die Signatur ändert sich nur, wenn eine Anforderung es verlangt, und die
+Wächter werden dabei mitgezogen statt abgeschaltet.
 
 - **WHEN** die Signatur und der Spaltensatz von `admin_list_members` gegen den
   Stand vor AGE-927 gehalten werden
@@ -526,7 +544,7 @@ verliert.
 - **THEN** bleibt das Feld leer und trägt kein Datum — und kein Wort daneben
   wiederholt die Auskunft
 
-#### Scenario: Der Filter überlebt ein Neuladen
+#### Scenario: Der Reiter überlebt ein Neuladen
 
 - **WHEN** ein Admin „Gelöscht" wählt und die Seite neu lädt
 - **THEN** steht sie wieder auf „Gelöscht"; dasselbe gilt für ② Eingeladen
