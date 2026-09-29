@@ -1,136 +1,146 @@
-# Session Handoff — 2026-09-28 (AGE-927 Mitglied anlegen)
+# Session Handoff — 2026-09-29 (AGE-927 Mitglied anlegen)
 
 > **Scope dieser Übergabe: AGE-927.** Fremde offene Punkte stehen hier bewusst
-> NICHT. Die Fassung zu AGE-903 steht in `git log -- session-handoff.md` auf
-> `main` und gehört der abgeschlossenen Arbeit.
+> NICHT. AGE-903 ist abgeschlossen und auf PROD ausgeliefert.
 
 > ## ⚠ ZUERST
 >
-> **Kein Code geschrieben — das Gate steht noch offen und soll es bleiben.**
-> Der Change ist vorgeschlagen, das Delta geschrieben, eine Review-Runde
-> aufgelöst. `openspec validate --all` 36/0.
+> `cd /Users/donald/worktrees/fbc-platform/mitglied-anlegen`
 >
-> **Zwei Dinge fehlen vor der ersten Codezeile:**
+> **Fünf Commits, NICHT gepusht, Arbeitsbaum sauber.** Branch `mitglied-anlegen`,
+> bewusst **ohne Kürzel** — AGE-927 gehört nur in den Titel des letzten PR.
 >
-> 1. **opencode lief in Runde 2 in den 180-s-Timeout** und ist nicht gezählt.
->    Die Zwei-Anbieter-Regel ist für die **korrigierte** Fassung damit nicht
->    erfüllt. Wiederholen mit hochgesetztem Timeout:
->    `REVIEW_TIMEOUT=600 ~/.agenticapps/bin/run-plan-review.sh mitglied-anlegen --implementing-host claude gemini opencode`
->    — opencode war in Runde 1 der schärfere der beiden.
-> 2. **gemini (Runde 2) hält die Teilausfall-Oberfläche für zu vage:** was sieht
->    der Admin während 35 aufeinanderfolgenden Aufrufen, aktualisiert sich die
->    Tabelle mit, was beim Wegnavigieren. Die Zusage steht, die Darstellung
->    nicht. Gehört in `design.md`.
+> **Was fehlt, ist genau §5 der `tasks.md`: das Frontend.** Alles davor ist
+> gebaut und belegt. Erste Handlung: `openspec/changes/mitglied-anlegen/tasks.md`
+> lesen, dort §5.
 >
-> Der Erzeuger schreibt `REVIEWS.md` neu. **Die Resolution vorher sichern** —
-> sie steht dort vor dem Trailer und wäre sonst weg.
+> **Der lokale Stack muss laufen** (`supabase start`), und er trägt beide
+> Migrationen schon.
 
 ## Accomplished
 
-**Die Frage beantwortet, mit der die Sitzung begann:** nein, ein Weg, ein
-Mitglied von Hand anzulegen, existiert nicht. AGE-927 stand auf Todo, ohne
-Change, ohne Branch.
-
-**AGE-927 in Linear ergänzt** um den Prozessteil, die auf PROD gemessenen Zahlen
-und die Begründung, warum der Filter eine Migration braucht:
-
-| | |
+| Lauf | Ergebnis |
 |---|---|
-| Profile gesamt | 78 |
-| bestätigt | 28 |
-| **nicht bestätigt** | **50** |
-| … davon Link schon verschickt | 15 |
-| … davon **nie eingeladen** | **35** |
+| pgTAP (CI-Liste, nicht `supabase test db` nackt) | **41 Dateien, 1422 Zusagen**, PASS |
+| Deno (CI-Zeile, siehe Fallen unten) | **288 Zusagen**, 0 gescheitert |
+| `deno check supabase/functions/*/*.ts` | sauber |
+| Wächter-Skripte (`pnpm vitest run scripts/`) | 33 Dateien, 489 Zusagen |
+| `openspec validate --all` | 36/0 |
 
-**Change `mitglied-anlegen`** mit Proposal, Design, Delta (vier Anforderungen
-geändert mit allen 31 Szenarien, zwei neu), Tasks und `REVIEWS.md`.
+**Gebaut:** die Migration `20260928140000_aufnahmestrecke.sql` (aus `offen`
+werden `angelegt` und `eingeladen`), `20260929090000_adresse_nachschlagen.sql`
+(zwei eng gewährte Funktionen), beide Edge Functions samt reiner Logikmodule
+und Deno-Tests, und `supabase/tests/admin_einladungsstand_test.sql` (30 Zusagen).
 
-**ADR-0007** zur Grenzverschiebung — siehe unten.
+**Plan-Review:** zwei gezählte Runden, beide REQUEST-CHANGES, alles aufgelöst
+und in `REVIEWS.md` protokolliert.
 
 ## Decisions
 
-**Der Einladungsstand wird ABGELEITET, nicht gespeichert.** Keine Spalte in
-`profiles`, kein Flag, kein Trigger. *Warum:* die Wahrheit steht in
-`activation_tokens`; eine zweite Ablage liefe auseinander, sobald irgendein Weg
-ein Token erzeugt, ohne die Kopie zu berühren.
+**Der Einladungsstand wird ABGELEITET, nicht gespeichert.** Keine Spalte, kein
+Flag, kein Trigger. *Warum:* die Wahrheit steht in `activation_tokens`; eine
+zweite Ablage liefe auseinander, sobald irgendein Weg ein Token erzeugt, ohne
+die Kopie zu berühren.
 
-**Die Mehrfachauswahl öffnet den AGE-304-Zaun eng** (Donald, 28.09.). Die
-geltende Spec schloss sie **wörtlich** aus. Sie darf jetzt ausschliesslich den
-bestehenden Aktivierungslink auslösen; Massenmail, CRM und Newsletter bleiben
-wortgleich verboten. Festgehalten in **ADR-0007**, mit den verworfenen
-Alternativen und der ausdrücklichen Folge, dass der Zaun dünner wird.
+**`member_state_matches` bekommt den Zeitpunkt als fünftes ARGUMENT**, statt
+selbst zu lesen. *Warum:* so bleibt sie `immutable` und der Planer zieht sie in
+den Filter; läse sie selbst, wäre sie `stable` und liefe je Zeile als Blackbox.
 
-**Kein „alle auf dieser Seite auswählen".** *Warum:* ein Kopfkästchen über
-Schritt ① wäre mit **einem** Klick deckungsgleich mit „alle 35 einladen" — genau
-der Alternative, die ADR-0007 verwirft. Befund des Plan-Reviews, und er trifft.
+**`offen` bleibt**, ohne Filter auf der Fläche. *Warum:* Lesezeichen tragen es,
+und die Summenzusage `angelegt + eingeladen = offen` braucht es, um prüfbar zu
+sein.
 
-**Die Schleife lebt im Frontend** über die bestehende Einzel-Function. *Warum:*
-so **gilt** jeder Schutzriegel unverändert, statt in einem zweiten Endpunkt
-nachgebaut zu werden.
+**Eigener Endpunkt `admin-invite-members`** statt einer Frontend-Schleife über
+`send-activation` (Donald, 28.09.). *Warum:* jene antwortet auf **jedem** Pfad
+mit `202 {accepted: true}`, damit ihre Antwortzeit nicht verrät, ob eine Adresse
+besteht — über sie ist kein wahrheitsgemässer Bericht herstellbar. Der
+Aufzählungsschutz entfällt gegenüber einem Admin; die Schutzriegel entfallen
+nicht, sie liegen in `issue_activation_token`.
 
-## Drei Annahmen, die am Katalog fielen
+**Kein „alle auf dieser Seite auswählen"** (ADR-0007). *Warum:* ein Kopfkästchen
+über Schritt ① wäre mit **einem** Klick deckungsgleich mit „alle 35 einladen" —
+der Alternative, die der Record verwirft. Befund des Plan-Reviews.
 
-Zwei davon meine eigenen. Alle drei gemessen, nicht diskutiert:
-
-* **`admin_member_counts` liefert `TABLE(status, anzahl)`** — Zeilen je Zustand,
-  keine Spalte je Zustand. Ihr Rückgabetyp ändert sich nicht, `create or
-  replace` genügt.
-* **Der Abwurf scheitert NICHT an `pg_depend`.** `member_state_matches` ist
-  `sql`, beide Aufrufer sind `plpgsql`, und für alle drei stehen **null**
-  Referenten. Er bricht die Aufrufer nur **still** bis zur Neuanlage in
-  derselben Transaktion — das zu wissen ist wichtiger als ein Fehlschlag.
-* **Auf `auth.users(email)` gibt es keinen Unique-Constraint**, sondern den
-  partiellen Unique-**Index** `users_email_partial_key` —
-  `btree (email) where (is_sso_user = false)`, also **schreibungsempfindlich**.
-  Der einzige Index über `lower(email)` ist nicht unique. `A@x.de` neben
-  `a@x.de` fängt die Datenbank nicht.
-
-Dazu eine eigene Falschbehauptung korrigiert: ein `::regprocedure`-Cast auf eine
-verschwundene Signatur prüft nicht stillschweigend nichts — er wirft `42883`.
-
-## Der Schutzriegel, der jede Oberfläche hier betrifft
-
-`issue_activation_token` verschickt **nichts**, wenn ein gültiger, unbenutzter
-Link jünger als 24 h im Postfach liegt (`pending`). Dazu 60 s je Profil und 5 pro
-Tag — **je Profil**, nicht je Absender (gemessen). Ein Bericht, der dann
-„verschickt" meldet, wäre gelogen; die getrennte Rückmeldung steht deshalb als
-Zusage im Delta, nicht als Detail im Entwurf.
+**Die Mehrfachauswahl öffnet den AGE-304-Zaun eng** — ausschliesslich für den
+bestehenden Aktivierungslink. **ADR-0007**, mit der Folge, dass der Zaun dünner
+wird.
 
 ## Files modified
 
-* `openspec/changes/mitglied-anlegen/{proposal,design,tasks}.md`,
-  `specs/admin/spec.md`, `REVIEWS.md` — neu.
-* `docs/decisions/0007-mehrfachauswahl-nur-fuer-den-aktivierungslink.md` — neu.
-* Kein Produktionscode. Keine Migration. Nichts an der Datenbank.
+* `supabase/migrations/20260928140000_aufnahmestrecke.sql` — `drop`+`create` von
+  `member_state_matches` (5 Argumente) und `admin_list_members` (`eingeladen_am`),
+  `create or replace` von `admin_member_counts`.
+* `supabase/migrations/20260929090000_adresse_nachschlagen.sql` —
+  `admin_adresse_nachschlagen` und `admin_mitglied_einrichten`, **nur an
+  `service_role` gewährt**.
+* `supabase/functions/admin-create-member/{anlegen.ts,anlegen.test.ts,index.ts}`
+* `supabase/functions/admin-invite-members/{einladung.ts,einladung.test.ts,index.ts}`
+* `supabase/tests/admin_einladungsstand_test.sql` — neu, 30 Zusagen.
+* `supabase/tests/admin_member_list_test.sql` — vier Zusagen **benannt** gekippt,
+  eine dazu (`angelegt + eingeladen = offen`).
+* `supabase/config.toml`, `.github/workflows/ci.yml`,
+  `docs/decisions/0007-…md`, `openspec/changes/mitglied-anlegen/*`.
+* **`send-activation` ist unangetastet** — das ist eine Zusage, keine Beobachtung.
 
 ## Next session: start here
 
-`cd /Users/donald/worktrees/fbc-platform/mitglied-anlegen`. Branch
-`mitglied-anlegen`, **bewusst ohne Kürzel** — AGE-927 gehört nur in den Titel
-des letzten PR, sonst schliesst ein Teil-PR das Issue zu früh. Zwei Commits,
-**noch nicht gepusht**, Arbeitsbaum sauber.
+**§5 der `tasks.md`.** Die Reihenfolge dort ist gemeint: RED zuerst.
 
-Die beiden Punkte aus dem ZUERST-Block abarbeiten, dann §2 der `tasks.md`: die
-Migration, RED zuerst.
+1. `src/lib/database.types.ts` von Hand nachziehen — **kein `gen types`**, die
+   Datei trägt handgepflegte Verengungen. Sie liegt unter `src/lib/`, nicht
+   `src/types/`.
+2. Aufnahmestrecke ①→②→③ über der bestehenden Reiterleiste; genau einer von
+   sieben Filtern gewählt, der Wert steht in der Adresse. `?tab=offen` fällt auf
+   ① mit einmaligem Hinweis.
+3. „+"-Knopf und Maske; Plan nur DISCOVER · FOCUS · IMPACT.
+4. Kontrollkästchen je Zeile, **kein** Kopfkästchen, „Ausgewählte einladen" nur
+   in ① und ②.
+5. Der Bericht: fünf Ausgänge getrennt, Übersprungene namentlich, bleibt stehen.
+   Vorher Rückfrage mit der **Zahl**, währenddessen Fortschritt als Zahl, die
+   Liste bewegt sich erst danach und behält Filter, Suche und Seite.
+
+Danach: Code-Review auf den Diff, Sichtprobe, PR.
+
+## Fallen, die diese Sitzung gekostet haben
+
+* **`deno test` ohne `--allow-read=supabase/functions`** lässt vier
+  Verdrahtungstests fallen, die `index.ts` lesen. Sie sehen wie Vorbestand aus
+  — sie fallen auch auf einem unveränderten Baum. Immer die CI-Zeile fahren:
+  `deno test --frozen --allow-env --allow-net --allow-read=supabase/functions supabase/functions/`
+* **`supabase test db` ohne Argument** zieht die manuellen `probe_*.sql` ein,
+  die absichtlich keinen `plan()` haben → „Bad plan". CI fährt die Liste aus
+  `ci.yml`; das Skript dafür liegt im Scratchpad.
+* **Ein `drop function` nimmt den `revoke` mit.** Beim ersten Anlauf für
+  `admin_list_members` nur den `grant` wiederhergestellt — `anon` hätte die
+  Mitgliederliste aufrufen dürfen. Der Bestandstest hat es gefangen.
+* **Die Migration ist nach dem ersten Lauf nicht wiederverwendbar** (der `drop`
+  nennt die alte Signatur). Zum Wiederholen erst die neuen Signaturen von Hand
+  abwerfen.
+* **Hausstil für Deno-Tests ist `jsr:@std/assert@1`**, nicht `deno.land/std` —
+  sonst wächst `deno.lock` und CI fährt `--frozen`.
+* **`ls` ist ein eza-Alias**, `ls <pfad>` bricht ab. `find` nehmen.
 
 ## Zustand der Umgebung
 
-* **AGE-903 ist fertig und auf PROD ausgeliefert** (vorige Sitzung). `main` steht
-  auf `150c0a2`, alles grün.
-* Im **Haupt-Checkout** `/Users/donald/Sourcecode/factiv/fbc-platform` liegt
-  **fremde ungesicherte Arbeit** (AGE-907): `session-handoff.md` geändert plus
-  untracked Archivdateien. **Nicht anfassen.** Sie bringt den `sync-main`-Hook
-  von `wt switch` zum Scheitern; der Weg daran vorbei ist
+* **Lokaler Stack läuft**, 137 von 138 Migrationen plus meinen beiden.
+  `20260925120000_release_backfill.sql` (AGE-905) fehlt und bricht lokal ab —
+  **fremde Migration, nicht anfassen**, aber einrechnen.
+* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907).
+  **Nicht anfassen.** Sie bringt den `sync-main`-Hook von `wt switch` zum
+  Scheitern; der Weg daran vorbei ist
   `wt switch --create <name> --base origin/main --no-hooks --no-cd`.
-* Der Worktree `stufen-v5` steht noch (AGE-903, gemergt) und kann mit
-  `wt remove` weg — Donald hat das nicht freigegeben, deshalb blieb er.
+* Der Worktree `stufen-v5` (AGE-903, gemergt) steht noch und kann mit
+  `wt remove` weg — nicht freigegeben, deshalb blieb er.
 
 ## Open questions
 
-* **Teilausfall-Oberfläche** — die einzige inhaltlich offene Frage (gemini,
-  Runde 2).
-* **Was gilt, wenn das Konto entsteht und das Setzen von Name oder `tier` danach
-  scheitert?** Ein Konto ohne Stufe ist ein Zustand, den die Liste zeigen können
-  muss. Steht als Aufgabe, ist aber nicht entschieden.
-* **Schreibt GoTrue beim Admin-Anlegen selbst klein?** Zu messen, nicht
-  anzunehmen — davon hängt ab, ob die Normalisierung allein trägt.
+* **Was gilt, wenn das Konto entsteht und `admin_mitglied_einrichten` scheitert?**
+  Entschieden und gebaut: Konto bleibt, Antwort sagt `teilweise`, es steht auf
+  der Vorgabestufe in ①. Offen ist nur, ob die Oberfläche das deutlich genug
+  zeigt — das entscheidet sich in §5.
+* **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen. Es zu
+  schliessen hiesse, einen Unique-Index über `lower(email)` in `auth.users`
+  anzulegen, also in fremdes Schema zu schreiben. Eigene Entscheidung.
+* **`admin_list_members` liefert `eingeladen_am` je Zeile** — bei 78 Profilen
+  bezahlbar, der Index passt. Wenn die Liste je gross wird, ist der Umbau auf
+  eine gepflegte Spalte eine eigene Änderung, dann mit Trigger.
