@@ -1,130 +1,117 @@
-# Session Handoff — 2026-09-29 (AGE-927 Mitglied anlegen)
+# Session Handoff — 2026-09-29 (AGE-969 Stufen nur noch Club)
 
-> **Scope dieser Übergabe: AGE-927.** Fremde offene Punkte stehen hier bewusst
-> NICHT. AGE-903 ist ebenfalls abgeschlossen und auf PROD.
+> **Scope dieser Übergabe: AGE-969.** Fremde offene Punkte stehen hier nicht.
+> AGE-927 ist ebenfalls abgeschlossen und auf PROD (PR #440, #442).
 
 > ## ✅ ABGESCHLOSSEN UND AUF PROD
 >
-> PR #440 gemergt (`560dcdf`), `migrate-prod` gelaufen, Deploy grün, AGE-927 in
-> Linear auf **Done**. **Es ist nichts offen.**
->
-> Wer hier weiterarbeitet, fängt bei einem neuen Vorgang an — und darf diesen
-> Worktree mit `wt remove` abräumen, ebenso `stufen-v5` (AGE-903).
+> PR #443 gemergt (`10c86ff`), Deploy grün, keine Migration nötig.
+> **Es ist nichts offen.** Wer hier weiterarbeitet, fängt bei einem neuen
+> Vorgang an — und darf diesen Worktree mit `wt remove` abräumen, ebenso
+> `mitglied-anlegen` und `stufen-v5`.
+
+## ⚠ Eine Sache braucht noch deine Entscheidung
+
+**Die AGB § 3.2 ist mitgeändert.** Ein Reviewer hat dagegen einen HIGH-Befund
+erhoben: ein Anwaltsdokument gehöre vor dem Ausrollen einer Kanzlei vorgelegt.
+Der Einwand ist berechtigt; die Entscheidung war deine vom 29.09., deshalb ist
+sie drin. **Soll eine Kanzlei zuerst schauen, nehme ich `src/content/legal/agb.ts`
+einzeln wieder heraus** — der Rest des Change hängt nicht daran.
+
+Was dort steht: die Aufzählung nennt Discover · Focus · Impact statt der sechs.
+Das ist eine **Berichtigung** (sie führte noch *Basic* und *Exchange*, die es
+seit AGE-903 nicht gibt) **und** eine Kürzung. Getragen wird sie vom Text
+selbst: „derzeit insbesondere folgende" plus Einführungsvorbehalt.
 
 ## Accomplished
 
-**Detlev kann ein Mitglied selbst anlegen** — ohne Stripe, ohne Odoo-API — und
-sieht danach, wer noch auf seine Einladung wartet.
-
-| Ebene | Beleg |
-|---|---|
-| pgTAP (CI-Liste) | 41 Dateien, 1422 Zusagen |
-| Vitest | 254 Dateien, 2960 Zusagen |
-| Deno (CI-Zeile) | 287 Zusagen |
-| `openspec validate --all` | 35/0 |
-| CI auf `33454c7` | `verify`, `migrations`, `edge-functions`, `pr-title` grün |
-| PROD-Deploy `36532591224` | `drift-gate`, `migrate-dev`, `deploy`, `functions` grün |
-
-**Auf PROD nachgemessen, durch die echten Funktionen** (nicht an grünen Haken):
-
 | | |
 |---|---|
-| `admin_member_counts()` | angelegt **22** + eingeladen **14** = offen **36**; aktiviert 28; alle 64; deaktiviert 14; gelöscht 0 |
-| `admin_list_members(…, 'eingeladen')` | 14 Zeilen, **alle 14** mit `eingeladen_am` |
-| `admin_list_members(…, 'angelegt')` | 22 Zeilen, **0** mit `eingeladen_am` |
-| Rechte | `member_state_matches` niemand · `admin_list_members` nur `authenticated` · beide neuen nur `service_role` |
-| Ausgeliefertes Bündel | `SENTRY_RELEASE.id` = `560dcdf…` = Kopf von `main` |
-| Seiten-Chunk live | trägt „Mitglied anlegen", „Ausgewählte einladen/erinnern", „kein Versand bestätigt" |
-| Beide Edge Functions | antworten unauthentifiziert **401**, nicht 404 |
-| `open_contact` | **`true`**, unverändert — nur gelesen |
+| Vitest | **256 Dateien, 2996 Zusagen** |
+| `tsc --noEmit` · `eslint` · `pnpm build` | sauber |
+| `openspec validate --all` | 35/0 |
+| CI auf `8279154` | verify, migrations, edge-functions, pr-title grün |
+| Deploy `36565950210` | alle vier Jobs grün |
+| Ausgeliefertes Bündel | `10c86ff…` = Kopf von `main` |
 
-**Die 22 sind der Punkt:** der alte Reiter „Nicht aktiviert" zeigte 36 als einen
-Klumpen. Jetzt steht da, dass 22 davon noch **nie** eine Einladung bekommen
-haben.
+**Vorher der Bestand:** drei Konten auf ACTIVE über `admin_set_tier` mit
+Begründung auf DISCOVER gehoben (Spur dreimal `active → discover`). PROD danach:
+**5 × discover, 73 × impact.** Ohne das wäre das Ausblenden Kaschierung gewesen.
+
+**Live nachgemessen:** „Sechs Stufen" ist weg, „Der Club beginnt bei" steht da,
+`Boost` kommt im Hauptbündel nicht vor. Die fünf `Connect`-Treffer dort sind
+Bibliothekscode (`secureConnection`, `connectEnd`) — kein Stufenname. Im
+`levels`-Chunk stehen `Active` und `Boost` weiterhin, **und das ist richtig so**:
+`levels.ts` behält alle sechs Labels, `genannterName` gibt sie nur nie zurück.
 
 ## Decisions
 
-**Der Einladungsstand wird ABGELEITET, nicht gespeichert** — keine Spalte, kein
-Flag, kein Trigger, keine Policy auf `activation_tokens`. *Warum:* die Wahrheit
-steht in der Tokentabelle; eine zweite Ablage liefe auseinander.
+**Sichtbarkeit und Recht bekommen zwei Konstanten.** `GENANNTE_STUFEN` wird
+NICHT aus `CLUB_RANK` abgeleitet, obwohl beide heute dieselbe Menge ergeben.
+*Warum:* jene Zahl steht als `has_level(4)` in den SQL-Policies. Wer BOOST
+später wieder nennen will, müsste sie senken — dann liefen Oberfläche und RLS
+auseinander, das Verzeichnis sähe erreichbar aus und die Datenbank verweigerte.
 
-**Eigener Endpunkt `admin-invite-members`.** *Warum:* `send-activation`
-antwortet auf **jedem** Pfad mit `202 {accepted: true}` — über sie ist kein
-wahrheitsgemässer Bericht herstellbar. Die Schutzriegel bleiben unverändert in
-`issue_activation_token`.
+**Kein Ersatzname unterhalb des Clubs**, sondern ein Satz, der die Sackgasse
+benennt und einen Weg nennt (Support › Feedback). *Warum:* das ist die einzige
+Gruppe, die wächst — Selbstregistrierungen landen dort, der Kaufweg ruht.
 
-**Die Schleife liegt in der FLÄCHE, ein Aufruf je Mitglied.** *Warum:*
-„Fortschritt als Zahl" und „Wegnavigieren bricht ab" sind beide unmöglich, wenn
-der Server schleift.
-
-**Kein Kopfkästchen „alle auswählen"** (ADR-0007). *Warum:* ein Klick,
-deckungsgleich mit der Massenaktion, die der Record verwirft.
+**Der Bündel-Wächter wurde verworfen, bevor er gebaut war.** Die drei Namen
+müssen im Bündel bleiben; ein Test darüber wäre ab dem ersten Bau rot gewesen.
 
 ## Files modified
 
-`src/pages/AdminMitgliederPage.tsx` · `…aufnahme.test.tsx` (neu, 32 Zusagen) ·
-`…test.tsx` · `src/lib/admin-members.ts` · `src/lib/database.types.ts` (von
-Hand) · zwei Migrationen · zwei Edge Functions · `docs/lastenheft.md` ·
-`openspec/specs/admin/spec.md` + Archiv.
+`src/config/levels.ts` (+`GENANNTE_STUFEN`, `genannterName`, `waehlbareStufen`,
+`KEIN_CLUBZUGANG_SATZ`) · `TierBadge` · `MembershipSummary` · `ProfileHero` ·
+`MemberDirectory` · `MemberDashboard` · `AppShell` · `MemberLookup` ·
+`EinstellungenPage` · `HomePage` · `PublicProfilePage` · `AdminMitglied(er)Page` ·
+`MitgliedschaftPage` · `agb.ts` · `release-geschichten.ts` · `lastenheft.md` ·
+zwei neue Testdateien.
 
 ## Next session: start here
 
-**Nichts aus AGE-927.** Wer hier landet, sollte den Worktree abräumen und mit
-einem neuen Vorgang anfangen.
+**Nichts aus AGE-969.** Zwei Dinge liegen bereit:
 
-Einzige noch offene Zeile in `tasks.md` §7 ist bewusst so: der
-Neuigkeiten-Eintrag dieses Change ist **für Mitglieder nicht gedacht** — er
-beschreibt eine reine Adminfläche und gehört in keine Release-Note.
+1. **Die drei Neuigkeiten-Entwürfe** vom 29.09. (Artifact, privat) — Tutorials,
+   Konto löschen, Stufen. Sie sind noch **nicht zugestellt**. Der Entwurf zu den
+   Stufen sollte jetzt die AGB-Änderung erwähnen.
+2. **AGE-928** — `/mitgliedschaft` als reine Anzeige. Sie liest dann
+   `GENANNTE_STUFEN`; die Naht steht.
 
 ## Fallen, die diese Sitzung gekostet haben
 
-* **Ein Entzug, den nur eine FRISCHE Instanz messen kann.** `revoke … from
-  public, anon` ist auf einem gewachsenen Stack vollständig und auf einer neu
-  angelegten Instanz nicht — die vergibt rollen-eigen. Lokal 1422 Zusagen grün,
-  in der CI zwei rot. Der Befund stand seit dem 27.08. im Kopf von
-  `20260827070000_entzuege_nennen_alle_rollen.sql`; ich bin in dieselbe
-  beschriftete Grube gefallen. **Immer alle vier Rollen nennen**, dann genau
-  eine zurückgeben.
-* **`waitFor` ist zufrieden, sobald die Zahl EINMAL stimmt.** Die
-  Abbruch-Zusage bestand auch ohne den Riegel. Für „es passiert NICHTS mehr"
-  braucht es eine echte Pause und eine harte Zusage.
-* **`findByRole` löst auf dem ERSTEN Treffer auf** — die Zusage zur vergebenen
-  Adresse prüfte die Liste statt der Maske. Beide Male half nur, die Zahl der
-  Treffer zu messen.
-* **`openspec archive` meldet nur den ERSTEN fehlenden Szenariennamen**, und ein
-  umbenanntes Szenario ist ein gelöschtes.
-* **Der PR-TITEL schliesst den Linear-Vorgang**, auch wenn der Branch kein
-  Kürzel trägt. Ich hatte das Gegenteil angekündigt; `get_issue` hat es
-  widerlegt.
-* **GoTrue-Löschen räumt `public.profiles` nicht mit ab** — acht verwaiste
-  Zeilen nach der Sichtprobe.
-* **`cn()` ist ein Join ohne `tailwind-merge`** — `rounded-full` über
-  `rounded-md` verlor, der schwebende Knopf war eckig. Nur im Browser sichtbar.
+* **Ein Wächter kann den eigenen Anforderungen widersprechen.** Ich schrieb im
+  selben Entwurf, dass `levels.ts` alle Labels behält — und zwei Abschnitte
+  später, dass die Wörter im Bündel nicht vorkommen. opencode hat es gefunden,
+  nicht ich.
+* **Eine Begründung, die ins Delta wandert, muss stimmen.** Meine zu `CLUB_RANK`
+  war falsch (das Gating bliebe hart; auseinander liefen UI und RLS).
+* **Ein `{tier}` in JSX rutscht durch jede Wortsuche.** Zwei Fundstellen, beide
+  erst vom Quelltext-Wächter gefunden — nicht vom Lesen, nicht von drei
+  Reviewern.
+* **Ein Wächter über generiertem Inhalt fällt an der eigenen Erklärung:** der
+  Archiveintrag zu AGE-969 nennt `LEVEL_ORDER`, weil er erklärt, dass die Leiter
+  bleibt. Ausnahme mit Grund.
+* **opencode kann ins Rate-Limit laufen** („Too Many Requests"). Dann zählt der
+  Reviewer nicht — codex nehmen, der bei kleineren Artefaktsätzen durchläuft.
+* **Eine ausgenommene, unerreichbare Seite ist eine Zeitbombe.** Besser die eine
+  Zeile ändern als eine Ausnahme führen.
 
 ## Zustand der Umgebung
 
-* **Lokaler Stack:** auf dem Stand vor der Sichtprobe — 28 Profile, 0 Tokens,
-  0 Adminzeilen. `.env.local` gelöscht, vite und `functions serve` beendet,
-  Browser freigegeben, `localStorage` geleert, Sonden-Skript entfernt.
+* **Lokaler Stack:** 28 Profile, 0 Tokens — Stand vor der Sichtprobe.
+  `.env.local` gelöscht, vite beendet, Browser freigegeben.
 * `20260925120000_release_backfill.sql` (AGE-905) fehlt lokal und bricht ab —
   **fremde Migration, nicht anfassen**.
-* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907). **Nicht
-  anfassen.**
-* Screenshots der Sichtprobe: `.gstack/age927/` (gitignored).
+* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907).
+* Screenshots: `.gstack/age969/` und `.gstack/neuigkeiten/` (gitignored).
 
 ## Open questions
 
-* **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen — es zu
-  schliessen hiesse, einen Unique-Index über `lower(email)` in `auth.users`
-  anzulegen, also in fremdes Schema zu schreiben. Auf PROD gemessen: 0 von 78
-  Adressen mit Grossbuchstaben, 0 Paare, die sich nur in der Schreibung
-  unterscheiden.
-* **„Ohne Passwort" ist nicht am Feld ablesbar.** GoTrue schreibt auch ohne
-  übergebenes Passwort einen 60-Zeichen-bcrypt-Hash — wie bei allen
-  Bestandskonten. Belegt ist die Zusage durch den Anmeldeversuch: leer,
-  Leerzeichen und ein geratenes Wort geben alle `invalid_credentials`.
-* **`eingeladen_am` sagt „Link erzeugt", nicht „Mail zugestellt".** Eine
-  Zustellbestätigung wäre ein Resend-Webhook und ein eigener Change.
-* **`service_role` hat auf PROD sein Ausführungsrecht an `admin_list_members`
-  verloren** — beabsichtigt, kein Aufrufer im Repo, keine Zusage fordert es.
-  Vorher gemessen `true`, nachher `false`. Benannt, falls es je jemand sucht.
+* **Die AGB** — siehe oben, deine Entscheidung.
+* **Die Selbstregistrierung bleibt offen.** Wer sich registriert, landet weiter
+  unterhalb des Clubs und kommt von dort nicht hoch, solange Stripe ruht. Ob der
+  Knopf „Noch kein Konto? Registrieren" bleiben soll, ist eine Produktfrage und
+  ein eigener Vorgang.
+* **Diese Änderung ist Oberflächenkosmetik.** Das Repo ist öffentlich; alle
+  sechs Stufen stehen weiterhin in `levels.ts` und in der Historie.
