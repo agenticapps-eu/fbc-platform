@@ -19,10 +19,14 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Die Auswahl gilt je Seite, und eine Seite fasst 50. Ein Aufruf mit mehr
- * käme nicht von der Fläche — und „an alle" ist genau das, was ADR-0007
- * ausschliesst. Die Grenze steht hier und nicht in der Oberfläche, weil eine
- * Grenze, die nur die Oberfläche zieht, keine ist.
+ * Die Auswahl gilt je Seite, und eine Seite fasst **25** (`SEITENGROESSE`).
+ * Die Kappe von 50 lässt damit zwei volle Seiten zu und trotzdem nicht „an
+ * alle" — genau das, was ADR-0007 ausschliesst. Die Grenze steht hier und
+ * nicht in der Oberfläche, weil eine Grenze, die nur die Oberfläche zieht,
+ * keine ist.
+ *
+ * (Die frühere Fassung dieses Kommentars behauptete „eine Seite fasst 50" und
+ * hätte den nächsten Leser über die Zahl rätseln lassen. Diff-Review.)
  */
 export const MAX_EINLADUNGEN = 50;
 

@@ -182,7 +182,12 @@ const AUSGANG_TEXT: Record<Ausgang, string> = {
   uebersprungen: "übersprungen — es liegt noch ein gültiger Link im Postfach",
   abgewiesen: "abgewiesen — die Grenze von fünf Anforderungen am Tag griff",
   nicht_einladbar: "nicht einladbar — das Konto ist deaktiviert, gelöscht oder fort",
-  fehlgeschlagen: "fehlgeschlagen — der Versand wurde abgelehnt",
+  // NICHT „abgelehnt". Der Ausgang entsteht an ZWEI Stellen im Endpunkt: bei
+  // einer Ablehnung durch Resend — dann ist das Token entwertet — und in dessen
+  // `catch`, wo der Versand UNBEKANNT ist: die Mail kann zugestellt sein, und
+  // das Token bleibt dort absichtlich gültig. „Abgelehnt" behauptete eine
+  // Ursache, die der Bericht nicht kennt. Befund des Diff-Reviews.
+  fehlgeschlagen: "fehlgeschlagen — kein Versand bestätigt",
 };
 
 /** Was im Zeilenmenü stehen kann. Nicht jede Aktion an jeder Zeile — was wo
@@ -334,6 +339,13 @@ export default function AdminMitgliederPage() {
   if (letzteSeite !== seitenschluessel) {
     setLetzteSeite(seitenschluessel);
     setAuswahl(new Set());
+    // DER BERICHT FÄLLT MIT. „Er bleibt stehen, bis der Admin ihn schliesst"
+    // meint: er verschwindet nicht von selbst wie ein Ton. Über einer ANDEREN
+    // Liste stehen zu bleiben ist etwas anderes — in der Sichtprobe stand der
+    // Bericht über zwei Mitgliedern aus ② über der Liste von ①, und nichts
+    // sagte, dass er sie nicht meint. Den Filter zu wechseln ist die Handlung
+    // des Admins, mit der er ihn schliesst.
+    setBericht(null);
   }
 
   /**
@@ -624,7 +636,11 @@ export default function AdminMitgliederPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
+    // `pb-28` und nicht `py-8` unten: der schwebende Knopf liegt fest am
+    // Ansichtsfenster und deckte in der Sichtprobe auf einem Telefon den
+    // „Weiter"-Knopf der Blätterung zu. Platz darunter löst es, ein Wegrücken
+    // des Knopfes verschöbe nur das Problem.
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-8 pb-28">
       <header className="flex flex-col gap-1">
         <h1 className="font-display text-2xl font-semibold text-ink">Mitglieder</h1>
         <p className="text-sm text-muted">
@@ -666,6 +682,12 @@ export default function AdminMitgliederPage() {
                   id={`reiter-${s.id}`}
                   aria-selected={gewaehlt}
                   aria-controls={tafelId}
+                  // Auch die Filter sind während des Laufs gesperrt. Ohne das
+                  // wechselte der Admin auf „Alle", der Fortschrittsstreifen
+                  // verschwände mit der Auswahlleiste, und die Schleife liefe
+                  // unsichtbar weiter — „die Liste steht still" wäre ein
+                  // grösseres Versprechen als die Umsetzung. Diff-Review.
+                  disabled={fortschritt !== null}
                   onClick={() => waehleFilter(s.id)}
                   className={
                     "flex flex-col gap-0.5 rounded-[var(--radius-card)] border px-4 py-2 text-left text-sm transition-colors " +
@@ -721,6 +743,7 @@ export default function AdminMitgliederPage() {
                 id={`reiter-${r.id}`}
                 aria-selected={gewaehlt}
                 aria-controls={tafelId}
+                disabled={fortschritt !== null}
                 onClick={() => waehleFilter(r.id)}
                 className={
                   "border-b-2 px-1 pb-3 text-sm font-medium whitespace-nowrap transition-colors " +
@@ -872,10 +895,12 @@ export default function AdminMitgliederPage() {
                   <span className="text-ink tabular-nums">
                     {treffer.length} {AUSGANG_TEXT[a]}
                   </span>
-                  {/* NAMENTLICH, nicht nur gezählt — ausser bei den
-                      Verschickten: „2 übersprungen" ohne die Namen zwingt den
-                      Admin, sie sich aus der Liste zusammenzusuchen. */}
-                  {a !== "verschickt" && treffer.length > 0 && (
+                  {/* NAMENTLICH, nicht nur gezählt — und zwar in JEDEM Topf.
+                      Die erste Fassung liess die Verschickten aus, um Platz zu
+                      sparen; der Diff-Review hat benannt, was das kostet: der
+                      Admin muss die genannten Fehlschläge von seiner Auswahl
+                      abziehen, um zu wissen, wer die Mail hat. */}
+                  {treffer.length > 0 && (
                     <span className="text-muted">
                       : {treffer.map((e) => e.name ?? "Ohne Namen").join(", ")}
                     </span>
@@ -903,6 +928,10 @@ export default function AdminMitgliederPage() {
             </Button>
           </div>
           <p className="mt-1 text-sm text-muted">
+            {/* Drei Zweige und kein Sammelzweig — dieselbe Erlaubnisliste-Disziplin
+                wie in `ausgangFuer`: ein unbekannter Schritt entsteht, wenn
+                Function und Fläche auseinanderlaufen, und darf dann nicht die
+                Auskunft eines bekannten bekommen. */}
             {anlageMeldung.schritt === "stufe_nicht_gesetzt" ? (
               <>
                 <strong>{anlageMeldung.name}</strong> hat ein Konto, aber die Stufe wurde nicht
@@ -910,12 +939,18 @@ export default function AdminMitgliederPage() {
                 „Stufe setzen“ im Zeilenmenü zu berichtigen. Ein zweites Anlegen hilft nicht —
                 die Adresse ist jetzt vergeben.
               </>
-            ) : (
+            ) : anlageMeldung.schritt === "mail_nicht_verschickt" ? (
               <>
                 <strong>{anlageMeldung.name}</strong> ist angelegt, die Bestätigungsmail ging
                 aber nicht hinaus. Das Mitglied steht trotzdem in ② Eingeladen, weil ein Link
-                erzeugt wurde; „Ausgewählte erinnern“ schickt ihn erneut, sobald das
-                Schutzfenster abgelaufen ist.
+                erzeugt wurde — dieser Link ist entwertet und hält das Schutzfenster NICHT.
+                „Ausgewählte erinnern“ schickt nach einer Minute einen neuen.
+              </>
+            ) : (
+              <>
+                <strong>{anlageMeldung.name}</strong> hat ein Konto, aber die Anlage ist nicht
+                vollständig durchgelaufen. Welcher Schritt fehlt, sagt die Antwort nicht — das
+                Mitglied steht in ① Angelegt und ist von dort aus zu prüfen.
               </>
             )}
           </p>
@@ -1136,11 +1171,17 @@ export default function AdminMitgliederPage() {
           verschwindet, ist unerreichbar. Die Abstände rechnen
           `env(safe-area-inset-*)` mit ein, damit er auf einem Gerät ohne
           Home-Knopf nicht im Wischstreifen liegt. */}
-      <Button
+      {/* EIN EIGENER KNOPF UND NICHT `Button`. Jener bringt `rounded-md` mit,
+          und `cn()` ist ein blosser Join ohne `tailwind-merge` — über den
+          Vorrang entscheidet dann die Reihenfolge im Stylesheet, nicht die im
+          Attribut. In der Sichtprobe war der Knopf deshalb ECKIG, obwohl
+          `rounded-full` danebenstand. Dieselbe Falle steht schon am Auslöser
+          des Zeilenmenüs im Kommentar. */}
+      <button
         type="button"
         aria-label="Mitglied anlegen"
         onClick={() => setMaskeOffen(true)}
-        className="fixed z-40 h-14 w-14 rounded-full p-0 shadow-soft"
+        className="fixed z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-soft transition-colors hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-soft focus-visible:outline-none"
         style={{
           right: "calc(1.5rem + env(safe-area-inset-right))",
           bottom: "calc(1.5rem + env(safe-area-inset-bottom))",
@@ -1150,7 +1191,7 @@ export default function AdminMitgliederPage() {
           <path d="M11 5h2v14h-2z" />
           <path d="M5 11h14v2H5z" />
         </svg>
-      </Button>
+      </button>
 
       {maskeOffen && (
         <AnlageMaske
@@ -1170,6 +1211,7 @@ export default function AdminMitgliederPage() {
       {einladefrage && (
         <Einladefrage
           menge={einladefrage}
+          erinnerung={reiter === "eingeladen"}
           onAbbrechen={() => setEinladefrage(null)}
           onBestaetigen={() => void einladungenSchicken(einladefrage)}
         />
@@ -1989,10 +2031,14 @@ function Auswahlkasten({
  */
 function Einladefrage({
   menge,
+  erinnerung,
   onAbbrechen,
   onBestaetigen,
 }: {
   menge: AdminMember[];
+  /** In ② heisst dieselbe Handlung erinnern. Die Rückfrage sagt das auch —
+   *  sonst fragt sie nach etwas anderem, als der Knopf verspricht. */
+  erinnerung: boolean;
   onAbbrechen: () => void;
   onBestaetigen: () => void;
 }) {
@@ -2004,12 +2050,13 @@ function Einladefrage({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={`Einladung an ${menge.length} Mitglieder`}
+      aria-label={`${erinnerung ? "Erinnerung" : "Einladung"} an ${menge.length} Mitglieder`}
     >
       <div className="absolute inset-0 bg-scrim backdrop-blur-sm" onClick={onAbbrechen} />
       <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-canvas p-6 shadow-soft">
         <h2 className="font-display text-lg font-semibold text-ink">
-          An {menge.length} Mitglieder eine Einladung schicken?
+          An {menge.length} Mitglieder {erinnerung ? "eine Erinnerung" : "eine Einladung"}{" "}
+          schicken?
         </h2>
         <p className="mt-2 text-sm text-muted">
           Verschickte Mails lassen sich nicht zurückholen.

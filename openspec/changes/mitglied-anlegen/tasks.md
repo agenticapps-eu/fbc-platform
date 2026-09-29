@@ -239,16 +239,40 @@ Aufruf, der gar nicht von der Fläche kommt.
       bedienbar, auf Mobil nicht von Feedback- oder Chat-Fläche verdeckt
 - [x] `pnpm build`, danach `git checkout -- src/content/release-entries.generated.ts`
 
-## 6 · Abnahme
+## 6 · Abnahme — erledigt
 
-- [ ] Code-Review auf den **Diff** (zwei Anbieter, in `REVIEWS.md` aufgelöst)
-- [ ] Sichtprobe gegen den lokalen Stack: Mitglied anlegen mit und ohne Haken,
-      beide landen im richtigen Schritt
-- [ ] Sichtprobe für den `pending`-Fall: zweimal hintereinander einladen, und der
-      Bericht sagt beim zweiten Mal die Wahrheit
-- [ ] Die drei Schritte summieren sich auf einem PROD-ähnlichen Bestand zu dem,
-      was heute „Nicht aktiviert" ist
-- [ ] `docs/lastenheft.md` nachziehen
+- [x] Code-Review auf den **Diff** (gemini und opencode, beide
+      REQUEST-CHANGES, elf Befunde aufgelöst, zwei begründet nicht geändert —
+      `REVIEWS.md`, Abschnitt „Diff-Review (Stufe 2)")
+- [x] Sichtprobe gegen den lokalen Stack: Mitglied anlegen **ohne** Haken →
+      `201 ok / ohne_mail_angelegt`, steht in ① Angelegt; **mit** Haken →
+      `207 teilweise / mail_nicht_verschickt` (der Resend-Schlüssel der
+      Sichtprobe ist ungültig, der Versand wird also abgelehnt), das Konto
+      steht auf FOCUS in ② Eingeladen, mit **einer** Tokenzeile, **entwertet**.
+      Genau die Lage, für die es die Meldung gibt: ein Link wurde erzeugt, die
+      Mail ging nicht hinaus, und das sagt sonst niemand
+- [x] Sichtprobe für den `pending`-Fall — als Vorlage gesät statt zweimal
+      geklickt: zwei Mitglieder mit gültigem, unbenutztem Link, dann
+      „Ausgewählte erinnern". Bericht: **0 verschickt, 2 übersprungen — es
+      liegt noch ein gültiger Link im Postfach: <beide namentlich>**. Es ging
+      nichts hinaus, und der Bericht behauptet es auch nicht
+- [x] Die drei Schritte summieren sich: am laufenden Stack gemessen
+      **35 = 29 + 6** und **6 = 4 (angelegt) + 2 (eingeladen)** — die
+      Summenzusage der Datenbank an der Fläche nachgerechnet
+- [x] `docs/lastenheft.md` nachziehen — D.8.1 trägt jetzt die Aufnahmestrecke,
+      das Anlegen ohne Stripe und den Bericht; der Zaun aus AGE-304 bleibt
+      benannt, samt der einen Wirkung, die die Auswahl haben darf
+
+**Was die Sichtprobe zusätzlich gefunden hat** (alles behoben, mit Zusagen):
+
+* Der **Bericht blieb über einem anderen Filter stehen** — zwei Mitglieder aus
+  ② über der Liste von ①, und nichts sagte, dass er sie nicht meint.
+* Der **schwebende Knopf war eckig**: `Button` bringt `rounded-md` mit, `cn()`
+  ist ein blosser Join ohne `tailwind-merge`. Jetzt ein eigener Knopf.
+* Der Knopf **verdeckte auf dem Telefon die Blätterung**. Platz darunter
+  (`pb-28`) statt Wegrücken.
+* Die Rückfrage sagte auch in ② „Einladung" — dort heisst die Handlung
+  erinnern.
 
 ## 7 · Nach dem Merge
 

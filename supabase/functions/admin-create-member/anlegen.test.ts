@@ -1,7 +1,6 @@
 import { assertEquals } from "jsr:@std/assert@1";
 import {
   CLUB_PLAENE,
-  gleicheAdresse,
   parseCreateRequest,
   zusammenfassen,
 } from "./anlegen.ts";
@@ -88,12 +87,6 @@ Deno.test("parseCreateRequest nimmt Firma und Telefon, wenn sie da sind", () => 
     parseCreateRequest({ ...{ vorname: "A", nachname: "B", email: "a@b.test", plan: "impact", mailSenden: true }, firma: "   " })?.firma,
     null,
   );
-});
-
-Deno.test("gleicheAdresse vergleicht ohne Rücksicht auf Schreibung", () => {
-  assertEquals(gleicheAdresse("Anna@Example.TEST", "anna@example.test"), true);
-  assertEquals(gleicheAdresse(" anna@example.test ", "anna@example.test"), true);
-  assertEquals(gleicheAdresse("anna@example.test", "anne@example.test"), false);
 });
 
 Deno.test("zusammenfassen: der Normalfall", () => {

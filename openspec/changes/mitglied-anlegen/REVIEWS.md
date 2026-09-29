@@ -140,6 +140,103 @@ haben. Wer das anders sieht, laesst
 noch einmal laufen — **vorher diese Resolution sichern**, der Erzeuger schreibt
 die Datei neu.
 
+
+
+---
+
+## Diff-Review (Stufe 2, 29.09.) — auf dem fertigen Code, nicht auf dem Plan
+
+Gegenstand: `git diff origin/main...HEAD -- supabase src`, 3997 Zeilen.
+Prompt-Digest: `sha256:b1c541452bb9212f…`.
+
+| Reviewer | Modell | Verdikt |
+|---|---|---|
+| gemini | gemini (über `reviewer-cli.sh`, exit 0) | REQUEST-CHANGES |
+| opencode | `hf:moonshotai/Kimi-K3` | REQUEST-CHANGES |
+
+Zwei Anbieter, beide fremd. Codex wurde nicht gefragt — er delegiert bei
+Artefaktsätzen dieser Grösse zurück (Befund aus Runde 1 des Plan-Reviews).
+
+### Was geändert wurde
+
+**[MEDIUM, opencode] Der Meldungstext zu `mail_nicht_verschickt` liess den Admin
+24 Stunden warten, die es nicht gibt.** Bei abgelehntem Versand entwertet die
+Function das Token, und `issue_activation_token` prüft das Schutzfenster
+ausdrücklich mit `invalidated_at is null` — ein entwertetes Token hält es nicht.
+*Am Rumpf der Funktion nachgelesen, nicht geglaubt:* die 24 Stunden greifen
+nicht, der 60-Sekunden-Riegel schon, denn der zählt `max(created_at)` über
+**alle** Tokenzeilen. Der Text sagt jetzt genau das.
+
+**[MEDIUM, opencode] Der Bericht behauptete für `fehlgeschlagen` eine Ursache,
+die er nicht kennt.** „Der Versand wurde abgelehnt" gilt für den einen der zwei
+Wege in diesen Ausgang; der andere ist der `catch` der Function, wo der Versand
+**unbekannt** ist — die Mail kann zugestellt sein, und genau deshalb bleibt das
+Token dort absichtlich gültig. Jetzt: „kein Versand bestätigt". Eine eigene
+Zusage hält den Satz fest.
+
+**[LOW, gemini] Der Bericht nannte die Verschickten nicht namentlich.** Die
+Asymmetrie zwang den Admin, die genannten Fehlschläge von seiner Auswahl
+abzuziehen. Jetzt trägt jeder Topf seine Namen.
+
+**[LOW, opencode] `gleicheAdresse` war toter Produktivcode** — exportiert,
+getestet, nie gerufen (der Vergleich steckt im RPC). Gelöscht, samt Zusage.
+Deno: 288 → 287.
+
+**[LOW, opencode] Der Kommentar zur Mengengrenze war falsch** („eine Seite fasst
+50"; sie fasst 25). Die Kappe von 50 bleibt und lässt zwei volle Seiten zu.
+
+**[LOW, opencode] `limit 1` ohne `order by`** in `admin_adresse_nachschlagen`.
+Der Fall — zwei Schreibungen derselben Adresse — ist auf PROD gemessen
+**0-mal** vorhanden, aber der Plan entschiede sonst, welche der Admin sieht.
+`order by u.created_at` ergänzt. Die Migration ist nicht ausgeliefert, sie
+liegt nur lokal; deshalb geändert statt nachgeschoben.
+
+**[LOW, opencode] Die Filter blieben während des Laufs bedienbar.** Der Wechsel
+auf „Alle" liess den Fortschritt verschwinden, während die Schleife weiterlief —
+„die Liste steht still" war ein grösseres Versprechen als die Umsetzung. Filter
+sind jetzt gesperrt, mit eigener Zusage.
+
+**[LOW, opencode] Die Zählvorrichtung verletzte ihre eigene Gleichung**
+(`alle` ≠ `aktiviert` + `offen`, 12 ≠ 10 + 5). Auf 7 berichtigt.
+
+**[LOW, opencode] Ein unbekannter `schritt` bekam den Text eines bekannten.**
+Jetzt drei Zweige und kein Sammelzweig — dieselbe Erlaubnisliste-Disziplin wie
+in `ausgangFuer`.
+
+**[LOW, opencode] `502` sagte „Es ist nichts entstanden".** Im Rennfall ist das
+falsch: ein Konto besteht, nur nicht von diesem Aufruf. Satz entschärft.
+
+**[LOW, gemini] Die Adressform steht an zwei Stellen.** Beide tragen jetzt einen
+Verweis aufeinander; die im Endpunkt ist als die massgebliche benannt.
+
+### Bewusst NICHT geändert
+
+**Der Rennfall bekommt keinen zweiten Nachschlag** (opencode: bei
+`23505` erneut `admin_adresse_nachschlagen` rufen und 409 antworten). Der
+Ausgang heilt sich beim nächsten Versuch von selbst — dann greift die reguläre
+409-Prüfung. Ein zweiter Pfad in den Fehlerzweig wäre ein Zweig, den keine
+Zusage erreicht, weil das Rennen im Test nicht herstellbar ist. Der falsche Satz
+war das eigentliche Problem und ist weg.
+
+**`ladeEin` bleibt bei „der erste nichtleere Topf gewinnt"** (opencode:
+bei einem Serverfehler, der eine Kennung in zwei Töpfe legt, gewänne still
+`verschickt`). Der Endpunkt legt je Kennung genau ein Ergebnis ab — die Schleife
+dort ruft `ergebnisse.push` einmal je Durchlauf und `continue` danach. Eine
+Abwehr gegen einen Rumpf, den derselbe Diff erzeugt, wäre Misstrauen gegen die
+eigene Zusage.
+
+### Annahmen, die die Reviewer benannt haben — gemessen statt angenommen
+
+* **„`issue_activation_token` kennt keinen `activated`-Status."** Stimmt, und es
+  ist folgenlos: am Katalog gemessen gibt die Funktion genau sieben Werte zurück
+  (`blocked, issued, issued_reset, pending, rate_limited, rate_limited_day,
+  unknown`) — die sieben, die `ausgangFuer` als Erlaubnisliste führt. Der
+  `already_activated`-Zweig gehört dem **Selbst**-Anforderungsweg.
+* **„`alle` = `aktiviert` + `offen`"** — an der Fläche gegen den lokalen Stack
+  nachgerechnet: 35 = 29 + 6, und 6 = 4 (angelegt) + 2 (eingeladen).
+* **„`admin_audit.action` kennt `create_member`"** — gemessen: der Eintrag steht
+  nach der Sichtprobe in der Tabelle, `action = create_member`, `tier = discover`.
+
 <!-- openspec-review-trailer v1
 implementing-host: claude
 digest: sha256:9378928451b57ea9963e941052dc6d80d06fe5e374c912d69e7ac9b97bdf5360

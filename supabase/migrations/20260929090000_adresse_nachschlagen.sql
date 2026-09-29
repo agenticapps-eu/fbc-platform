@@ -52,6 +52,13 @@ as $$
     from auth.users u
     join public.profiles p on p.id = u.id
    where lower(u.email) = lower(btrim(p_email))
+   -- `order by` und nicht nur `limit 1`: der Unique-Index auf `auth.users(email)`
+   -- ist schreibungsempfindlich, zwei Schreibungen derselben Adresse koennen
+   -- also nebeneinander stehen — genau der Fall, den `lower()` hier abbilden
+   -- soll. Ohne Ordnung entschiede der Plan, welche der Admin zu sehen bekommt.
+   -- Gemessen am 29.09. auf PROD: 0 solche Paare. Die Ordnung kostet nichts und
+   -- macht aus „kommt nicht vor" ein „ist entschieden". Diff-Review.
+   order by u.created_at
    limit 1;
 $$;
 

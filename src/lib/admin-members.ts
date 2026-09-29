@@ -375,7 +375,11 @@ export type AnlageAusgang =
 const ANLAGE_SAETZE: Record<number, string> = {
   400: "Die Angaben sind unvollständig oder die Adresse hat keine gültige Form.",
   403: "Dafür fehlt die Berechtigung — nur Admins können Mitglieder anlegen.",
-  502: "Das Konto konnte nicht angelegt werden. Es ist nichts entstanden.",
+  // NICHT „es ist nichts entstanden". Denselben Ausgang nimmt der Rennfall:
+  // zwei gleichzeitige Anlagen, der partielle Unique-Index wirft für die
+  // zweite — und dann BESTEHT ein Konto, nur nicht von diesem Aufruf. Ein
+  // zweiter Versuch beantwortet das sauber mit 409. Befund des Diff-Reviews.
+  502: "Das Konto konnte nicht angelegt werden. Noch einmal versuchen.",
 };
 
 /**

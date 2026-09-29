@@ -553,6 +553,61 @@ describe("Der Lauf, der Fortschritt und der Bericht (5.7)", () => {
     expect(lastListArgs().p_offset).toBe(0);
   });
 
+  it("nennt auch die Verschickten namentlich", async () => {
+    invoke
+      .mockResolvedValueOnce(bericht("verschickt", ANNA.id, ANNA.name))
+      .mockResolvedValueOnce(bericht("fehlgeschlagen", BODO.id, BODO.name));
+    await auswaehlenUndAusloesen(["Anna Angelegt", "Bodo Angelegt"]);
+    fireEvent.click(await screen.findByRole("button", { name: /^Einladen$/ }));
+
+    // Ohne die Namen im Erfolgstopf muss der Admin die genannten Fehlschläge
+    // von seiner Auswahl abziehen, um zu wissen, wer die Mail hat.
+    const b = await screen.findByRole("status");
+    expect(within(b).getByText(/Anna Angelegt/)).toBeInTheDocument();
+    expect(within(b).getByText(/Bodo Angelegt/)).toBeInTheDocument();
+  });
+
+  it("behauptet für einen Fehlschlag keine Ursache, die er nicht kennt", async () => {
+    invoke.mockResolvedValue(bericht("fehlgeschlagen", ANNA.id, ANNA.name));
+    await auswaehlenUndAusloesen(["Anna Angelegt"]);
+    fireEvent.click(await screen.findByRole("button", { name: /^Einladen$/ }));
+
+    // Der Ausgang entsteht an zwei Stellen: bei einer Ablehnung durch Resend —
+    // dann ist das Token entwertet — und im `catch` der Function, wo der
+    // Versand UNBEKANNT ist und die Mail zugestellt sein kann.
+    const b = await screen.findByRole("status");
+    expect(b).toHaveTextContent(/kein Versand bestätigt/);
+    expect(b).not.toHaveTextContent(/abgelehnt/);
+  });
+
+  it("nimmt den Bericht weg, sobald ein anderer Filter gewählt ist", async () => {
+    invoke.mockResolvedValue(bericht("uebersprungen", ANNA.id, ANNA.name));
+    await auswaehlenUndAusloesen(["Anna Angelegt"]);
+    fireEvent.click(await screen.findByRole("button", { name: /^Einladen$/ }));
+    await screen.findByRole("status");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Alle" }));
+
+    // In der Sichtprobe stand der Bericht über zwei Mitgliedern aus ② über der
+    // Liste von ① — und nichts sagte, dass er sie nicht meint.
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
+  it("sperrt während des Laufs auch die Filter, nicht nur die Kästchen", async () => {
+    let fertig: (wert: unknown) => void = () => {};
+    invoke.mockReturnValueOnce(new Promise((aufloesen) => (fertig = aufloesen)));
+    await auswaehlenUndAusloesen(["Anna Angelegt", "Bodo Angelegt"]);
+    fireEvent.click(await screen.findByRole("button", { name: /^Einladen$/ }));
+    await waitFor(() => expect(invokeCalls("admin-invite-members")).toHaveLength(1));
+
+    // Ohne das wechselte der Admin auf „Alle", der Fortschritt verschwände mit
+    // der Auswahlleiste, und die Schleife liefe unsichtbar weiter.
+    expect(screen.getByRole("tab", { name: "Alle" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /Bestätigt/ })).toBeDisabled();
+
+    fertig(bericht("verschickt", ANNA.id, ANNA.name));
+  });
+
   it("bricht beim Wegnavigieren ab, statt weiterzuschicken", async () => {
     // Der erste Aufruf bleibt offen, bis der Test ihn auflöst — dazwischen
     // verlässt der Admin die Seite.

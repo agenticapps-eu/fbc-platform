@@ -15,6 +15,12 @@ export type ClubPlan = (typeof CLUB_PLAENE)[number];
 // Anmeldedienst übernommen — eine strenge Prüfung gäbe eine Sicherheit vor,
 // die sie nicht hat. Was sie abfängt, sind Tippfehler und leere Felder.
 // Dieselbe Begründung wie in change-email.ts.
+//
+// DIESELBE FORM steht ein zweites Mal in `AdminMitgliederPage.tsx`
+// (`EMAIL_FORM`), damit die Maske sagen kann, was fehlt, bevor ein Konto
+// entsteht. Zwei Stellen, eine Regel — wer sie ändert, ändert beide. Die
+// hier ist die massgebliche: sie greift auch für Aufrufe, die an der Maske
+// vorbeigehen.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface CreateRequest {
@@ -72,10 +78,6 @@ export function parseCreateRequest(body: unknown): CreateRequest | null {
   };
 }
 
-/** Vergleicht zwei Anmeldeadressen so, wie die Prüfung es zusagt. */
-export function gleicheAdresse(a: string, b: string): boolean {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
-}
 
 export interface AnlageVerlauf {
   kontoAngelegt: boolean;

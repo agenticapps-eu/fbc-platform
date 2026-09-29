@@ -118,7 +118,9 @@ function listCalls(): number {
  *  nie gibt. */
 const ZAEHLER = [
   { status: "alle", anzahl: 12 },
-  { status: "aktiviert", anzahl: 10 },
+  // 7 und nicht 10: `alle` ist `aktiviert` plus `offen` — eine Vorrichtung, die
+  // das verletzt, prueft eine Flaeche, die es nie gibt. Diff-Review.
+  { status: "aktiviert", anzahl: 7 },
   { status: "offen", anzahl: 5 },
   { status: "angelegt", anzahl: 2 },
   { status: "eingeladen", anzahl: 3 },
