@@ -64,7 +64,10 @@ $$;
 
 -- Erst entziehen, dann geben: `create function` gibt PUBLIC das
 -- Ausführungsrecht mit, und `default privileges` wirken auf Funktionen nicht.
-revoke execute on function public.admin_adresse_nachschlagen(text) from public, anon, authenticated;
+-- Alle Rollen nennen, dann genau eine zurückgeben: eine frisch angelegte
+-- Instanz vergibt rollen-eigen (siehe 20260827070000).
+revoke execute on function public.admin_adresse_nachschlagen(text)
+  from public, anon, authenticated, service_role;
 grant  execute on function public.admin_adresse_nachschlagen(text) to service_role;
 
 comment on function public.admin_adresse_nachschlagen(text) is
@@ -141,7 +144,7 @@ begin
 end $$;
 
 revoke execute on function public.admin_mitglied_einrichten(uuid, uuid, text, text, text, text)
-  from public, anon, authenticated;
+  from public, anon, authenticated, service_role;
 grant execute on function public.admin_mitglied_einrichten(uuid, uuid, text, text, text, text)
   to service_role;
 

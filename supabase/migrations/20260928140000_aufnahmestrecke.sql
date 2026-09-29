@@ -107,9 +107,18 @@ $$;
 -- mit. Hier wird NUR entzogen: die Funktion ist keine Fläche, sondern eine
 -- Bedingung. Beide Aufrufer sind SECURITY DEFINER mit Eigentümer `postgres`,
 -- und dort prüft PostgreSQL das Ausführungsrecht gegen den EIGENTÜMER.
+--
+-- ALLE VIER ROLLEN WERDEN GENANNT, und das ist nicht Gründlichkeit, sondern
+-- der Befund aus `20260827070000_entzuege_nennen_alle_rollen.sql`: **eine frisch
+-- angelegte Instanz vergibt die Rechte ROLLEN-EIGEN statt über die Pseudo-Rolle
+-- `public`.** Ein `revoke … from public, anon` lässt dort das eigene Recht von
+-- `authenticated` stehen. Genau diese Datei hatte den Fehler wieder — auf einem
+-- gewachsenen lokalen Stack blieb er unsichtbar, die CI hat ihn mit derselben
+-- Zusage gefangen, für die jene Migration geschrieben wurde
+-- (`admin_member_list_test.sql` Nr. 74, `admin_einladungsstand_test.sql` Nr. 18).
 revoke execute on function
   public.member_state_matches(text, timestamptz, timestamptz, timestamptz, timestamptz)
-  from public, anon;
+  from public, anon, authenticated, service_role;
 
 comment on function
   public.member_state_matches(text, timestamptz, timestamptz, timestamptz, timestamptz) is
@@ -210,7 +219,12 @@ end $$;
 -- `default privileges` wirken auf Funktionen NICHT. Ohne diese Zeile darf anon
 -- die Mitgliederliste aufrufen — die Abwehr sässe dann allein im `is_admin()`
 -- des Rumpfes, und die Zusage „anon haelt kein EXECUTE" wäre still gebrochen.
-revoke execute on function public.admin_list_members(text, text, int, int) from public, anon;
+-- Dieselbe Lehre wie oben: erst ALLE Rollen entziehen, dann genau die eine
+-- zurückgeben, die die Fläche braucht. `from public, anon` allein liesse auf
+-- einer frisch angelegten Instanz das rollen-eigene Recht von `service_role`
+-- stehen.
+revoke execute on function public.admin_list_members(text, text, int, int)
+  from public, anon, authenticated, service_role;
 grant  execute on function public.admin_list_members(text, text, int, int) to authenticated;
 
 comment on function public.admin_list_members(text, text, int, int) is
