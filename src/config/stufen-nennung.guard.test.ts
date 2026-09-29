@@ -33,6 +33,9 @@ const DARF_DIE_GANZE_LEITER_LESEN: Record<string, string> = {
   "config/levels.ts": "definiert sie",
   "config/levels.test.ts": "prüft sie",
   "config/stufen-nennung.guard.test.ts": "diese Datei",
+  "content/release-entries.generated.ts":
+    "erzeugt aus dem Archiv, erreicht kein Mitglied — und der Archiveintrag zu " +
+    "AGE-969 nennt `LEVEL_ORDER`, weil er erklaert, dass die Leiter bleibt",
   "components/membership/MembershipSummary.tsx":
     "sucht die nächste Stufe — liest aber GENANNTE_STUFEN, nicht die Leiter; " +
     "steht hier, falls die Einfuhr zurückkommt",
