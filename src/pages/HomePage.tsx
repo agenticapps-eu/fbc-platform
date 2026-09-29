@@ -6,7 +6,7 @@ import { PageHero } from "../components/ui/PageHero";
 import { Card } from "../components/ui/Card";
 import { TierBadge } from "../components/ui/TierBadge";
 import { VideoEmbed } from "../components/ui/VideoEmbed";
-import { CLUB_LEVEL, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
+import { CLUB_LEVEL, GENANNTE_STUFEN, LEVELS, levelLabel } from "../config/levels";
 import { displayAuthor } from "../lib/displayAuthor";
 import { REGISTRIEREN_PFAD } from "./LoginPage";
 import {
@@ -160,8 +160,10 @@ function PublicHome() {
  * ohnehin definiert, und eine Einladung. Auf dieser Seite standen bis AGE-541
  * vier erfundene Angaben; die Schiene ist nicht der Ort, an dem neue entstehen.
  *
- * Gelesen wird aus `LEVEL_ORDER` und `LEVELS`, nicht aus einer abgeschriebenen
- * Liste: eine zweite Liste driftet von dem weg, was die Plattform verkauft.
+ * Gelesen wird aus `GENANNTE_STUFEN` und `LEVELS`, nicht aus einer
+ * abgeschriebenen Liste: eine zweite Liste driftet von dem weg, was die
+ * Plattform verkauft. Seit AGE-969 sind das die drei Clubstufen — die Leiter
+ * selbst ist unveraendert sechsteilig, sie wird hier nur nicht aufgezaehlt.
  */
 function Stufenschiene() {
   return (
@@ -173,12 +175,15 @@ function Stufenschiene() {
         Mitglied werden
       </h2>
       <p className="text-sm text-muted">
-        Sechs Stufen, aufsteigend. Der Club beginnt bei {levelLabel(CLUB_LEVEL)} — darunter
-        legst du kostenlos ein Profil an und siehst öffentliche Events.
+        Der Club beginnt bei {levelLabel(CLUB_LEVEL)}. Ohne Mitgliedschaft legst du kostenlos
+        ein Profil an und siehst öffentliche Events.
       </p>
 
       <ul className="space-y-2">
-        {LEVEL_ORDER.map((key) => {
+        {/* Die Schiene ist die einzige OEFFENTLICHE Flaeche mit einer
+            Stufenliste — wer kein Konto hat, sieht hier zuerst, welche es
+            gibt. Seit AGE-969 nennt sie nur die Clubstufen. */}
+        {GENANNTE_STUFEN.map((key) => {
           const stufe = LEVELS[key];
           return (
             <li key={key}>

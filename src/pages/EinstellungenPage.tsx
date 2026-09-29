@@ -20,7 +20,7 @@ import {
 } from "../lib/member-settings";
 import { kontoLoeschen } from "../lib/konto-loeschen";
 import { MIN_PASSWORT_LAENGE } from "../config/auth";
-import { levelLabel, DEFAULT_LEVEL } from "../config/levels";
+import { DEFAULT_LEVEL, KEIN_CLUBZUGANG_SATZ, genannterName } from "../config/levels";
 import { useAuth } from "../providers/auth-context";
 import { useDesignVariant } from "../providers/design-variant-context";
 
@@ -268,10 +268,20 @@ export default function EinstellungenPage() {
 
       <Card className="flex flex-col gap-4">
         <CardTitle>Mitgliedschaft</CardTitle>
-        <div className="flex items-center gap-2">
-          <TierBadge tier={tier ?? DEFAULT_LEVEL} />
-          <span className="text-sm text-muted">{levelLabel(tier ?? DEFAULT_LEVEL)}-Mitglied</span>
-        </div>
+        {/* AGE-969: Unterhalb des Clubs steht hier keine Stufe, sondern eine
+            Aussage über den Zugang — samt Weg. Die Karte trifft die einzige
+            Gruppe, die wächst: Selbstregistrierungen landen dort, und der
+            Kaufweg ruht. */}
+        {genannterName(tier ?? DEFAULT_LEVEL) === null ? (
+          <p className="text-sm text-muted">{KEIN_CLUBZUGANG_SATZ}</p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <TierBadge tier={tier ?? DEFAULT_LEVEL} />
+            <span className="text-sm text-muted">
+              {genannterName(tier ?? DEFAULT_LEVEL)}-Mitglied
+            </span>
+          </div>
+        )}
         {/* AGE-907: Hier stand „Stufe ansehen & upgraden". Der Kaufweg ist
             ruhend; die Karte beantwortet weiter „welche Stufe habe ich?" über
             Abzeichen und Namen, und das war ohnehin ihr Titel. Zurückholen für

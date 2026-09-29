@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLUB_RANK,
   DEFAULT_LEVEL,
+  GENANNTE_STUFEN,
+  genannterName,
   LEVELS,
   LEVEL_ORDER,
   LEVEL_RANK,
@@ -97,5 +100,67 @@ describe("Leiter V5", () => {
     for (const level of LEVEL_ORDER) {
       expect(LEVELS[level].key).toBe(level);
     }
+  });
+});
+
+/**
+ * Welche Stufen die Oberfläche BENENNT (AGE-969).
+ *
+ * Getrennt vom Rest dieser Datei, weil es eine andere Frage ist: die Leiter
+ * oben beschreibt, was es GIBT; hier steht, worüber gesprochen wird. Die
+ * Datenbank kennt weiterhin sechs.
+ */
+describe("Die genannten Stufen (AGE-969)", () => {
+  it("nennt genau die drei Clubstufen", () => {
+    expect(GENANNTE_STUFEN).toEqual(["discover", "focus", "impact"]);
+  });
+
+  it("löscht dabei nichts — die Leiter führt weiterhin sechs", () => {
+    // Die Positivkontrolle zu allem, was darunter steht. Ohne sie bestünde
+    // „nicht gelöscht" auch dann, wenn jemand `LEVEL_ORDER` gekürzt hätte.
+    expect(LEVEL_ORDER).toHaveLength(6);
+    expect(Object.keys(LEVELS)).toHaveLength(6);
+    expect(levelLabel("active")).toBe("Active");
+  });
+
+  it("gibt für eine genannte Stufe ihren Namen", () => {
+    expect(genannterName("discover")).toBe("Discover");
+    expect(genannterName("focus")).toBe("Focus");
+    expect(genannterName("impact")).toBe("Impact");
+  });
+
+  it("gibt für eine nicht genannte Stufe NULL, nicht den leeren Text", () => {
+    // `null` und nicht `""`: die Fläche soll die Plakette weglassen können.
+    // Ein leerer Text liefe durch jede Bedingung, die auf Wahrheit prüft, und
+    // erzeugte einen sichtbaren Kasten ohne Inhalt.
+    expect(genannterName("active")).toBeNull();
+    expect(genannterName("boost")).toBeNull();
+    expect(genannterName("connect")).toBeNull();
+  });
+
+  it("gibt auch für einen unbekannten Schlüssel NULL", () => {
+    // Eine halbe Auslieferung — Datenbank neu, Bündel alt — darf keinen rohen
+    // Schlüssel an die Oberfläche lassen.
+    expect(genannterName("gibtesnicht")).toBeNull();
+    expect(genannterName("")).toBeNull();
+  });
+
+  /**
+   * DIESER TEST SOLL EINES TAGES FALLEN, und dann muss die Meldung den
+   * nächsten Bearbeiter anleiten — sonst wird er stillschweigend gelöscht.
+   * Befund des Plan-Reviews (opencode).
+   */
+  it("ist heute deckungsgleich mit den Clubstufen — als STAND, nicht als Gesetz", () => {
+    const clubstufen = LEVEL_ORDER.filter((k) => LEVELS[k].rank >= CLUB_RANK);
+    expect(
+      GENANNTE_STUFEN,
+      "Diese Zusage hält den Stand vom 29.09.2026 fest (AGE-969): die genannten " +
+        "Stufen sind heute genau die Clubstufen. Sie ist ABSICHTLICH keine " +
+        "Ableitung — `CLUB_RANK` ist die Zahl, die als has_level(4) auch in den " +
+        "SQL-Policies steht; eine Anzeigeänderung darf sie nicht bewegen. " +
+        "WENN DU HIER STEHST, weil du eine Stufe wieder sichtbar gemacht hast: " +
+        "das ist richtig so. Ändere GENANNTE_STUFEN, lösche diese Zusage, und " +
+        "schreib in den Commit, dass die Deckungsgleichheit damit endet.",
+    ).toEqual(clubstufen);
   });
 });

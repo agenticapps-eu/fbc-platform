@@ -13,7 +13,12 @@ import { PageSkeleton } from "../components/ui/Skeleton";
 import { TierBadge } from "../components/ui/TierBadge";
 import { useOverlay } from "../components/ui/useOverlay";
 import { useToast } from "../components/ui/toast-context";
-import { CLUB_LEVEL, CLUB_RANK, LEVELS, LEVEL_ORDER, levelLabel } from "../config/levels";
+import {
+  CLUB_LEVEL,
+  GENANNTE_STUFEN,
+  levelLabel,
+  waehlbareStufen,
+} from "../config/levels";
 import { requestActivationLink } from "../lib/activation";
 import {
   activateMember,
@@ -36,7 +41,6 @@ import {
   type LebenszyklusAktion,
   type NeuesMitglied,
 } from "../lib/admin-members";
-
 /**
  * Die Admin-Mitgliederliste (AGE-566).
  *
@@ -57,11 +61,8 @@ import {
  * DIE GRENZE STEHT IN DER DATENBANK. `is_admin()` sitzt im Rumpf der beiden
  * RPCs; `RequireAdmin` an der Route ist Komfort.
  */
-
 type Sicht = "Tabelle" | "Karten" | "Verzeichnis";
-
 const SICHTEN: Sicht[] = ["Tabelle", "Karten", "Verzeichnis"];
-
 /**
  * Die SIEBEN Filter (AGE-581 Abschnitt 8, erweitert in AGE-927) — und ihre
  * Abbildung auf `p_status` ist NICHT die Identität. Genau deshalb steht sie
@@ -90,13 +91,11 @@ type Reiter =
   | "deaktiviert"
   | "geloescht"
   | "mitgliedschaft";
-
 interface Filterdefinition {
   id: Reiter;
   label: string;
   status: AdminMemberStatus;
 }
-
 /**
  * Die Aufnahmestrecke — eine FOLGE, keine Aufzählung.
  *
@@ -125,7 +124,6 @@ const STRECKE: (Filterdefinition & { ziffer: string; naechste?: string })[] = [
   },
   { id: "bestaetigt", ziffer: "③", label: "Bestätigt", status: "aktiviert" },
 ];
-
 /** Die übrigen Zustände. Sie beantworten „welcher Ausschnitt des Bestands?" —
  *  eine andere Frage, deshalb eine eigene Gruppe. */
 const REITER: Filterdefinition[] = [
@@ -134,19 +132,15 @@ const REITER: Filterdefinition[] = [
   { id: "geloescht", label: "Gelöscht", status: "geloescht" },
   { id: "mitgliedschaft", label: "Mitgliedschaft", status: "alle" },
 ];
-
 /** Beide Gruppen sind EINE Auswahl: genau einer der sieben ist gewählt. Die
  *  Trennung ist Darstellung, nicht Abfrage. */
 const FILTER: Filterdefinition[] = [...STRECKE, ...REITER];
-
 /** Der Filter steht in der Adresse (`?tab=geloescht`), damit ein Neuladen ihn
  *  nicht verliert — auf einer Fläche, die beim Aufräumen oft neu geladen wird. */
 const REITER_PARAM = "tab";
-
 /** Der Wert, den die Fläche bis AGE-927 unter „Nicht aktiviert" führte. Er
  *  steht in Lesezeichen und meinte die Vereinigung aus ① und ②. */
 const ALTER_WERT = "offen";
-
 /**
  * Ein unbekannter oder fehlender Wert fällt auf „Alle" zurück, statt eine leere
  * Liste oder einen Fehler zu zeigen: die Adresszeile ist Eingabe von aussen.
@@ -159,14 +153,12 @@ function leseReiter(wert: string | null): Reiter {
   if (wert === ALTER_WERT) return "angelegt";
   return FILTER.some((r) => r.id === wert) ? (wert as Reiter) : "alle";
 }
-
 /** In welchen Schritten die Mehrfachauswahl etwas bewirken kann (ADR-0007).
  *  In ③, „Alle", „Deaktiviert", „Gelöscht" und „Mitgliedschaft" gibt es weder
  *  Kästchen noch Handlung — dort bewirkte sie nichts. */
 function auswahlErlaubt(reiter: Reiter): boolean {
   return reiter === "angelegt" || reiter === "eingeladen";
 }
-
 /** Ein Ergebnis des Laufs, so wie die Fläche es festhält: die Kennung und der
  *  Name kommen aus der LISTE, der Ausgang aus der Antwort. */
 interface Einladungsergebnis {
@@ -174,7 +166,6 @@ interface Einladungsergebnis {
   name: string | null;
   ausgang: Ausgang;
 }
-
 /** Wie der Bericht die fünf Ausgänge nennt — und warum. Der Grund steht dabei,
  *  weil „übersprungen" ohne ihn wie ein Fehler aussieht. */
 const AUSGANG_TEXT: Record<Ausgang, string> = {
@@ -189,7 +180,6 @@ const AUSGANG_TEXT: Record<Ausgang, string> = {
   // Ursache, die der Bericht nicht kennt. Befund des Diff-Reviews.
   fehlgeschlagen: "fehlgeschlagen — kein Versand bestätigt",
 };
-
 /** Was im Zeilenmenü stehen kann. Nicht jede Aktion an jeder Zeile — was wo
  *  gilt, entscheidet `aktionenFuer`. */
 type Zeilenaktion =
@@ -200,7 +190,6 @@ type Zeilenaktion =
   | "reaktivieren"
   | "loeschen"
   | "wiederherstellen";
-
 /**
  * Die drei Aktionen mit Rückfrage — und die Liste ist die Regel selbst, nicht
  * ihre Beschreibung: der Verteiler liest sie, statt die Fälle ein zweites Mal
@@ -214,18 +203,15 @@ type Zeilenaktion =
  */
 const BRAUCHT_RUECKFRAGE = ["aktivieren", "deaktivieren", "loeschen"] as const;
 type Rueckfragenart = (typeof BRAUCHT_RUECKFRAGE)[number];
-
 interface OffeneRueckfrage {
   member: AdminMember;
   art: Rueckfragenart;
 }
-
 /** Dieselbe Zweiteilung wie in der Edge Function: die beiden Aktionen, die
  *  jemandem den Zugang nehmen, gegen die beiden, die ihn zurückgeben. */
 function istSchliessen(was: LebenszyklusAktion): boolean {
   return was === "disable" || was === "delete";
 }
-
 /** Was der Erfolgston nach einer Lebenszyklus-Aktion meldet. */
 const VOLLZUG: Record<LebenszyklusAktion, string> = {
   disable: "deaktiviert",
@@ -233,23 +219,19 @@ const VOLLZUG: Record<LebenszyklusAktion, string> = {
   delete: "gelöscht",
   restore: "wiederhergestellt",
 };
-
 function fehlerText(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message: unknown }).message);
   }
   return "Unbekannter Fehler.";
 }
-
 export default function AdminMitgliederPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   /** Was im Feld steht. Der Abfrage liegt `query` zugrunde — entprellt, siehe unten. */
   const [eingabe, setEingabe] = useState("");
   const [query, setQuery] = useState("");
   const [seite, setSeite] = useState(0);
-
   /**
    * Der Reiter wird ABGELEITET, nicht gespiegelt. Ein `useState` daneben wäre
    * ein zweiter Ort für denselben Wert — und der, den die Adresszeile trägt,
@@ -261,7 +243,6 @@ export default function AdminMitgliederPage() {
   /** Ein Reiter und eine Tafel: alle fünf zeigen dieselbe Liste unter einem
    *  anderen Filter. Beschriftet wird sie deshalb vom GEWÄHLTEN Reiter. */
   const tafelId = "reiter-tafel";
-
   /**
    * Ein Reiterwechsel fängt wieder auf Seite 1 an — Seite 3 der Deaktivierten
    * ist keine Fortsetzung von Seite 3 der Offenen.
@@ -277,7 +258,6 @@ export default function AdminMitgliederPage() {
     setLetzterReiter(reiter);
     setSeite(0);
   }
-
   // 300 ms Entprellung, dieselbe Zahl und derselbe Grund wie im Verzeichnis
   // (MemberDirectory.tsx): sonst löst JEDER Tastendruck eine RPC aus, und die
   // hier verbindet `profiles` mit `auth.users` und zählt zu jedem Treffer
@@ -300,9 +280,7 @@ export default function AdminMitgliederPage() {
   const [rueckfrage, setRueckfrage] = useState<OffeneRueckfrage | null>(null);
   /** Das Mitglied, für das der Stufen-Dialog offen ist (AGE-707). */
   const [stufenDialog, setStufenDialog] = useState<AdminMember | null>(null);
-
   // ── Die Aufnahmestrecke, die Maske und der Lauf (AGE-927) ───────────────
-
   /** Die gewählten Zeilen, als Kennungen. Sie gilt JE SEITE — siehe den
    *  Rücksetzer darunter. */
   const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
@@ -324,7 +302,6 @@ export default function AdminMitgliederPage() {
   const [anlageMeldung, setAnlageMeldung] = useState<{ name: string; schritt: string } | null>(
     null,
   );
-
   /**
    * DIE AUSWAHL GILT JE SEITE. Sie fällt, sobald Filter, Suchbegriff oder Seite
    * wechseln — sonst löste „Ausgewählte einladen" Zeilen aus, die der Admin
@@ -347,7 +324,6 @@ export default function AdminMitgliederPage() {
     // des Admins, mit der er ihn schliesst.
     setBericht(null);
   }
-
   /**
    * Ob die Seite noch da ist. Der Lauf ist eine Schleife über mehrere Aufrufe;
    * verlässt der Admin die Fläche, sollen die restlichen NICHT mehr hinausgehen
@@ -364,13 +340,11 @@ export default function AdminMitgliederPage() {
       lebt.current = false;
     };
   }, []);
-
   const filter = { query, status, seite };
   const { data, isLoading, isError, error } = useQuery({
     queryKey: adminMembersQueryKey(filter),
     queryFn: () => fetchAdminMembers(filter),
   });
-
   /**
    * Die Zahlen an den Reitern (AGE-587).
    *
@@ -387,7 +361,6 @@ export default function AdminMitgliederPage() {
     queryKey: adminMemberCountsQueryKey,
     queryFn: fetchAdminMemberCounts,
   });
-
   const zugangslink = useMutation({
     mutationFn: (m: AdminMember) => requestActivationLink(m.login_email),
     onSuccess: () =>
@@ -408,7 +381,6 @@ export default function AdminMitgliederPage() {
         variant: "error",
       }),
   });
-
   /**
    * Die Stufe eines Mitglieds aus der Liste heraus setzen (AGE-707).
    *
@@ -435,7 +407,6 @@ export default function AdminMitgliederPage() {
     onError: (e) =>
       toast({ title: "Stufe nicht gesetzt", description: fehlerText(e), variant: "error" }),
   });
-
   const aktivieren = useMutation({
     mutationFn: (m: AdminMember) => activateMember(m.id),
     onSuccess: async (_daten, m) => {
@@ -452,7 +423,6 @@ export default function AdminMitgliederPage() {
       toast({ title: "Aktivierung fehlgeschlagen", description: fehlerText(e), variant: "error" });
     },
   });
-
   /**
    * Die vier Lebenszyklus-Aktionen — EINE Mutation für alle vier, weil sich
    * nur der Wert von `action` unterscheidet und die Nachbehandlung dieselbe
@@ -506,7 +476,6 @@ export default function AdminMitgliederPage() {
       toast({ title: "Aktion fehlgeschlagen", description: fehlerText(e), variant: "error" });
     },
   });
-
   // `fortschritt !== null` gehört dazu: während des Laufs darf sich an den
   // Zeilen nichts ändern, sonst verschiebt sich die Auswahl unter der Hand.
   const laeuft =
@@ -514,7 +483,6 @@ export default function AdminMitgliederPage() {
     aktivieren.isPending ||
     lebenszyklus.isPending ||
     fortschritt !== null;
-
   /**
    * Der einzige Weg vom Menü in die Mutationen.
    *
@@ -540,7 +508,6 @@ export default function AdminMitgliederPage() {
     }
     lebenszyklus.mutate({ m, was: was === "reaktivieren" ? "enable" : "restore" });
   }
-
   const members = data?.members ?? [];
   const auswahlMoeglich = auswahlErlaubt(reiter);
   /** In der REIHENFOLGE DER LISTE, nicht in der des Anklickens — der Bericht
@@ -550,7 +517,6 @@ export default function AdminMitgliederPage() {
    *  zweiter Link ersetzt den ersten, sobald dessen Schutzfenster abgelaufen
    *  ist — und tut er es nicht, meldet der Bericht „übersprungen". */
   const einladeLabel = reiter === "eingeladen" ? "Ausgewählte erinnern" : "Ausgewählte einladen";
-
   /** Der Filter GEHÖRT in die Adresse. `replace` wäre falsch — ein Wechsel ist
    *  eine Navigation, und die Zurück-Taste soll ihn zurücknehmen. */
   function waehleFilter(id: Reiter) {
@@ -558,7 +524,6 @@ export default function AdminMitgliederPage() {
     naechste.set(REITER_PARAM, id);
     setSuchparameter(naechste);
   }
-
   function auswahlUmschalten(id: string) {
     setAuswahl((alt) => {
       const neu = new Set(alt);
@@ -567,7 +532,6 @@ export default function AdminMitgliederPage() {
       return neu;
     });
   }
-
   /**
    * Der Lauf: ein Aufruf je Mitglied, nacheinander.
    *
@@ -585,7 +549,6 @@ export default function AdminMitgliederPage() {
     setEinladefrage(null);
     setBericht(null);
     setFortschritt({ fertig: 0, gesamt: menge.length });
-
     const ergebnisse: Einladungsergebnis[] = [];
     for (const m of menge) {
       if (!lebt.current) return;
@@ -594,17 +557,14 @@ export default function AdminMitgliederPage() {
       if (!lebt.current) return;
       setFortschritt({ fertig: ergebnisse.length, gesamt: menge.length });
     }
-
     setFortschritt(null);
     setBericht(ergebnisse);
     setAuswahl(new Set());
     await queryClient.invalidateQueries({ queryKey: ["admin-members"] });
   }
-
   /** Der Name aus der letzten Eingabe — die Antwort der Function trägt ihn
    *  nicht zurück, und die Meldung soll das Mitglied benennen. */
   const letzterName = useRef("");
-
   /**
    * Das Anlegen. Drei der vier Ausgänge bleiben in der Maske stehen, weil der
    * Admin dort weiterarbeitet: eine vergebene Adresse berichtigt er, einen
@@ -634,7 +594,6 @@ export default function AdminMitgliederPage() {
     onError: (e) =>
       toast({ title: "Anlegen fehlgeschlagen", description: fehlerText(e), variant: "error" }),
   });
-
   return (
     // `pb-28` und nicht `py-8` unten: der schwebende Knopf liegt fest am
     // Ansichtsfenster und deckte in der Sichtprobe auf einem Telefon den
@@ -648,16 +607,13 @@ export default function AdminMitgliederPage() {
           niemanden sichtbar — hier schon.
         </p>
       </header>
-
       {/* ZWEI GRUPPEN, EINE AUSWAHL (AGE-927).
-
           Die Aufnahmestrecke steht über der Reiterleiste; technisch ist beides
           derselbe Wert in der Adresse. Ein EINZIGES `tablist` hält die sieben
           zusammen — zwei nebeneinander läsen sich für eine Vorleseausgabe wie
           zwei unabhängige Auswahlen, und genau das sind sie nicht. Die beiden
           Gruppenkästen tragen deshalb `role="presentation"`: sie gruppieren
           optisch und reichen die Reiter an die Leiste durch.
-
           Eigene Leiste statt `components/ui/Tabs`: die dortige Komponente hält
           den gewählten Reiter in einem eigenen `useState` und verlangt je
           Reiter einen eigenen Inhalt. Hier trägt die Adresse den Zustand, und
@@ -724,7 +680,6 @@ export default function AdminMitgliederPage() {
             );
           })}
         </div>
-
         {/* Die graue Linie sitzt am UMSCHLAG, nicht an der scrollbaren Leiste.
             Beides in einem Element hiess `overflow-x-auto` — und das setzt
             `overflow-y` implizit auf `auto`. Der 1px-Überstand des negativen
@@ -758,12 +713,10 @@ export default function AdminMitgliederPage() {
                     läse eine Vorleseausgabe „Nicht aktiviert 2" als Bezeichnung
                     eines Bedienelements vor — und dieser Name änderte sich bei
                     jeder Aktivierung.
-
                     Solange die Zahl fehlt, steht KEINE da. Nicht die Null: die
                     behauptete einen leeren Verein, solange nur die Antwort noch
                     unterwegs ist (die Lehre aus AGE-582, 6.6). Aus demselben
                     Grund erscheint auch nach einem Fehler keine.
-
                     `r.status` und nicht `r.id`: „Mitgliedschaft" ist ein
                     Darstellungsmodus über derselben Menge wie „Alle" und trägt
                     deshalb dieselbe Zahl. `admin_list_members(…,
@@ -785,7 +738,6 @@ export default function AdminMitgliederPage() {
           </div>
         </div>
       </div>
-
       {/* DAS ALTE LESEZEICHEN. `?tab=offen` meinte die VEREINIGUNG aus ① und ②;
           ① allein zeigt weniger. Ohne diesen Satz stünde dort eine kleinere
           Zahl, und niemand erführe, warum. Er hängt am Wert in der ADRESSE und
@@ -811,7 +763,6 @@ export default function AdminMitgliederPage() {
           </Button>
         </div>
       )}
-
       <div className="flex flex-wrap items-end gap-4">
         <Field label="Suche" className="min-w-56 flex-1">
           {({ id }) => (
@@ -838,7 +789,6 @@ export default function AdminMitgliederPage() {
           ))}
         </div>
       </div>
-
       {/* DIE EINZIGE HANDLUNG, die aus einer Mehrfachauswahl folgt (ADR-0007).
           Kein Feld für Betreff, Text oder Textbaustein, kein Weg, die Menge zu
           übernehmen oder auszuleiten — und sie erscheint nur in ① und ②, wo sie
@@ -866,7 +816,6 @@ export default function AdminMitgliederPage() {
           )}
         </div>
       )}
-
       {/* DER BERICHT BLEIBT STEHEN, bis der Admin ihn schliesst. Kein Ton: ein
           Ton verschwindet, und dieser Bericht ist das Einzige, was sagt, was
           wirklich geschah. */}
@@ -911,7 +860,6 @@ export default function AdminMitgliederPage() {
           </ul>
         </Card>
       )}
-
       {/* EIN HALB EINGERICHTETES KONTO. Auch hier kein Ton: das Konto BESTEHT,
           und was fehlt, entscheidet, was zu tun ist. */}
       {anlageMeldung && (
@@ -956,7 +904,6 @@ export default function AdminMitgliederPage() {
           </p>
         </Card>
       )}
-
       <div
         role="tabpanel"
         id={tafelId}
@@ -970,7 +917,6 @@ export default function AdminMitgliederPage() {
             <p className="mt-1 text-sm text-muted">{fehlerText(error)}</p>
           </Card>
         )}
-
         {!isLoading && !isError && members.length === 0 && (
           <Card className="p-5">
             <CardTitle>Keine Mitglieder gefunden</CardTitle>
@@ -997,7 +943,6 @@ export default function AdminMitgliederPage() {
             )}
           </Card>
         )}
-
         {!isLoading && !isError && members.length > 0 && (
           <>
             {sicht === "Tabelle" && (
@@ -1074,7 +1019,6 @@ export default function AdminMitgliederPage() {
                 </table>
               </div>
             )}
-
             {sicht === "Karten" && (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {members.map((m) => (
@@ -1106,7 +1050,6 @@ export default function AdminMitgliederPage() {
                 ))}
               </div>
             )}
-
             {sicht === "Verzeichnis" && (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {members.map((m) => (
@@ -1119,7 +1062,6 @@ export default function AdminMitgliederPage() {
                       Zustand und Aktionen stehen DANEBEN und nicht darin: die
                       Karte ist ein Link, und ein Knopf in einem Link ist weder
                       gültiges HTML noch bedienbar.
-
                       `flex-1` an der Karte, damit die Aktionszeilen über die
                       Spalten hinweg FLUCHTEN. Ohne das hing jede an ihrer
                       unterschiedlich hohen Karte, und die Sichtprobe zeigte
@@ -1151,7 +1093,6 @@ export default function AdminMitgliederPage() {
                 ))}
               </div>
             )}
-
             <Blaetterung
               seite={seite}
               anzahl={members.length}
@@ -1162,10 +1103,8 @@ export default function AdminMitgliederPage() {
           </>
         )}
       </div>
-
       {/* DER EINSTIEG IN DIE MASKE — schwebend, damit er beim Blättern durch
           fünfundzwanzig Zeilen nicht davonscrollt.
-
           `z-40` liegt ÜBER der Chatfenster-Reihe (`z-30`), und das ist die
           Entscheidung: ein Anlegen-Knopf, der hinter einem Chatfenster
           verschwindet, ist unerreichbar. Die Abstände rechnen
@@ -1192,7 +1131,6 @@ export default function AdminMitgliederPage() {
           <path d="M5 11h14v2H5z" />
         </svg>
       </button>
-
       {maskeOffen && (
         <AnlageMaske
           laeuft={anlegen.isPending}
@@ -1207,7 +1145,6 @@ export default function AdminMitgliederPage() {
           }}
         />
       )}
-
       {einladefrage && (
         <Einladefrage
           menge={einladefrage}
@@ -1216,7 +1153,6 @@ export default function AdminMitgliederPage() {
           onBestaetigen={() => void einladungenSchicken(einladefrage)}
         />
       )}
-
       {stufenDialog && (
         <StufenDialog
           member={stufenDialog}
@@ -1225,7 +1161,6 @@ export default function AdminMitgliederPage() {
           onBestaetigen={(tier, grund) => stufeSetzen.mutate({ m: stufenDialog, tier, grund })}
         />
       )}
-
       {rueckfrage && (
         <Rueckfrage
           member={rueckfrage.member}
@@ -1246,7 +1181,6 @@ export default function AdminMitgliederPage() {
     </div>
   );
 }
-
 /**
  * Der Zustand einer Zeile — in JEDER Sicht, sonst hiesse „drei Sichten auf
  * dieselben Zeilen" drei verschiedene Wahrheiten. Gemeint sind die drei
@@ -1276,7 +1210,6 @@ function Zustand({ member }: { member: AdminMember }) {
     <Badge variant="neutral">Nicht aktiviert</Badge>
   );
 }
-
 /**
  * Die Mitgliedschaftsfelder EINER Zeile — nur im Reiter „Mitgliedschaft"
  * (AGE-581, Abschnitt 9).
@@ -1307,13 +1240,11 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
   const name = member.name ?? "Ohne Namen";
   const [datum, setDatum] = useState(member.paid_until ?? "");
   const [art, setArt] = useState(member.payment_type ?? "");
-
   /** Ein VERGLEICH gegen das Mitglied, kein zweiter Zustand. Nach dem
    *  Speichern bringt die neu geladene Liste genau diese Werte mit, und die
    *  Zeile ist von selbst wieder sauber — ein Merker müsste dafür von Hand
    *  zurückgestellt werden und bliebe irgendwann stehen. */
   const geaendert = datum !== (member.paid_until ?? "") || art !== (member.payment_type ?? "");
-
   const speichern = useMutation({
     mutationFn: () => updateMitgliedschaft(member.id, { paid_until: datum, payment_type: art }),
     onSuccess: async () => {
@@ -1330,7 +1261,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
         variant: "error",
       }),
   });
-
   /**
    * DIE STUFE IST NUR LESBAR. Sie steht als Plakette da, nicht als Auswahlfeld:
    * ein Stufenwechsel berührt Rechte und Preise und hat einen eigenen Weg
@@ -1338,7 +1268,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
    * folgenreichste Änderung auf dieser Fläche und zugleich die unauffälligste.
    */
   const stufe = <TierBadge tier={member.tier} />;
-
   /**
    * EIN LEERES FELD IST DIE AUSKUNFT „nicht erfasst", und daneben stand bis
    * zum 24.08. noch das Wort „unbekannt". Es ist weg: neben dem „nicht
@@ -1360,7 +1289,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
       onChange={(e) => setDatum(e.target.value)}
     />
   );
-
   const zahlungsart = (
     <Select
       aria-label={`Zahlungsart für ${name}`}
@@ -1378,7 +1306,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
       ))}
     </Select>
   );
-
   {
     /* Je Zeile ein eigener Knopf und kein Speichern beim Verlassen des Feldes:
        auf einer Fläche mit 25 Zeilen ist ein Tastendruck neben dem Feld sonst
@@ -1396,7 +1323,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
       {speichern.isPending ? "Speichert …" : "Speichern"}
     </Button>
   );
-
   /**
    * In der Tabelle EIGENE SPALTEN, sonst ein beschrifteter Block.
    *
@@ -1421,7 +1347,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
       </>
     );
   }
-
   return (
     <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
       <span className="text-xs text-muted">Stufe</span>
@@ -1435,7 +1360,6 @@ function Mitgliedschaft({ member, alsZellen }: { member: AdminMember; alsZellen?
     </div>
   );
 }
-
 /**
  * Was an DIESER Zeile anwendbar ist.
  *
@@ -1461,7 +1385,6 @@ function aktionenFuer(m: AdminMember): { id: Zeilenaktion; label: string; gefahr
   const deaktiviert = m.deaktiviert_seit !== null;
   const geloescht = m.geloescht_seit !== null;
   const gesperrt = deaktiviert || geloescht;
-
   const eintraege: { id: Zeilenaktion; label: string; gefahr?: boolean }[] = [];
   if (!gesperrt) eintraege.push({ id: "zugangslink", label: "Zugangslink schicken" });
   // Nur an unbestätigten Zeilen. An einer bestätigten bräche
@@ -1490,7 +1413,6 @@ function aktionenFuer(m: AdminMember): { id: Zeilenaktion; label: string; gefahr
   if (geloescht) eintraege.push({ id: "wiederherstellen", label: "Wiederherstellen" });
   return eintraege;
 }
-
 /**
  * Das Zeilenmenü (AGE-581).
  *
@@ -1526,7 +1448,6 @@ function Zeilenmenue({
    *  unten braucht ihn, und bis dahin ist das Menü schon aufgeklappt. */
   const ankerRef = useRef<DOMRect | null>(null);
   const eintraege = aktionenFuer(member);
-
   // KLAPPRICHTUNG. Nach unten, ausser es passt nicht mehr — dann nach oben.
   // Ohne das ragt das Menü an einer Zeile am unteren Rand hinaus, und weil es
   // `fixed` liegt, lässt es sich nicht heranscrollen: JEDER Scroll schliesst
@@ -1543,7 +1464,6 @@ function Zeilenmenue({
     if (anker.bottom + 4 + hoehe <= window.innerHeight - 8) return;
     setPos((p) => ({ ...p, top: Math.max(8, anker.top - 4 - hoehe) }));
   }, [offen]);
-
   // Der Fokus wandert beim Öffnen auf den ERSTEN Eintrag. Ohne das wäre das
   // Menü mit der Tastatur nicht erreichbar: der Auslöser behielte den Fokus,
   // und Tab spränge an ihm vorbei in die nächste Zeile.
@@ -1551,7 +1471,6 @@ function Zeilenmenue({
     if (!offen) return;
     menueRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
   }, [offen]);
-
   useEffect(() => {
     if (!offen) return;
     const draussen = (ziel: Node) =>
@@ -1573,14 +1492,12 @@ function Zeilenmenue({
       window.removeEventListener("resize", onWeg);
     };
   }, [offen]);
-
   function schliessen(zurueck: boolean) {
     setOffen(false);
     // Nach Escape gehört der Fokus dorthin zurück, wo er herkam — sonst fällt
     // er auf `body`, und der nächste Tab fängt am Seitenanfang an.
     if (zurueck) knopfRef.current?.focus();
   }
-
   function onKey(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -1606,7 +1523,6 @@ function Zeilenmenue({
     const schritt = e.key === "ArrowDown" ? 1 : -1;
     knoten[(i + schritt + knoten.length) % knoten.length].focus();
   }
-
   return (
     <>
       <Button
@@ -1657,7 +1573,6 @@ function Zeilenmenue({
             Inline und ohne Icon-Bibliothek, wie `ui/NavIcon.tsx` — hier sogar
             gefüllt statt gestrichelt, weil drei Kreise mit 1.6 px Kontur bei
             dieser Grösse zu Ringen würden.
-
             `aria-hidden`: das Symbol trägt keine Auskunft, die es nicht schon
             im `aria-label` des Knopfes gäbe. Ohne diese Zeile läse eine
             Vorleseausgabe im schlechteren Fall beides. */}
@@ -1725,7 +1640,6 @@ function Zeilenmenue({
     </>
   );
 }
-
 /**
  * Der Wortlaut je Rückfrage.
  *
@@ -1763,7 +1677,6 @@ const RUECKFRAGEN: Record<
     knopf: "Löschen",
   },
 };
-
 /**
  * Die Rückfrage vor den drei nehmenden Aktionen.
  *
@@ -1791,7 +1704,6 @@ function Rueckfrage({
   const overlay = useOverlay(true, onAbbrechen);
   const text = RUECKFRAGEN[art];
   const name = member.name ?? "Dieses Mitglied";
-
   return (
     <div
       ref={overlay}
@@ -1822,7 +1734,6 @@ function Rueckfrage({
     </div>
   );
 }
-
 /**
  * Der Stufen-Dialog (AGE-707).
  *
@@ -1853,7 +1764,6 @@ function StufenDialog({
   // Vorbelegt mit der Stufe, auf der das Mitglied steht: der Dialog beantwortet
   // „worauf setzen", und dazu gehört sichtbar, wovon aus.
   const [tier, setTier] = useState<string>(member.tier);
-
   // ── Angeboten werden nur die drei CLUBSTUFEN (AGE-903, Detlev 25.09.) ──────
   //
   // ACTIVE, BOOST und CONNECT liegen ausserhalb des Clubs und sind nicht
@@ -1870,11 +1780,10 @@ function StufenDialog({
   // Auswahl, die eine gesetzte Stufe verschweigt, liesse den Admin glauben, das
   // Konto stehe auf der ersten angebotenen — und `value={tier}` fiele auf einen
   // Wert zurück, den niemand gewählt hat.
-  const waehlbar = LEVEL_ORDER.filter(
-    (key) => LEVELS[key].rank >= CLUB_RANK || key === member.tier,
-  );
+  // AGE-969: die Regel steht jetzt in `levels.ts` und nicht mehr zweimal
+  // ausgeschrieben — `AdminMitgliedPage` trug dieselbe.
+  const waehlbar = waehlbareStufen(member.tier);
   const [grund, setGrund] = useState("");
-
   return (
     <div
       ref={overlay}
@@ -1889,7 +1798,6 @@ function StufenDialog({
         <p className="mt-2 text-sm text-muted">
           <strong>{name}</strong> steht auf {levelLabel(member.tier)}.
         </p>
-
         <div className="mt-4 flex flex-col gap-4">
           <Field label="Neue Stufe">
             {({ id }) => (
@@ -1913,7 +1821,6 @@ function StufenDialog({
             )}
           </Field>
         </div>
-
         {/* Dieselbe Zusage, die die Karte in der Einzelbearbeitung trägt: die
             Fläche benennt, was ein späterer Stripe-Kauf mit dieser Stufe tut. */}
         <p className="mt-4 text-sm text-muted">
@@ -1921,7 +1828,6 @@ function StufenDialog({
           das Mitglied später eine höhere Stufe, überschreibt Stripe diese Angabe; eine niedrigere
           überschreibt sie nicht.
         </p>
-
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onAbbrechen}>
             Abbrechen
@@ -1938,7 +1844,6 @@ function StufenDialog({
     </div>
   );
 }
-
 function Blaetterung({
   seite,
   anzahl,
@@ -1983,7 +1888,6 @@ function Blaetterung({
     </div>
   );
 }
-
 /**
  * Das Kontrollkästchen einer Zeile (AGE-927, ADR-0007).
  *
@@ -2018,7 +1922,6 @@ function Auswahlkasten({
     />
   );
 }
-
 /**
  * Die Rückfrage vor einem Lauf (AGE-927).
  *
@@ -2043,7 +1946,6 @@ function Einladefrage({
   onBestaetigen: () => void;
 }) {
   const overlay = useOverlay(true, onAbbrechen);
-
   return (
     <div
       ref={overlay}
@@ -2077,7 +1979,6 @@ function Einladefrage({
     </div>
   );
 }
-
 /**
  * Bewusst GROB, und dieselbe Form wie in `admin-create-member/anlegen.ts`. Die
  * Adresse wird nicht von uns bestätigt, sondern vom Anmeldedienst übernommen —
@@ -2088,7 +1989,6 @@ function Einladefrage({
  * Prüfung, die nur die Fläche vornimmt, ist keine.
  */
 const EMAIL_FORM = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * Die Maske zum Anlegen eines einzelnen Mitglieds (AGE-927).
  *
@@ -2127,9 +2027,7 @@ function AnlageMaske({
   /** Was die Maske selbst beanstandet. Getrennt von `ergebnis`, das vom
    *  Endpunkt kommt — sonst verdeckte das eine das andere. */
   const [fehler, setFehler] = useState<string | null>(null);
-
-  const waehlbar = LEVEL_ORDER.filter((key) => LEVELS[key].rank >= CLUB_RANK);
-
+  const waehlbar = GENANNTE_STUFEN;
   function absenden() {
     const v = vorname.trim();
     const n = nachname.trim();
@@ -2153,7 +2051,6 @@ function AnlageMaske({
       telefon: telefon.trim(),
     });
   }
-
   return (
     <div
       ref={overlay}
@@ -2169,7 +2066,6 @@ function AnlageMaske({
           Das Konto entsteht ohne Passwort und unbestätigt — genau wie ein importiertes. Das
           Mitglied bestätigt selbst über den Link.
         </p>
-
         <div className="mt-4 flex flex-col gap-4">
           <Field label="Vorname">
             {({ id }) => (
@@ -2225,9 +2121,7 @@ function AnlageMaske({
             <span>Bestätigungsmail senden</span>
           </label>
         </div>
-
         {fehler && <p className="mt-4 text-sm text-danger">{fehler}</p>}
-
         {/* Die Adresse gehört schon jemandem. NAMENTLICH und verlinkt — und mit
             der Angabe, ob das Mitglied entfernt wurde: der wiederkehrende
             Bewerber ist der erwartbare Fall, und ein Verweis auf jemanden, den
@@ -2248,7 +2142,6 @@ function AnlageMaske({
         {ergebnis?.art === "fehler" && (
           <p className="mt-4 text-sm text-danger">{ergebnis.text}</p>
         )}
-
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onAbbrechen}>
             Abbrechen

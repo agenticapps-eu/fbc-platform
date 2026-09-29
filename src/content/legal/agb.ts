@@ -5,10 +5,26 @@
  * 178 Abschnitte samt vier Anlagen (Widerrufsbelehrung,
  * Muster-Widerrufsformular). Vollständig übernommen.
  *
- * WAS DER TEXT RICHTIG HAT, und das ist erwähnenswert: § 3.2 nennt exakt die
- * sechs Stufen Basic · Connect · Discover · Exchange · Focus · Impact —
- * identisch mit `src/config/levels.ts` (AGE-311). Auf diesem Punkt ist das
- * Anwaltsdokument aktueller als die Legacy-Dokumentation.
+ * § 3.2 IST GEÄNDERT — die einzige Abweichung vom gelieferten Text, und sie
+ * ist zweierlei (AGE-969, Entscheidung Donald 29.09.2026):
+ *
+ *   1. Eine BERICHTIGUNG. Der Anwaltstext nannte die sechs Stufen Basic ·
+ *      Connect · Discover · Exchange · Focus · Impact — richtig zum Zeitpunkt
+ *      der Lieferung, überholt seit AGE-903: „Basic" und „Exchange" gibt es
+ *      nicht mehr, dafür ACTIVE und BOOST. Die Aufzählung stand damit falsch da.
+ *   2. Eine KÜRZUNG auf die drei Stufen, die tatsächlich angeboten werden —
+ *      Discover, Focus, Impact. Die drei darunter tragen 0 € und keine
+ *      Clubfunktion; sie werden nicht angeboten, sondern technisch zugewiesen.
+ *
+ * WAS DIE KÜRZUNG TRÄGT, und das steht im Text selbst: der einleitende Satz
+ * lautet „Der Anbieter bietet DERZEIT INSBESONDERE folgende
+ * Mitgliedschaftsstufen an", und der Absatz danach behält ausdrücklich das
+ * Recht vor, zusätzliche Stufen einzuführen. Eine Liste, die heute drei nennt
+ * und morgen fünf, ist damit vorgesehen.
+ *
+ * ALS ANNAHME BENANNT: dass eine Kürzung an dieser Aufzählung ohne Rückfrage
+ * bei der Kanzlei vertretbar ist. Das ist die Einschätzung eines Nichtjuristen.
+ * Keine andere Zeile dieses Dokuments ist angefasst.
  *
  * WAS ER NICHT HAT: „ActivePoints“ kommt 26-mal vor. Im Code existiert das nur
  * in `src/vision/` — totem Code. Nicht stillschweigend entfernt: der Text ist
@@ -529,7 +545,8 @@ export const agb: Rechtsdokument = {
         },
         {
           art: "liste",
-          punkte: [["Basic"], ["Connect"], ["Discover"], ["Exchange"], ["Focus"], ["Impact"]],
+          // AGE-969: berichtigt und gekürzt — siehe den Dateikopf.
+          punkte: [["Discover"], ["Focus"], ["Impact"]],
         },
         {
           art: "absatz",

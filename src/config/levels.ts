@@ -132,3 +132,81 @@ export function levelLabel(level: string): string {
 export function isMembershipLevel(value: string): value is MembershipLevel {
   return value in LEVELS;
 }
+
+// ── Welche Stufen die Oberfläche BENENNT (AGE-969) ──────────────────────────
+
+/**
+ * Die Stufen, über die an der Oberfläche gesprochen wird.
+ *
+ * **Eine eigene Festlegung, KEINE Ableitung aus `CLUB_RANK`** — obwohl beide
+ * heute dieselbe Menge ergeben. Der Grund ist die Richtung der Abhängigkeit:
+ * `CLUB_RANK` ist die Zahl, die als `has_level(4)` auch in den SQL-Policies
+ * steht. Wer BOOST später wieder NENNEN will, müsste sie senken, und dann
+ * liefen Oberfläche und RLS auseinander — das Verzeichnis sähe erreichbar aus,
+ * und die Datenbank verweigerte die Antwort. Das Mitglied bekäme einen Fehler
+ * statt einer Absage.
+ *
+ * Eine Anzeigeentscheidung darf diese Kongruenz nicht antasten. Also: wenn
+ * BOOST zurückkommt, ändert sich diese Liste; wenn der Club anderswo beginnt,
+ * ändert sich `CLUB_RANK`. Nie beides durch einen Griff.
+ *
+ * **Gelöscht wird nichts.** `LEVEL_ORDER` und `LEVELS` führen weiterhin alle
+ * sechs, `membership_tiers` ebenso, und `levelLabel` liefert für jede ihren
+ * Namen — die Admin-Einzelbearbeitung braucht ihn, um eine gesetzte niedrigere
+ * Stufe anzuzeigen, statt sie stillschweigend hochzusetzen.
+ */
+export const GENANNTE_STUFEN: readonly MembershipLevel[] = ["discover", "focus", "impact"];
+
+/**
+ * Der Anzeigename einer Stufe — oder `null`, wenn die Oberfläche sie nicht
+ * benennt.
+ *
+ * **`null` und nicht der leere Text:** eine Fläche soll die Plakette WEGLASSEN
+ * können. Ein leerer Text liefe durch jede Wahrheitsprüfung und erzeugte einen
+ * sichtbaren Kasten ohne Inhalt — und der liest sich als Fehler.
+ *
+ * Ein unbekannter Schlüssel gibt ebenfalls `null`: eine halbe Auslieferung
+ * (Datenbank neu, Bündel alt) darf keinen rohen Schlüssel an die Oberfläche
+ * lassen. `levelLabel` fällt dort bewusst auf den Schlüssel zurück — die
+ * beiden beantworten verschiedene Fragen.
+ */
+export function genannterName(level: string): string | null {
+  return GENANNTE_STUFEN.includes(level as MembershipLevel) ? levelLabel(level) : null;
+}
+
+/**
+ * Was dort steht, wo ein Mitglied unterhalb des Clubs seine Stufe erwartet.
+ *
+ * An EINER Stelle, nicht an dreien: der Satz ist der einzige sichtbare Inhalt
+ * von AGE-969, und er trifft die einzige Gruppe, die wächst —
+ * Selbstregistrierungen landen unterhalb des Clubs, der Kaufweg ruht, von dort
+ * führt kein Weg nach oben.
+ *
+ * **Er benennt die Sackgasse und nennt einen Weg.** Ein Satz, der nur sagt, wo
+ * der Club beginnt, verschwiege das eine, was das Mitglied wissen muss.
+ * Befund des Plan-Reviews, von beiden Anbietern.
+ */
+export const KEIN_CLUBZUGANG_SATZ =
+  `Der Clubzugang beginnt bei ${LEVELS[CLUB_LEVEL].label}. ` +
+  "Eine Stufe lässt sich hier zurzeit nicht selbst buchen — schreib uns über " +
+  "Support › Feedback, dann melden wir uns.";
+
+/**
+ * Die Stufen, die eine Admin-Auswahl anbietet: die genannten — **plus die am
+ * Konto bereits gesetzte**, falls sie darunter liegt.
+ *
+ * Die zweite Hälfte ist die wichtigere. Ohne sie fiele ein Auswahlfeld auf die
+ * erste angebotene Stufe zurück, und ein Speichern ohne Absicht höbe das Konto
+ * still an. Die Regel galt seit AGE-903 in der Mitgliederliste und stand
+ * danach zweimal ausgeschrieben; seit AGE-969 steht sie hier, einmal.
+ *
+ * **Das ist ausdrücklich KEINE Sicherheitsgrenze.** `admin_set_tier` nimmt
+ * weiterhin alle sechs Schlüssel und setzt in beide Richtungen — eine Korrektur
+ * nach unten muss möglich bleiben.
+ */
+export function waehlbareStufen(gesetzt: string): readonly MembershipLevel[] {
+  if (GENANNTE_STUFEN.includes(gesetzt as MembershipLevel)) return GENANNTE_STUFEN;
+  return isMembershipLevel(gesetzt)
+    ? [gesetzt, ...GENANNTE_STUFEN]
+    : GENANNTE_STUFEN;
+}

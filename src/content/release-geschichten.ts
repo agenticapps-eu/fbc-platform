@@ -293,12 +293,17 @@ Sehen kannst du beide Arten von Events. Die Stufe entscheidet über die Anmeldun
   {
     slug: "2026-09-02-rechte-matrix-stufen",
     datum: "2026-09-02",
-    titel: "Das Verzeichnis beginnt bei Connect",
-    text: `Das Mitgliederverzeichnis ist ab der Stufe Connect zu sehen. Du siehst die Liste aller Mitglieder, kannst darin suchen und nach Branche und Region eingrenzen.
+    // AGE-969: Titel und Text nannten „Connect". Das war am 02.09. richtig —
+    // damals begann das Verzeichnis dort. Seit AGE-903 beginnt der Club bei
+    // Discover, und die Geschichte beschreibt eine Schwelle, die es so nicht
+    // mehr gibt. Berichtigt, nicht umgeschrieben: das Archiv unter
+    // `openspec/changes/archive/` hält weiterhin fest, was damals galt.
+    titel: "Das Verzeichnis beginnt bei Discover",
+    text: `Das Mitgliederverzeichnis ist ab der Stufe Discover zu sehen. Du siehst die Liste aller Mitglieder, kannst darin suchen und nach Branche und Region eingrenzen.
 
-Die ausführlichen Angaben eines Profils beginnen eine Stufe höher, ab Discover: Kompetenzen, Interessen, Kompass-Themen und das Such- und Bieteprofil. Auf den Karten im Verzeichnis bleiben diese Felder darunter leer, und auch die Suche findet unterhalb von Discover nichts, was in ihnen steht.
+Ab derselben Stufe stehen auch die ausführlichen Angaben eines Profils da: Kompetenzen, Interessen, Kompass-Themen und das Such- und Bieteprofil. Darunter bleiben diese Felder auf den Karten leer, und auch die Suche findet nichts, was in ihnen steht.
 
-Passend dazu erscheinen die Filter für Kompetenz, Thema und Angebote erst ab Discover. Unterhalb dieser Stufe stehen sie nicht da; an ihrer Stelle steht, ab wann es sie gibt.
+Passend dazu erscheinen die Filter für Kompetenz, Thema und Angebote ebenfalls ab Discover. Darunter stehen sie nicht da; an ihrer Stelle steht, ab wann es sie gibt.
 
 Diese Grenzen sitzen im Server, nicht in der Oberfläche. Was du nicht sehen darfst, wird gar nicht erst ausgeliefert.`,
     bild: {

@@ -11,13 +11,32 @@ function renderSummary(current: string | null) {
 }
 
 describe("MembershipSummary", () => {
-  it("shows the current tier label and its next step", () => {
+  /**
+   * AGE-969: DIESE ZUSAGE IST GEKIPPT, und zwar absichtlich.
+   *
+   * Sie hielt fest, dass die Karte für ACTIVE den Namen „Active" und als
+   * nächsten Schritt „Boost" zeigt — also genau das, was die Oberfläche seit
+   * AGE-969 nicht mehr sagt. Der nächste Schritt wird jetzt aus den GENANNTEN
+   * Stufen gesucht, und über ACTIVE liegt darin keine.
+   *
+   * Die alte Fassung steht in der Historie dieses Commits; was sie prüfte,
+   * prüft jetzt die Zeile darunter in der anderen Richtung.
+   */
+  it("nennt für eine Stufe ausserhalb des Clubs weder Namen noch nächsten Schritt", () => {
     renderSummary("active");
-    expect(screen.getByText("Active")).toBeInTheDocument();
-    // Der nächste Schritt ist die Stufe mit `rank + 1`, nicht die nächste
-    // KAUFBARE. Über ACTIVE (Rang 1) liegt BOOST (Rang 2) — auch das noch
-    // ausserhalb des Clubs und ebenfalls für 0 €.
-    expect(screen.getByText(/Nächster Schritt: Boost/)).toBeInTheDocument();
+    expect(screen.queryByText("Active")).toBeNull();
+    expect(screen.queryByText(/Nächster Schritt/)).toBeNull();
+    // Positivkontrolle: die Karte rendert sehr wohl etwas, nur eben keine
+    // Stufe. Ohne diese Zeile wäre der Test auch grün, wenn sie leer bliebe.
+    expect(screen.getByText(/Clubzugang beginnt bei Discover/)).toBeInTheDocument();
+  });
+
+  it("nennt innerhalb des Clubs Namen und nächsten Schritt", () => {
+    // Die Gegenprobe zur Zeile darüber — und zugleich der Ersatz für das, was
+    // die gekippte Zusage ursprünglich meinte.
+    renderSummary("discover");
+    expect(screen.getByText("Discover")).toBeInTheDocument();
+    expect(screen.getByText(/Nächster Schritt: Focus/)).toBeInTheDocument();
   });
 
   it("has no next step for the top tier", () => {
@@ -26,9 +45,17 @@ describe("MembershipSummary", () => {
     expect(screen.queryByText(/Nächster Schritt/)).toBeNull();
   });
 
-  it("falls back to Active for null/unknown tier", () => {
+  /**
+   * AGE-969: AUCH DIESE ZUSAGE IST GEKIPPT. Der Rückfall auf `DEFAULT_LEVEL`
+   * besteht weiter — er liegt nur ausserhalb des Clubs und wird deshalb nicht
+   * mehr benannt. Geprüft wird jetzt, dass daraus kein roher Schlüssel und
+   * kein Ersatzname wird.
+   */
+  it("fällt bei null auf die Vorgabestufe zurück, ohne sie zu benennen", () => {
     renderSummary(null);
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.queryByText("Active")).toBeNull();
+    expect(screen.queryByText("active")).toBeNull();
+    expect(screen.getByText(/Clubzugang beginnt bei Discover/)).toBeInTheDocument();
   });
 
   // AGE-907: Zwei Zusagen standen hier — „renders the manage CTA only when
