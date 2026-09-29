@@ -5,142 +5,132 @@
 
 > ## ⚠ ZUERST
 >
-> `cd /Users/donald/worktrees/fbc-platform/mitglied-anlegen`
+> **PR #440 ist offen.** Der Change ist **fertig gebaut, geprüft, archiviert
+> und gepusht** — es ist nichts mehr zu bauen.
 >
-> **Fünf Commits, NICHT gepusht, Arbeitsbaum sauber.** Branch `mitglied-anlegen`,
-> bewusst **ohne Kürzel** — AGE-927 gehört nur in den Titel des letzten PR.
+> Erste Handlung: `gh pr checks 440`. Grün → mergen (Freigabe steht).
 >
-> **Was fehlt, ist genau §5 der `tasks.md`: das Frontend.** Alles davor ist
-> gebaut und belegt. Erste Handlung: `openspec/changes/mitglied-anlegen/tasks.md`
-> lesen, dort §5.
->
-> **Der lokale Stack muss laufen** (`supabase start`), und er trägt beide
-> Migrationen schon.
+> **Danach `migrate-prod` und den blockierten Deploy — dafür braucht es
+> Donalds AUSDRÜCKLICHE Freigabe.** Die Merge-Freigabe deckt es nicht.
 
 ## Accomplished
 
 | Lauf | Ergebnis |
 |---|---|
 | pgTAP (CI-Liste, nicht `supabase test db` nackt) | **41 Dateien, 1422 Zusagen**, PASS |
-| Deno (CI-Zeile, siehe Fallen unten) | **288 Zusagen**, 0 gescheitert |
-| `deno check supabase/functions/*/*.ts` | sauber |
-| Wächter-Skripte (`pnpm vitest run scripts/`) | 33 Dateien, 489 Zusagen |
-| `openspec validate --all` | 36/0 |
+| Vitest | **254 Dateien, 2960 Zusagen** |
+| Deno (CI-Zeile, siehe Fallen) | **287 Zusagen** |
+| `tsc --noEmit` · `eslint` · `pnpm build` | sauber |
+| `openspec validate --all` | 35/0 |
 
-**Gebaut:** die Migration `20260928140000_aufnahmestrecke.sql` (aus `offen`
-werden `angelegt` und `eingeladen`), `20260929090000_adresse_nachschlagen.sql`
-(zwei eng gewährte Funktionen), beide Edge Functions samt reiner Logikmodule
-und Deno-Tests, und `supabase/tests/admin_einladungsstand_test.sql` (30 Zusagen).
+**Gebaut:** das ganze Frontend (§5) — Aufnahmestrecke ①→②→③ über der
+Reiterleiste, Anlege-Maske hinter einem schwebenden Knopf, Kontrollkästchen je
+Zeile mit genau **einer** Handlung, Bericht mit fünf getrennten Ausgängen.
+Dazu 32 neue Zusagen in `AdminMitgliederPage.aufnahme.test.tsx`.
 
-**Plan-Review:** zwei gezählte Runden, beide REQUEST-CHANGES, alles aufgelöst
-und in `REVIEWS.md` protokolliert.
+**Geprüft:** Diff-Review mit zwei fremden Anbietern (gemini, opencode), beide
+REQUEST-CHANGES, elf Befunde aufgelöst, zwei begründet nicht geändert.
+Sichtprobe gegen den lokalen Stack mit vier weiteren Funden. Alles in
+`openspec/changes/archive/2026-09-29-mitglied-anlegen/REVIEWS.md`.
+
+**Archiviert:** zwei Anforderungen dazu, vier geändert; `pnpm release:entries`
+nachgezogen (90 Einträge).
 
 ## Decisions
 
-**Der Einladungsstand wird ABGELEITET, nicht gespeichert.** Keine Spalte, kein
-Flag, kein Trigger. *Warum:* die Wahrheit steht in `activation_tokens`; eine
-zweite Ablage liefe auseinander, sobald irgendein Weg ein Token erzeugt, ohne
-die Kopie zu berühren.
+**Die Schleife liegt in der FLÄCHE, ein Aufruf je Mitglied** — obwohl
+`admin-invite-members` eine Liste nimmt. *Warum:* „Fortschritt als Zahl" gibt es
+nur, wenn Antworten einzeln eintreffen, und „Wegnavigieren bricht ab" ist
+unmöglich, wenn die Schleife im Server läuft. Die Mengengrenze im Endpunkt
+bleibt richtig — sie schützt vor einem Aufruf, der nicht von der Fläche kommt.
 
-**`member_state_matches` bekommt den Zeitpunkt als fünftes ARGUMENT**, statt
-selbst zu lesen. *Warum:* so bleibt sie `immutable` und der Planer zieht sie in
-den Filter; läse sie selbst, wäre sie `stable` und liefe je Zeile als Blackbox.
+**Der Bericht fällt mit dem Filter.** *Warum:* „bleibt stehen, bis der Admin ihn
+schliesst" heisst, er verschwindet nicht von selbst wie ein Ton. Über einer
+ANDEREN Liste stehen zu bleiben ist etwas anderes — in der Sichtprobe stand er
+über zwei Mitgliedern aus ② über der Liste von ①.
 
-**`offen` bleibt**, ohne Filter auf der Fläche. *Warum:* Lesezeichen tragen es,
-und die Summenzusage `angelegt + eingeladen = offen` braucht es, um prüfbar zu
-sein.
+**Der schwebende Knopf ist ein eigener `<button>`, nicht `Button`.** *Warum:*
+jener bringt `rounded-md` mit, und `cn()` ist ein blosser Join ohne
+`tailwind-merge` — in der Sichtprobe war der Knopf deshalb eckig.
 
-**Eigener Endpunkt `admin-invite-members`** statt einer Frontend-Schleife über
-`send-activation` (Donald, 28.09.). *Warum:* jene antwortet auf **jedem** Pfad
-mit `202 {accepted: true}`, damit ihre Antwortzeit nicht verrät, ob eine Adresse
-besteht — über sie ist kein wahrheitsgemässer Bericht herstellbar. Der
-Aufzählungsschutz entfällt gegenüber einem Admin; die Schutzriegel entfallen
-nicht, sie liegen in `issue_activation_token`.
-
-**Kein „alle auf dieser Seite auswählen"** (ADR-0007). *Warum:* ein Kopfkästchen
-über Schritt ① wäre mit **einem** Klick deckungsgleich mit „alle 35 einladen" —
-der Alternative, die der Record verwirft. Befund des Plan-Reviews.
-
-**Die Mehrfachauswahl öffnet den AGE-304-Zaun eng** — ausschliesslich für den
-bestehenden Aktivierungslink. **ADR-0007**, mit der Folge, dass der Zaun dünner
-wird.
+**Der Branch trägt bewusst kein Kürzel.** *Folge:* der Merge schliesst AGE-927
+**nicht** von selbst; der Vorgang ist von Hand auf Done zu setzen.
 
 ## Files modified
 
-* `supabase/migrations/20260928140000_aufnahmestrecke.sql` — `drop`+`create` von
-  `member_state_matches` (5 Argumente) und `admin_list_members` (`eingeladen_am`),
-  `create or replace` von `admin_member_counts`.
-* `supabase/migrations/20260929090000_adresse_nachschlagen.sql` —
-  `admin_adresse_nachschlagen` und `admin_mitglied_einrichten`, **nur an
-  `service_role` gewährt**.
-* `supabase/functions/admin-create-member/{anlegen.ts,anlegen.test.ts,index.ts}`
-* `supabase/functions/admin-invite-members/{einladung.ts,einladung.test.ts,index.ts}`
-* `supabase/tests/admin_einladungsstand_test.sql` — neu, 30 Zusagen.
-* `supabase/tests/admin_member_list_test.sql` — vier Zusagen **benannt** gekippt,
-  eine dazu (`angelegt + eingeladen = offen`).
-* `supabase/config.toml`, `.github/workflows/ci.yml`,
-  `docs/decisions/0007-…md`, `openspec/changes/mitglied-anlegen/*`.
-* **`send-activation` ist unangetastet** — das ist eine Zusage, keine Beobachtung.
+* `src/pages/AdminMitgliederPage.tsx` — sieben Filter in zwei Gruppen, Maske,
+  Auswahl, Lauf, Bericht, schwebender Knopf.
+* `src/pages/AdminMitgliederPage.aufnahme.test.tsx` — neu, 32 Zusagen.
+* `src/pages/AdminMitgliederPage.test.tsx` — drei Bestandszusagen **benannt**
+  nachgezogen, Zählvorrichtung auf sieben Zustände.
+* `src/lib/admin-members.ts` — `createMember`, `ladeEin`, `Ausgang`;
+  `uebersetzeFehler` bekommt die Satztafel als Argument.
+* `src/lib/database.types.ts` — `eingeladen_am`, erweiterte `p_status`-Werte.
+  **Von Hand**, kein `gen types`.
+* `supabase/migrations/20260929090000_adresse_nachschlagen.sql` — `order by`.
+* `supabase/functions/admin-{create,invite}-member*/` — zwei Lint-Fehler, ein
+  toter Helfer, ein falscher Kommentar.
+* `docs/lastenheft.md` — D.8.1.
+* `openspec/specs/admin/spec.md` + Archiv.
 
 ## Next session: start here
 
-**§5 der `tasks.md`.** Die Reihenfolge dort ist gemeint: RED zuerst.
+**`gh pr checks 440`.** Ist er grün, mergen (`gh pr merge 440 --squash`) und
+**den Erfolg verifizieren** — `gh pr merge` kann still fehlschlagen.
 
-1. `src/lib/database.types.ts` von Hand nachziehen — **kein `gen types`**, die
-   Datei trägt handgepflegte Verengungen. Sie liegt unter `src/lib/`, nicht
-   `src/types/`.
-2. Aufnahmestrecke ①→②→③ über der bestehenden Reiterleiste; genau einer von
-   sieben Filtern gewählt, der Wert steht in der Adresse. `?tab=offen` fällt auf
-   ① mit einmaligem Hinweis.
-3. „+"-Knopf und Maske; Plan nur DISCOVER · FOCUS · IMPACT.
-4. Kontrollkästchen je Zeile, **kein** Kopfkästchen, „Ausgewählte einladen" nur
-   in ① und ②.
-5. Der Bericht: fünf Ausgänge getrennt, Übersprungene namentlich, bleibt stehen.
-   Vorher Rückfrage mit der **Zahl**, währenddessen Fortschritt als Zahl, die
-   Liste bewegt sich erst danach und behält Filter, Suche und Seite.
+Danach liegt genau ein Schritt an, und der braucht eine eigene Freigabe:
+`migrate-prod` auslösen, dann den **neuesten** blockierten Deploy-Lauf mit
+`gh run rerun --failed` wiederholen. `gh run list --workflow=deploy.yml --limit 5`
+— **nie** den ältesten nehmen, `rerun` baut den Commit *jenes* Laufs.
 
-Danach: Code-Review auf den Diff, Sichtprobe, PR.
+Zum Schluss: AGE-927 in Linear von Hand auf Done, und der Worktree
+`stufen-v5` (AGE-903, gemergt) darf mit `wt remove` weg.
 
 ## Fallen, die diese Sitzung gekostet haben
 
+* **`waitFor` ist zufrieden, sobald die Zahl EINMAL stimmt.** Die Abbruch-Zusage
+  bestand deshalb auch ohne den Riegel: unmittelbar nach dem Abbau stimmt sie
+  immer. Eine echte Pause und eine harte Zusage — gemessen 1 mit Riegel, 2 ohne.
+* **`findByRole` löst auf dem ERSTEN Treffer auf.** Die Zusage zur vergebenen
+  Adresse fand die Zeile in der LISTE, nicht die Maske — gleicher Name, gleiches
+  Ziel. Jetzt `within(dialog)`. Beide Male half nur, die Zahl der Treffer zu
+  messen statt dem grünen Haken zu glauben.
+* **`openspec archive` meldet nur den ERSTEN fehlenden Szenariennamen.** Drei
+  Läufe für drei Funde. Das Vergleichsskript liegt im Scratchpad
+  (`szenarien.py`) und zeigt alle auf einmal.
+* **Ein umbenanntes Szenario ist ein gelöschtes.** „Der Filter überlebt ein
+  Neuladen" statt „Der Reiter …" hätte es aus der Spec geworfen.
+* **Ein Konto über die GoTrue-Admin-API zu löschen räumt `public.profiles`
+  NICHT mit ab** — acht verwaiste Zeilen blieben stehen.
 * **`deno test` ohne `--allow-read=supabase/functions`** lässt vier
-  Verdrahtungstests fallen, die `index.ts` lesen. Sie sehen wie Vorbestand aus
-  — sie fallen auch auf einem unveränderten Baum. Immer die CI-Zeile fahren:
+  Verdrahtungstests fallen. Immer die CI-Zeile fahren:
   `deno test --frozen --allow-env --allow-net --allow-read=supabase/functions supabase/functions/`
-* **`supabase test db` ohne Argument** zieht die manuellen `probe_*.sql` ein,
-  die absichtlich keinen `plan()` haben → „Bad plan". CI fährt die Liste aus
-  `ci.yml`; das Skript dafür liegt im Scratchpad.
-* **Ein `drop function` nimmt den `revoke` mit.** Beim ersten Anlauf für
-  `admin_list_members` nur den `grant` wiederhergestellt — `anon` hätte die
-  Mitgliederliste aufrufen dürfen. Der Bestandstest hat es gefangen.
-* **Die Migration ist nach dem ersten Lauf nicht wiederverwendbar** (der `drop`
-  nennt die alte Signatur). Zum Wiederholen erst die neuen Signaturen von Hand
-  abwerfen.
-* **Hausstil für Deno-Tests ist `jsr:@std/assert@1`**, nicht `deno.land/std` —
-  sonst wächst `deno.lock` und CI fährt `--frozen`.
-* **`ls` ist ein eza-Alias**, `ls <pfad>` bricht ab. `find` nehmen.
+* **`supabase test db` ohne Argument** zieht die manuellen `probe_*.sql` ein →
+  „Bad plan". CI fährt die Liste aus `ci.yml`.
+* **`ls` ist ein eza-Alias**, `find` nehmen.
 
 ## Zustand der Umgebung
 
-* **Lokaler Stack läuft**, 137 von 138 Migrationen plus meinen beiden.
-  `20260925120000_release_backfill.sql` (AGE-905) fehlt und bricht lokal ab —
+* **Lokaler Stack:** zurückgesetzt auf 28 Profile, 0 Tokens, 0 Adminzeilen —
+  genau den Stand vor der Sichtprobe. `.env.local` gelöscht, vite und
+  `functions serve` beendet, Browser freigegeben und `localStorage` geleert.
+* `20260925120000_release_backfill.sql` (AGE-905) fehlt lokal und bricht ab —
   **fremde Migration, nicht anfassen**, aber einrechnen.
-* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907).
-  **Nicht anfassen.** Sie bringt den `sync-main`-Hook von `wt switch` zum
-  Scheitern; der Weg daran vorbei ist
-  `wt switch --create <name> --base origin/main --no-hooks --no-cd`.
-* Der Worktree `stufen-v5` (AGE-903, gemergt) steht noch und kann mit
-  `wt remove` weg — nicht freigegeben, deshalb blieb er.
+* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907). **Nicht
+  anfassen.** `wt switch` braucht deshalb
+  `--base origin/main --no-hooks --no-cd`.
+* Die Screenshots der Sichtprobe liegen unter `.gstack/age927/` (gitignored).
 
 ## Open questions
 
-* **Was gilt, wenn das Konto entsteht und `admin_mitglied_einrichten` scheitert?**
-  Entschieden und gebaut: Konto bleibt, Antwort sagt `teilweise`, es steht auf
-  der Vorgabestufe in ①. Offen ist nur, ob die Oberfläche das deutlich genug
-  zeigt — das entscheidet sich in §5.
 * **Das Rennen bei verschieden geschriebenen Adressen** bleibt offen. Es zu
   schliessen hiesse, einen Unique-Index über `lower(email)` in `auth.users`
-  anzulegen, also in fremdes Schema zu schreiben. Eigene Entscheidung.
-* **`admin_list_members` liefert `eingeladen_am` je Zeile** — bei 78 Profilen
-  bezahlbar, der Index passt. Wenn die Liste je gross wird, ist der Umbau auf
-  eine gepflegte Spalte eine eigene Änderung, dann mit Trigger.
+  anzulegen — fremdes Schema, eigene Entscheidung. Gemessen auf PROD: 0 von 78
+  Adressen mit Grossbuchstaben, 0 Paare, die sich nur in der Schreibung
+  unterscheiden.
+* **„Ohne Passwort" ist nicht am Feld ablesbar.** GoTrue schreibt auch ohne
+  übergebenes Passwort einen 60-Zeichen-bcrypt-Hash — wie bei allen 28
+  Bestandskonten. Belegt ist die Zusage durch den Anmeldeversuch: leer, Leerzeichen
+  und ein geratenes Wort geben alle `invalid_credentials`.
+* **`eingeladen_am` sagt „Link erzeugt", nicht „Mail zugestellt".** Eine
+  Zustellbestätigung wäre ein Resend-Webhook und ein eigener Change.
