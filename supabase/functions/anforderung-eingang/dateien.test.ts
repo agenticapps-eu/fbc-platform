@@ -132,6 +132,43 @@ Deno.test("fremder Host und http werden nicht geladen, der Host wird genannt", a
   assert(!aufgerufen);
 });
 
+// Der erste echte Aufruf (30.09., AGE-993) kam nicht von `files.`, sondern von
+// regionalen Unterdomains. Beide Bilder wurden abgewiesen.
+Deno.test("regionale OpenAI-Hosts werden geladen", async () => {
+  const { deps, hochgeladen } = baueDeps({ "a.png": ok(PNG), "b.png": ok(PNG) });
+  const r = await uebernehmeDateien([
+    { ...ref("a.png", "image/png"), download_link: "https://sdmntprdenmarkeast.oaiusercontent.com/a.png?sig=x" },
+    { ...ref("b.png", "image/png"), download_link: "https://sdmntprnortheu.oaiusercontent.com/b.png?sig=x" },
+  ], deps);
+  assertEquals(r.map((x) => "assetUrl" in x.ergebnis), [true, true]);
+  assertEquals(r.map((x) => x.protokoll.host), [
+    "sdmntprdenmarkeast.oaiusercontent.com",
+    "sdmntprnortheu.oaiusercontent.com",
+  ]);
+  assertEquals(hochgeladen.length, 2);
+});
+
+Deno.test("ein Host, der nur so aussieht, wird nicht geladen", async () => {
+  let aufgerufen = false;
+  const { deps } = baueDeps({}, {
+    fetch: (() => {
+      aufgerufen = true;
+      throw new Error("darf nicht");
+    }) as typeof fetch,
+  });
+  const r = await uebernehmeDateien([
+    { ...ref("a.png", "image/png"), download_link: "https://evil-oaiusercontent.com/a" },
+    { ...ref("b.png", "image/png"), download_link: "https://oaiusercontent.com.example.net/b" },
+    { ...ref("c.png", "image/png"), download_link: "http://sdmntprnortheu.oaiusercontent.com/c" },
+  ], deps);
+  assertEquals(r.map((x) => "grund" in x.ergebnis && x.ergebnis.grund), [
+    "Adresse nicht erlaubt: evil-oaiusercontent.com",
+    "Adresse nicht erlaubt: oaiusercontent.com.example.net",
+    "Adresse nicht erlaubt: sdmntprnortheu.oaiusercontent.com",
+  ]);
+  assert(!aufgerufen);
+});
+
 Deno.test("einer Weiterleitung wird nicht gefolgt, der Zielhost wird vermerkt", async () => {
   const { deps, hochgeladen } = baueDeps({
     "a.png": () =>

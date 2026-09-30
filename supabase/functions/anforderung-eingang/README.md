@@ -47,9 +47,11 @@ aus dem Repo-Wurzelverzeichnis. Kein Test ruft das Netz oder legt ein Issue an.
 Mit `ANFORDERUNG_PROBELAUF=1` läuft alles bis einschließlich der Downloads
 echt, aber es wird nichts hochgeladen, nichts angelegt und nichts gezählt. Die
 Antwort ist 200 mit `{ probelauf: true, hinweis }`. Im Log (`event: probelauf`)
-stehen je Datei Typ, Größe, Host und Ergebnis. Dort sieht man beim ersten Test,
-ob OpenAIs Links weiterleiten (`weitergeleitet nach …`). Dann muss
-`ERLAUBTE_HOSTS` in `dateien.ts` erweitert werden.
+stehen je Datei Typ, Größe, Host und Ergebnis. Geladen wird von
+`oaiusercontent.com` und jeder Unterdomain (`ERLAUBTE_DOMAIN` in `dateien.ts`),
+denn echte Links kommen von regionalen Hosts, nicht nur von `files.`.
+Weiterleitungen werden nie verfolgt und im Log als `weitergeleitet nach …`
+vermerkt.
 
 ## Log
 

@@ -9,11 +9,13 @@
 //   Form     — Objekt mit `download_link` und erlaubtem `mime_type`. Das
 //              Schema sagt `string`, OpenAI schickt Objekte (dokumentiert und
 //              am 22.09. gemessen). Ein String wird vermerkt, nicht geworfen.
-//   Adresse  — nur `https` und nur OpenAIs Host. Wer den Schlüssel hat,
-//              bestimmt die Links; ohne diese Liste lüde die Function jede
-//              Adresse und legte das Ergebnis in Linear ab.
+//   Adresse  — nur `https` und nur OpenAIs Domain `oaiusercontent.com` samt
+//              Unterdomains. Wer den Schlüssel hat, bestimmt die Links; ohne
+//              diese Prüfung lüde die Function jede Adresse und legte das
+//              Ergebnis in Linear ab. Die Doku nennt nur `files.`, echte Links
+//              kommen von regionalen Hosts wie `sdmntprnortheu.` (30.09.).
 //   Umleitung— wird nie verfolgt (`redirect: "manual"`), sonst wäre die
-//              Hostliste über einen 302 umgangen. Der Zielhost wird vermerkt:
+//              Hostprüfung über einen 302 umgangen. Der Zielhost wird vermerkt:
 //              leitet OpenAI in Wirklichkeit weiter, zeigt es der Probelauf.
 //   Größe    — 25 MB, geprüft am `Content-Length` vor dem ersten Byte und beim
 //              Lesen, damit eine Datei ohne Längenangabe nicht erst ganz im
@@ -30,7 +32,12 @@ import { bereinige, type Dateiergebnis } from "./beschreibung.ts";
 import { bisAbbruch } from "./frist.ts";
 
 export const MAX_BYTES = 25 * 1024 * 1024;
-export const ERLAUBTE_HOSTS = ["files.oaiusercontent.com"];
+export const ERLAUBTE_DOMAIN = "oaiusercontent.com";
+
+/** Die Domain selbst oder eine Unterdomain, mit Punkt-Grenze. */
+function hostErlaubt(host: string): boolean {
+  return host === ERLAUBTE_DOMAIN || host.endsWith(`.${ERLAUBTE_DOMAIN}`);
+}
 
 const ERLAUBTE_TYPEN = [
   "image/png",
@@ -152,7 +159,7 @@ async function uebernehmeEine(
   } catch {
     return abgelehnt("Adresse nicht lesbar");
   }
-  if (url.protocol !== "https:" || !ERLAUBTE_HOSTS.includes(url.hostname)) {
+  if (url.protocol !== "https:" || !hostErlaubt(url.hostname)) {
     return abgelehnt(`Adresse nicht erlaubt: ${bereinige(url.hostname)}`);
   }
   protokoll.host = url.hostname;
