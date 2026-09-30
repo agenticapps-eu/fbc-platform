@@ -22,7 +22,8 @@
 //              Speicher liegen muss, um abgelehnt zu werden.
 //   Inhalt   — die ersten Bytes müssen zum erklärten Typ passen. Die Bilder
 //              werden in Linear eingebettet und im Browser angezeigt, unter dem
-//              Typ, den wir beim `fileUpload` angeben.
+//              Typ, den wir beim `fileUpload` angeben. Videos, PDF und Word
+//              gehen nur als Link hinein.
 //   Zeit     — 12 s je Datei, 25 s für alle zusammen. ChatGPT bricht nach 45 s
 //              ab; es bleiben 8 s für `issueCreate` und Luft für den Weg.
 //
@@ -46,6 +47,8 @@ const ERLAUBTE_TYPEN = [
   "image/gif",
   "video/mp4",
   "video/quicktime",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
 type Typ = (typeof ERLAUBTE_TYPEN)[number];
 
@@ -91,6 +94,12 @@ function passtZumTyp(b: Uint8Array, typ: Typ): boolean {
       // Beide sind ISO-BMFF mit `ftyp` an Byte 4. Die Marke dahinter wird nicht
       // unterschieden: ein Video geht nur als Link ins Issue, nicht eingebettet.
       return text(4, "ftyp");
+    case "application/pdf":
+      return text(0, "%PDF-");
+    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      // `.docx` ist ein ZIP. Die Signatur unterscheidet es nicht von anderen
+      // Archiven; das genügt, weil Dokumente nur als Link ins Issue gehen.
+      return ab(0, [0x50, 0x4b, 0x03, 0x04]);
   }
 }
 
@@ -192,7 +201,8 @@ async function uebernehmeEine(
     protokoll.groesse = bytes.byteLength;
     if (!passtZumTyp(bytes, typ as Typ)) throw new Abgelehnt("Inhalt passt nicht zum Typ");
 
-    const art = (typ as string).startsWith("image/") ? "bild" : "video";
+    const t = typ as string;
+    const art = t.startsWith("image/") ? "bild" : t.startsWith("video/") ? "video" : "dokument";
     if (deps.hochladen === null) {
       return { ergebnis: { name, art, assetUrl: "" }, protokoll: { ...protokoll, ergebnis: "geprüft" } };
     }

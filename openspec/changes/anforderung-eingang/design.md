@@ -129,6 +129,12 @@ Je Eintrag:
    Download-Antwort. Die Bilder werden in Linear eingebettet und im Browser
    angezeigt, und Linear übernimmt den Typ, den wir beim `fileUpload` angeben.
    Deshalb darf nur hochgehen, was wirklich ist, was es zu sein behauptet.
+   Seit 30.09. auch PDF (`%PDF-`) und Word `.docx` (ZIP, `PK 03 04`). Die ZIP-
+   Signatur unterscheidet `.docx` nicht von einem anderen Archiv; das genügt,
+   weil Dokumente wie Videos nur als Link ins Issue gehen und nie eingebettet
+   werden. Verworfen: das Archiv öffnen und `word/document.xml` suchen, das
+   wäre ein ZIP-Parser für einen Fall, der nichts im Browser anzeigt. Der
+   Abschnitt im Issue heißt seitdem „Anhänge" statt „Bilder".
 6. `fileUpload(mime, name, bytes.length)`, dann `PUT` mit dem Puffer, beides
    unter derselben Frist. Die Header werden in einem `Headers`-Objekt gebaut:
    zuerst `Content-Type` und `Cache-Control`, danach Linears gelieferte Header per

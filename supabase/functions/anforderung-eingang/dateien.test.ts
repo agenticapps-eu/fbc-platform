@@ -16,6 +16,9 @@ const MP4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0
 const MOV = new Uint8Array([0, 0, 0, 0x14, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20]);
 const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
 const GIF = new TextEncoder().encode("GIF89a....");
+const PDF = new TextEncoder().encode("%PDF-1.7\n....");
+const DOCX = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00]);
+const WORD = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const HOST = "https://files.oaiusercontent.com";
 
@@ -102,11 +105,11 @@ Deno.test("kein Link, unerlaubter Typ", async () => {
   const { deps, geladen } = baueDeps({});
   const r = await uebernehmeDateien([
     { name: "a.png", mime_type: "image/png" },
-    ref("b.pdf", "application/pdf"),
+    ref("b.zip", "application/zip"),
   ], deps);
   assertEquals(r.map((x) => "grund" in x.ergebnis && x.ergebnis.grund), [
     "kein Download-Link",
-    "Typ nicht erlaubt: application/pdf",
+    "Typ nicht erlaubt: application/zip",
   ]);
   assertEquals(geladen, []);
 });
@@ -134,6 +137,26 @@ Deno.test("fremder Host und http werden nicht geladen, der Host wird genannt", a
 
 // Der erste echte Aufruf (30.09., AGE-993) kam nicht von `files.`, sondern von
 // regionalen Unterdomains. Beide Bilder wurden abgewiesen.
+Deno.test("PDF und Word werden als Dokument übernommen", async () => {
+  const { deps, hochgeladen } = baueDeps({ "a.pdf": ok(PDF), "b.docx": ok(DOCX) });
+  const r = await uebernehmeDateien([ref("a.pdf", "application/pdf"), ref("b.docx", WORD)], deps);
+  assertEquals(r.map((x) => x.ergebnis), [
+    { name: "a.pdf", art: "dokument", assetUrl: "https://uploads.linear.app/a.pdf" },
+    { name: "b.docx", art: "dokument", assetUrl: "https://uploads.linear.app/b.docx" },
+  ]);
+  assertEquals(hochgeladen.map((h) => h.mime), ["application/pdf", WORD]);
+});
+
+Deno.test("PDF oder Word mit fremdem Inhalt wird nicht hochgeladen", async () => {
+  const { deps, hochgeladen } = baueDeps({ "a.pdf": ok(PNG), "b.docx": ok(PDF) });
+  const r = await uebernehmeDateien([ref("a.pdf", "application/pdf"), ref("b.docx", WORD)], deps);
+  assertEquals(r.map((x) => "grund" in x.ergebnis && x.ergebnis.grund), [
+    "Inhalt passt nicht zum Typ",
+    "Inhalt passt nicht zum Typ",
+  ]);
+  assertEquals(hochgeladen, []);
+});
+
 Deno.test("regionale OpenAI-Hosts werden geladen", async () => {
   const { deps, hochgeladen } = baueDeps({ "a.png": ok(PNG), "b.png": ok(PNG) });
   const r = await uebernehmeDateien([

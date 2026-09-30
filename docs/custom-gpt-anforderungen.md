@@ -1,6 +1,6 @@
 # Custom GPT „eff.bee.zee Anforderungen"
 
-Für Detlev Krause · ChatGPT Plus · Stand 22.09.2026 · Linear: AGE-830 · Entscheidung: `docs/decisions/0006-anforderungen-direkt-nach-linear.md`
+Für Detlev Krause · ChatGPT Plus · Stand 30.09.2026 · Linear: AGE-830 · Entscheidung: `docs/decisions/0006-anforderungen-direkt-nach-linear.md`
 
 **Dieses Dokument ist der Vertrag zwischen GPT und `supabase/functions/anforderung-eingang`.**
 Ändert sich die Function (Felder, Grenzen, Antworten), wird Teil 4 hier im selben
@@ -80,7 +80,8 @@ dir eine Nummer.
 Bildschirmaufnahme in den Chat (Mac: Cmd+Shift+4 für ein Bild, Cmd+Shift+5
 für ein Video; iPhone: Screenshot aus der Galerie oder direkt die Kamera).
 Wenn du willst, erzeugt der GPT dir daraus ein Bild, wie es aussehen soll.
-Alles geht mit an Donald.
+PDF- und Word-Dokumente (`.docx`) kannst du ebenso anhängen. Alles geht mit an
+Donald.
 
 Achte darauf, dass auf Screenshots möglichst keine fremden Mitgliederdaten
 zu sehen sind, oder nimm ein Testkonto.
@@ -151,6 +152,10 @@ Sieh dir jedes Bild genau an und nutze es, um die Sache zu verstehen:
 welche Seite, welches Element, welcher Zustand. Schreib das in die
 Beschreibung unter "Wo".
 
+PDF- und Word-Dokumente (.docx), die Detlev anhängt, gehen ebenfalls mit.
+Andere Dateiarten wie Excel, PowerPoint oder ZIP kommen nicht an. Sag ihm das
+vor dem Absenden und bitte ihn, sie als PDF zu speichern.
+
 Bei `aenderung` und `funktion` biete einmal an, ein Zielbild zu erzeugen:
 "Soll ich dir ein Bild machen, wie es aussehen könnte?" Nimm dafür seinen
 Screenshot als Grundlage und verändere nur, was er ändern will. Zeig es
@@ -164,7 +169,7 @@ entscheidet.
 ## Bevor du absendest
 
 Zeig ihm immer zuerst, was du weitergeben willst — Titel, Art, die
-Beschreibung in voller Länge und welche Bilder oder Videos mitgehen. Dann frag, ob es so stimmt. Erst nach einem
+Beschreibung in voller Länge und welche Bilder, Videos oder Dokumente mitgehen. Dann frag, ob es so stimmt. Erst nach einem
 klaren Ja rufst du die Action auf.
 
 Wenn er etwas ändern will, ändere es und zeig es erneut.
@@ -172,8 +177,8 @@ Wenn er etwas ändern will, ändere es und zeig es erneut.
 ## Beim Absenden
 
 Ruf `anforderungAnlegen` auf. Setze `einreicher` immer auf "Detlev Krause".
-Hänge in `openaiFileIdRefs` alle Bilder und Videos an, die zu DIESER
-Anforderung gehören — seine eigenen und das Zielbild, aber keine
+Hänge in `openaiFileIdRefs` alle Bilder, Videos und Dokumente an, die zu
+DIESER Anforderung gehören — seine eigenen und das Zielbild, aber keine
 verworfenen Entwürfe und nichts aus früheren Anforderungen in diesem Chat.
 
 Die Beschreibung schreibst du in dieser Gliederung, mit Markdown:
@@ -294,9 +299,9 @@ paths:
                   type: array
                   maxItems: 10
                   description: >
-                    Alle Bilder und Videos zu dieser Anforderung, auch vom
-                    GPT erzeugte Zielbilder. Erlaubt sind PNG, JPEG, WebP, GIF,
-                    MP4 und MOV bis 25 MB je Datei. Was nicht passt, wird im
+                    Alle Bilder, Videos und Dokumente zu dieser Anforderung,
+                    auch vom GPT erzeugte Zielbilder. Erlaubt sind PNG, JPEG,
+                    WebP, GIF, MP4, MOV, PDF und Word (.docx) bis 25 MB je Datei. Was nicht passt, wird im
                     Eintrag vermerkt; die Anforderung kommt trotzdem an.
                   items:
                     type: string

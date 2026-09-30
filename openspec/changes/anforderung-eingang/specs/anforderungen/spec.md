@@ -111,12 +111,12 @@ schließt. Eine Doppelerkennung gibt es nicht.
 ### Requirement: Die Beschreibung im Issue hat eine feste Gliederung
 
 Die Beschreibung des Issues SHALL in dieser Reihenfolge bestehen aus: dem Text
-aus `beschreibung` unverändert; einem Abschnitt „Bilder" mit allen übernommenen
-Dateien (Bilder eingebettet als `![name](assetUrl)`, Videos als
+aus `beschreibung` unverändert; einem Abschnitt „Anhänge" mit allen übernommenen
+Dateien (Bilder eingebettet als `![name](assetUrl)`, Videos und Dokumente als
 `[name](assetUrl)`) und allen nicht übernommenen Dateien mit Namen und Grund;
 einer Fußzeile „Eingereicht von {einreicher} über ChatGPT · {TT.MM.JJJJ, HH:MM}
 · Route: {route oder „unklar"}", die Uhrzeit in Europe/Berlin. Der Abschnitt
-„Bilder" MUST entfallen, wenn keine Datei mitkam. Dateinamen, `einreicher` und
+„Anhänge" MUST entfallen, wenn keine Datei mitkam. Dateinamen, `einreicher` und
 `route` MUST vor dem Einsetzen von Steuerzeichen befreit, auf 100 Zeichen
 begrenzt und so maskiert werden, dass sie kein Markdown öffnen oder schließen
 können. Der Issue-Titel SHALL `titel` unverändert sein.
@@ -126,13 +126,18 @@ können. Der Issue-Titel SHALL `titel` unverändert sein.
 - **WHEN** eine gültige Anforderung ohne `openaiFileIdRefs` und ohne `route`
   eintrifft
 - **THEN** besteht die Beschreibung aus dem Text und der Fußzeile mit
-  „Route: unklar", ohne Abschnitt „Bilder"
+  „Route: unklar", ohne Abschnitt „Anhänge"
 
 #### Scenario: Screenshot und Bildschirmaufnahme
 
 - **WHEN** ein PNG und ein MP4 mitkommen und beide übernommen werden
 - **THEN** steht das PNG als eingebettetes Bild und das MP4 als Link im
-  Abschnitt „Bilder"
+  Abschnitt „Anhänge"
+
+#### Scenario: PDF und Word-Dokument
+
+- **WHEN** ein PDF und eine `.docx` mitkommen und beide übernommen werden
+- **THEN** stehen beide als Link im Abschnitt „Anhänge", keines eingebettet
 
 #### Scenario: Dateiname mit Markdown
 
@@ -145,8 +150,10 @@ können. Der Issue-Titel SHALL `titel` unverändert sein.
 Die Function SHALL jede Datei aus `openaiFileIdRefs` noch im selben Aufruf von
 ihrem `download_link` laden und per Linear-`fileUpload` ablegen, weil die Links
 nach fünf Minuten verfallen. Es SHALL höchstens 10 Dateien geben, mit den Typen
-`image/png`, `image/jpeg`, `image/webp`, `image/gif`, `video/mp4` und
-`video/quicktime` und höchstens 25 MB je Datei. Geladen wird nur über `https`
+`image/png`, `image/jpeg`, `image/webp`, `image/gif`, `video/mp4`,
+`video/quicktime`, `application/pdf` und
+`application/vnd.openxmlformats-officedocument.wordprocessingml.document` (Word,
+`.docx`) und höchstens 25 MB je Datei. Geladen wird nur über `https`
 von `oaiusercontent.com` oder einer seiner Unterdomains (etwa
 `files.oaiusercontent.com` oder regionale wie `sdmntprnortheu.oaiusercontent.com`),
 ohne Weiterleitungen zu folgen. Der erklärte `mime_type` MUST zur Dateisignatur der
@@ -168,7 +175,7 @@ abgebrochen werden, und was bis dahin nicht übernommen ist, MUST mit dem Grund
 
 - **WHEN** ein `download_link` mit 403 antwortet
 - **THEN** wird das Issue angelegt
-- **AND** der Abschnitt „Bilder" nennt die Datei und den Grund „nicht mehr
+- **AND** der Abschnitt „Anhänge" nennt die Datei und den Grund „nicht mehr
   abrufbar"
 
 #### Scenario: Eintrag ist ein bloßer String

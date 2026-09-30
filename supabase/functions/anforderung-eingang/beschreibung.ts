@@ -1,6 +1,6 @@
 // Baut die Beschreibung des Linear-Issues (AGE-830).
 //
-// Gliederung, fest: der Text vom GPT unverändert · Abschnitt „Bilder" (nur
+// Gliederung, fest: der Text vom GPT unverändert · Abschnitt „Anhänge" (nur
 // wenn Dateien mitkamen) · Fußzeile mit Einreicher, Zeitpunkt und Route.
 //
 // Der Text vom GPT ist Markdown und soll es bleiben — er ist gegliedert, und
@@ -11,7 +11,7 @@
 import type { Anforderung } from "./pruefung.ts";
 
 export type Dateiergebnis =
-  | { name: string; art: "bild" | "video"; assetUrl: string }
+  | { name: string; art: "bild" | "video" | "dokument"; assetUrl: string }
   | { name: string; grund: string };
 
 const MAX_NAME = 100;
@@ -64,7 +64,7 @@ export function baueBeschreibung(
 ): string {
   const teile = [anforderung.beschreibung];
   if (dateien.length > 0) {
-    teile.push(["### Bilder", ...dateien.map(dateizeile)].join("\n\n"));
+    teile.push(["### Anhänge", ...dateien.map(dateizeile)].join("\n\n"));
   }
   const route = anforderung.route === null ? "unklar" : maskiere(anforderung.route);
   teile.push(
