@@ -94,3 +94,11 @@
 - [ ] 7.4 Datenschutzentscheidung aus AGE-830 vor der Übergabe an Detlev.
 - [ ] 7.5 `supabase functions delete bildtest --project-ref foelowldexkcqzewvrcf`,
       Test-GPT löschen.
+
+## 8. Nachtrag: regionale OpenAI-Hosts (30.09.)
+
+- [x] 8.1 Hostprüfung auf `oaiusercontent.com` und Unterdomains, mit Punkt-Grenze.
+      Roter Test zuerst: die beiden Hosts aus AGE-993 werden geladen,
+      `evil-oaiusercontent.com` und `oaiusercontent.com.example.net` nicht.
+- [ ] 8.2 PR, danach Deploy auf DEV und PROD, und Detlev schickt eine Meldung mit
+      Bild erneut.

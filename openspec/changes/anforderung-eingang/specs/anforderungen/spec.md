@@ -147,8 +147,9 @@ ihrem `download_link` laden und per Linear-`fileUpload` ablegen, weil die Links
 nach fünf Minuten verfallen. Es SHALL höchstens 10 Dateien geben, mit den Typen
 `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `video/mp4` und
 `video/quicktime` und höchstens 25 MB je Datei. Geladen wird nur über `https`
-von einem Host aus einer festen Liste (`files.oaiusercontent.com`), ohne
-Weiterleitungen zu folgen. Der erklärte `mime_type` MUST zur Dateisignatur der
+von `oaiusercontent.com` oder einer seiner Unterdomains (etwa
+`files.oaiusercontent.com` oder regionale wie `sdmntprnortheu.oaiusercontent.com`),
+ohne Weiterleitungen zu folgen. Der erklärte `mime_type` MUST zur Dateisignatur der
 geladenen Bytes passen.
 
 Ein Eintrag, der ein String statt eines Objekts ist, keinen `download_link`
@@ -175,6 +176,19 @@ abgebrochen werden, und was bis dahin nicht übernommen ist, MUST mit dem Grund
 - **WHEN** `openaiFileIdRefs` den String `file-abc123` enthält
 - **THEN** wird er unter dem Namen `file-abc123` als nicht übertragen
   vermerkt, und die Function wirft nicht
+
+#### Scenario: Regionaler OpenAI-Host
+
+- **WHEN** ein `download_link` auf `https://sdmntprdenmarkeast.oaiusercontent.com/…`
+  zeigt
+- **THEN** wird die Datei geladen und übernommen
+
+#### Scenario: Host, der nur so aussieht
+
+- **WHEN** ein `download_link` auf `evil-oaiusercontent.com` oder
+  `oaiusercontent.com.example.net` zeigt
+- **THEN** wird nicht geladen, und die Datei wird mit „Adresse nicht erlaubt" und
+  dem Host vermerkt
 
 #### Scenario: Fremder Host oder Weiterleitung
 

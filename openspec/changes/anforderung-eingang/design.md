@@ -105,9 +105,16 @@ Je Eintrag:
 1. Form prüfen: Objekt mit `download_link`, `mime_type` aus der Liste. Ein
    String wird unter seinem eigenen Wert als Namen vermerkt, ein Eintrag ohne
    Namen als „Datei {n}".
-2. Adresse prüfen: `https:`, Host genau `files.oaiusercontent.com`. Das ist der
-   Host aus OpenAIs Doku (developers.openai.com/api/docs/actions/sending-files,
-   gelesen am 22.09.). Andere Hosts werden mit ihrem Namen vermerkt.
+2. Adresse prüfen: `https:`, Host `oaiusercontent.com` oder eine Unterdomain
+   davon, verglichen mit Punkt-Grenze (`.endsWith(".oaiusercontent.com")`).
+   OpenAIs Doku (developers.openai.com/api/docs/actions/sending-files, gelesen
+   am 22.09.) nennt nur `files.oaiusercontent.com`. Der erste echte Aufruf am
+   30.09. (AGE-993) kam aber von regionalen Hosts,
+   `sdmntprdenmarkeast.oaiusercontent.com` und `sdmntprnortheu.oaiusercontent.com`,
+   und beide Bilder wurden abgewiesen. Eine Liste einzelner Hosts bräche beim
+   nächsten Rechenzentrum wieder still; die Domain gehört ganz OpenAI. Verworfen:
+   eine feste Liste mit genau den gesehenen Hosts. Andere Hosts werden mit ihrem
+   Namen vermerkt.
 3. `GET` mit `redirect: "manual"` und einem `AbortSignal`, das an der früheren
    von zwei Fristen abläuft: 12 s für diese Datei, 25 s für alle zusammen. Eine
    Weiterleitung (3xx) wird nicht verfolgt, sondern mit dem Zielhost vermerkt.
@@ -363,6 +370,8 @@ erreicht keine Action mehr etwas. Die Tabelle kann stehen bleiben.
 > `files.oaiusercontent.com`. Die Objektform trotz `string` im Schema ist von
 > OpenAI dokumentiert.
 
-1. **Leitet `files.oaiusercontent.com` weiter?** Der Probelauf auf DEV zeigt es
-   (Task 7.2). Bis dahin wird nicht gefolgt.
+1. **Leitet `files.oaiusercontent.com` weiter?** Beantwortet am 30.09.: Die
+   Links zeigen gleich auf regionale Unterdomains, Weiterleitungen wurden nicht
+   gesehen. Die Hostprüfung lässt seitdem die ganze Domain zu (Entscheidung 3,
+   Task 8.1); Weiterleitungen werden weiter nicht verfolgt.
 2. **Datenschutz** (AGE-830): muss vor der Übergabe an Detlev entschieden werden.
