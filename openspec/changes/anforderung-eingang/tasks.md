@@ -102,3 +102,15 @@
       `evil-oaiusercontent.com` und `oaiusercontent.com.example.net` nicht.
 - [ ] 8.2 PR, danach Deploy auf DEV und PROD, und Detlev schickt eine Meldung mit
       Bild erneut.
+
+## 9. Nachtrag: PDF und Word (30.09.)
+
+- [x] 9.1 Typen `application/pdf` und `.docx` zulassen, Signatur `%PDF-` bzw.
+      ZIP (`PK\x03\x04`). Beide als Link, nicht eingebettet. Abschnitt „Bilder"
+      heißt „Anhänge". Roter Test zuerst.
+- [x] 9.2 GPT-Vertrag nachziehen: Instructions (Dokumente mitgeben) und Schema
+      (Typenliste). Detlev fügt beides neu ein.
+- [ ] 9.3 Nach dem Deploy: Detlev schickt eine Meldung mit PDF oder `.docx`.
+      Zeigt das Log einen anderen `mime_type` als erwartet, wird die Liste
+      angepasst.
+

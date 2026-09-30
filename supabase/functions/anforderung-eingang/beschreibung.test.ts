@@ -27,14 +27,14 @@ const ANFORDERUNG: Anforderung = {
 // 22.09.2026 12:30 UTC = 14:30 in Berlin (Sommerzeit).
 const JETZT = new Date("2026-09-22T12:30:00Z");
 
-Deno.test("ohne Dateien: Text und Fußzeile, kein Abschnitt Bilder", () => {
+Deno.test("ohne Dateien: Text und Fußzeile, kein Abschnitt Anhänge", () => {
   const b = baueBeschreibung(ANFORDERUNG, [], JETZT);
   assertEquals(
     b,
     "**Was gewünscht ist**\nEin größeres Suchfeld.\n\n---\n\n" +
       "Eingereicht von Detlev Krause über ChatGPT · 22.09.2026, 14:30 · Route: /mitglieder",
   );
-  assert(!b.includes("Bilder"));
+  assert(!b.includes("Anhänge"));
 });
 
 Deno.test("ohne Route steht „unklar“", () => {
@@ -48,7 +48,7 @@ Deno.test("der Text vom GPT geht unverändert hinein, Markdown inklusive", () =>
   assert(b.startsWith(text + "\n\n"), b);
 });
 
-Deno.test("Reihenfolge: Text, Bilder, Fußzeile; Bild eingebettet, Video als Link", () => {
+Deno.test("Reihenfolge: Text, Anhänge, Fußzeile; Bild eingebettet, Video als Link", () => {
   const dateien: Dateiergebnis[] = [
     { name: "screenshot.png", art: "bild", assetUrl: "https://uploads.linear.app/a" },
     { name: "aufnahme.mov", art: "video", assetUrl: "https://uploads.linear.app/b" },
@@ -56,7 +56,7 @@ Deno.test("Reihenfolge: Text, Bilder, Fußzeile; Bild eingebettet, Video als Lin
   ];
   const b = baueBeschreibung(ANFORDERUNG, dateien, JETZT);
   const text = b.indexOf("Ein größeres Suchfeld.");
-  const bilder = b.indexOf("### Bilder");
+  const bilder = b.indexOf("### Anhänge");
   const bild = b.indexOf("![screenshot.png](https://uploads.linear.app/a)");
   const video = b.indexOf("[aufnahme.mov](https://uploads.linear.app/b)");
   const vermerk = b.indexOf("Nicht übertragen: ziel.webp (nicht mehr abrufbar)");
@@ -67,6 +67,18 @@ Deno.test("Reihenfolge: Text, Bilder, Fußzeile; Bild eingebettet, Video als Lin
   assert(text < bilder && bilder < bild && bild < video && video < vermerk && vermerk < fuss, b);
   // Das Video ist ein Link, kein eingebettetes Bild.
   assert(!b.includes("![aufnahme.mov]"), b);
+});
+
+Deno.test("PDF und Word stehen als Link, nicht eingebettet", () => {
+  const dateien: Dateiergebnis[] = [
+    { name: "konzept.pdf", art: "dokument", assetUrl: "https://uploads.linear.app/c" },
+    { name: "notizen.docx", art: "dokument", assetUrl: "https://uploads.linear.app/d" },
+  ];
+  const b = baueBeschreibung(ANFORDERUNG, dateien, JETZT);
+  assertStringIncludes(b, "### Anhänge");
+  assertStringIncludes(b, "[konzept.pdf](https://uploads.linear.app/c)");
+  assertStringIncludes(b, "[notizen.docx](https://uploads.linear.app/d)");
+  assert(!b.includes("![konzept.pdf]") && !b.includes("![notizen.docx]"), b);
 });
 
 Deno.test("Markdown im Dateinamen bleibt Text", () => {
