@@ -18,6 +18,18 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-10-03-chatleiste-blau",
+    "datum": "2026-10-03",
+    "titel": "Die Nachrichtenleiste ist im dunklen Modus dunkelblau",
+    "linear": "AGE-1002",
+    "aenderungen": [
+      "Die Nachrichtenleiste rechts ist im dunklen Modus dunkelblau (`#002B51`) — eingeklappt wie ausgeklappt, also durchgehend eine Fläche.",
+      "Alles darin bleibt lesbar: Namen, Vorschautexte, Zeitstempel, das Ungelesen-Abzeichen, der aktive Gesprächspartner und der Zustand unter dem Mauszeiger. Die Kontraste sind ausgerechnet und liegen über dem, was die Barrierefreiheits-Norm verlangt.",
+      "Im hellen Modus ändert sich **nichts** — die Leiste bleibt dort weiss, wie die linke Navigation.",
+      "Die Chat-Fenster und die Seite „Nachrichten\" bleiben in beiden Modi hell."
+    ]
+  },
+  {
     "slug": "2026-09-29-stufen-nur-club",
     "datum": "2026-09-29",
     "titel": "Die Fläche spricht nur noch von DISCOVER, FOCUS und IMPACT",
