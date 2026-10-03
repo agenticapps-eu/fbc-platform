@@ -296,8 +296,13 @@ export function FeedbackButton({
         // Der Fokusring bleibt, obwohl `NavLink` keinen trägt: ihn abzuräumen
         // wäre eine Angleichung nach unten. Dass die Einträge daneben keinen
         // haben, ist ein eigener Befund.
+        //
+        // Er liest ab AGE-1003 `--leiste-focus` statt `ring-accent`: auf der
+        // Leistenfläche `#002B51` trägt der Akzent nur 2,83:1, unter den 3:1
+        // für Bedienelemente. Der Ring IM Overlay weiter unten bleibt
+        // `ring-accent-strong` — er steht nicht auf der Leiste.
         className={cn(
-          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]",
           navEintragAbstaende(collapsed),
         )}
       >

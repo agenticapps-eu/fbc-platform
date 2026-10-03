@@ -18,6 +18,19 @@ export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
     ]
   },
   {
+    "slug": "2026-10-03-leiste-navy-nachziehen",
+    "datum": "2026-10-03",
+    "titel": "Beide Leisten tragen dasselbe Dunkelblau",
+    "linear": "AGE-1003",
+    "aenderungen": [
+      "Die linke Navigation ist im dunklen Modus dunkelblau (`#002B51`) — dieselbe Fläche wie die Nachrichtenleiste rechts. Die beiden Leisten rahmen die Seite damit in einer Farbe statt in zwei.",
+      "Das gilt aufgeklappt wie eingeklappt und auch für die Navigationsschublade auf dem Telefon.",
+      "Alles darin bleibt lesbar: Menüeinträge, Abschnittsmarken, der aktive Eintrag, die Wortmarke und der Zähler offener Anfragen. Die Kontraste sind ausgerechnet und liegen über dem, was die Barrierefreiheits-Norm verlangt.",
+      "Die Tastaturbedienung bleibt sichtbar: der Rahmen, der ein Bedienelement als „jetzt am Zug\" markiert, wird auf der neuen Fläche angepasst, statt in ihr zu verschwinden.",
+      "Im hellen Modus ändert sich **nichts**."
+    ]
+  },
+  {
     "slug": "2026-10-03-chatleiste-blau",
     "datum": "2026-10-03",
     "titel": "Die Nachrichtenleiste ist im dunklen Modus dunkelblau",

@@ -27,7 +27,10 @@ const COLORS: { name: string; token: string; className: string }[] = [
   { name: "Akzent", token: "#2F6BD1", className: "bg-accent" },
   { name: "Akzent kräftig", token: "#1F53B0", className: "bg-accent-strong" },
   { name: "Akzent weich", token: "#EFF5FD", className: "bg-accent-soft" },
-  { name: "Chrome (Sidebar)", token: "#FFFFFF", className: "bg-chrome" },
+  // Nicht mehr „(Sidebar)" seit AGE-1003: die Leisten tragen im navy-Modus
+  // `--sidebar-surface` (#002B51), dieses Token färbt `/onboarding`,
+  // `/willkommen` und den sekundären Knopf. Befund des Code-Reviews.
+  { name: "Chrome (Onboarding, sekundärer Knopf)", token: "#FFFFFF", className: "bg-chrome" },
   { name: "Chrome erhöht", token: "#F6F8FB", className: "bg-chrome-elevated" },
   { name: "Canvas (Karten)", token: "#FFFFFF", className: "bg-canvas" },
   { name: "Soft (Seite)", token: "#F6F8FB", className: "bg-soft" },
@@ -281,8 +284,12 @@ export default function StyleguidePage() {
             </p>
           </Section>
 
-          {/* Chrome-Vorschau (Sidebar-Fläche) */}
-          <Section title="Chrome — Sidebar-Fläche">
+          {/* Chrome-Vorschau. Bis AGE-1003 „Sidebar-Fläche" — das war schon
+              vorher ungenau und ist seitdem falsch: die Leisten hängen an
+              `--sidebar-surface`. Die Anordnung darunter zeigt trotzdem
+              weiterhin eine Leiste, weil sie die Chrome-FAMILIE vorführt
+              (`-elevated`, `-border`), die die Leiste sehr wohl liest. */}
+          <Section title="Chrome — Onboarding-Fläche und Chrome-Familie">
             <div className="overflow-hidden rounded-[var(--radius-card)] border border-chrome-border bg-chrome p-6 shadow-soft">
               <Logo />
               <div className="mt-5 flex flex-col gap-1">

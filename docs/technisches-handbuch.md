@@ -517,12 +517,33 @@ Mitglieds.
 | Akzent auf der Leiste | `--color-accent-on-chrome: #5b90e0` | nur navy-Chrome |
 | Fließtext | `--color-ink: #1e2a3a` | in beiden gleich — nie reines Schwarz |
 | Fläche der Nachrichtenleiste | `--chat-rail-surface: #002b51` | nur navy, nur die rechte Leiste |
+| Fläche der linken Navigation | `--sidebar-surface: #002b51` | nur navy; derselbe Wert |
+| Fokusring der linken Leiste | `--leiste-focus: #b9cce6` | nur navy; hell = `--color-accent` |
 
-> **Die rechte Leiste ist seit AGE-1002 ein eigener Fall.** Sie trägt im
-> dunklen Modus `#002B51` — ein- und ausgeklappt dieselbe Fläche, und
-> ausdrücklich **nicht** das `#081527` der linken Navigation. Die Farbe ist auf
-> dkrealinvest.com gemessen und von Detlev im Meeting am 03.10.2026 benannt; ob
-> die linke Navigation nachzieht, ist die offene Frage E7.
+> **Beide angedockten Leisten tragen im dunklen Modus `#002B51`.** Die Farbe
+> ist auf dkrealinvest.com gemessen und von Detlev im Meeting am 03.10.2026
+> benannt. AGE-1002 hat sie zuerst nur der rechten Leiste gegeben und
+> ausdrücklich festgehalten, sie sei **nicht** das `#081527` der linken
+> Navigation — das galt, solange Frage E7 offen war. Donald hat sie am
+> 03.10.2026 mit Ja beantwortet (AGE-1003), und seitdem rahmen die beiden
+> Leisten die Seite in **einer** Farbe.
+>
+> **`--color-chrome` bleibt daneben `#081527` und wandert nicht mit.** Es färbt
+> nicht die Leisten, sondern die Vollflächen von `/onboarding` und
+> `/willkommen` (`min-h-screen bg-chrome`), `Button variant="secondary"` und —
+> als `text-chrome` — die Ziffer auf den Zählern. Die Topbar ist
+> `bg-canvas/85`, eine Inhaltsfarbe, und in beiden Modi hell. (Die
+> Entwurfsvorlage `docs/design-system.html` führt `--color-chrome` noch als
+> „Sidebar- und Topbar-Fläche"; das beschreibt die Absicht von damals, nicht
+> den gebauten Zustand.)
+>
+> **Der Fokusring war der eine Befund, der den Farbwechsel teurer machte als
+> eine Zeile.** `ring-accent` (`#2F6BD1`) trägt auf `#081527` 3,61:1 und auf
+> `#002B51` nur 2,83:1 — unter den 3:1 der Norm. Vier Stellen auf der linken
+> Leiste lesen deshalb `--leiste-focus`: die Wortmarke, die Abschnittsmarken in
+> `SidebarNav`, der Feedback-Knopf und der `leiste`-Zweig von `LeistenPill`. Im
+> hellen Modus ist der Token zeichengleich mit `--color-accent`, dort ändert
+> sich also kein Pixel.
 >
 > Alles in der Leiste liest `--thread-*`-Tokens, die im `@theme`-Block auf die
 > Inhaltsfarben zurückfallen und **nur innerhalb von `.fbc-chat-rail`**

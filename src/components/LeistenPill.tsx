@@ -85,18 +85,24 @@ export function LeistenPill({
         // auf der dunkelblauen Nachrichtenleiste traegt `--color-accent`
         // (#2F6BD1) nur 2,8:1 — unter den 3:1 fuer Bedienelemente, und
         // schlechter als vorher (3,6:1 auf dem Chrome-Rail, 5,1:1 auf Weiss).
-        // Links faellt der Token auf genau `--color-accent` zurueck, dort
-        // aendert sich also nichts. Befund des Code-Reviews.
-        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--thread-focus)]",
+        // Befund des Code-Reviews.
+        //
+        // BERICHTIGT mit AGE-1003: hier stand „links faellt der Token auf
+        // genau `--color-accent` zurueck, dort aendert sich also nichts". Das
+        // galt, solange die linke Leiste `#081527` trug. Sie traegt jetzt
+        // dieselbe Flaeche wie die rechte, und damit holt derselbe Befund den
+        // linken Pill ein — er braucht seinen eigenen Token, nicht den der
+        // Thread-Liste. JE SEITE EINER, deshalb unten im Zweig und nicht hier.
+        "transition-colors focus-visible:outline-none focus-visible:ring-2",
         // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
         flaeche === "leiste"
-          ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active"
+          ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active focus-visible:ring-[color:var(--leiste-focus)]"
           : // `--thread-chrome-ink` und nicht `--thread-muted`: im HELLEN Modus
             // muss der eingeklappte Pill aussehen wie vorher, und das war
             // `text-on-chrome` (#475569) mit Hover `#1F53B0`. `--thread-muted`
             // ist #626f85 und waere sichtbar anders — die Zusage lautet „kein
             // Pixel". Befund des Code-Reviews.
-            "bg-[var(--chat-rail-surface)] text-[color:var(--thread-chrome-ink)] hover:text-[color:var(--thread-chrome-ink-hover)]",
+            "bg-[var(--chat-rail-surface)] text-[color:var(--thread-chrome-ink)] hover:text-[color:var(--thread-chrome-ink-hover)] focus-visible:ring-[color:var(--thread-focus)]",
         // Der Schatten ist GERICHTET — nach aussen, weg von der Leiste. Ein
         // Schatten ringsum sähe aus wie eine schwebende Marke; so sieht es aus,
         // als würfe die Leiste ihre eigene Wölbung.

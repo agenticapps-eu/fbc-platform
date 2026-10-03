@@ -913,9 +913,14 @@ export default function AppShell() {
             collapsed ? "justify-center px-2" : "px-5",
           )}
         >
+          {/* Der Fokusring liest ab AGE-1003 `--leiste-focus` statt
+              `ring-accent`. Grund: auf der neuen Leistenflaeche `#002B51`
+              traegt `--color-accent` nur 2,83:1 — unter den 3:1 fuer
+              Bedienelemente. Im hellen Modus faellt der Token auf genau
+              `--color-accent` zurueck, dort aendert sich also nichts. */}
           <Link
             to="/"
-            className="rounded-md text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="rounded-md text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]"
           >
             <Logo className="h-8" lockup={collapsed ? "mark" : "full"} onChrome />
           </Link>

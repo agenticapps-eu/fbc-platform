@@ -277,7 +277,8 @@ describe("Ein Pill für beide Leisten (AGE-638)", () => {
 
   // ══ EINE FLAECHE, NICHT ZWEI (AGE-1002) ══════════════════════════════════
   // Bis hierher war die Leiste zweifarbig: eingeklappt `fbc-sidebar-surface`
-  // (im dunklen Modus `#081527`), ausgeklappt `bg-canvas` (weiss). Im hellen
+  // (im dunklen Modus damals `#081527` — seit AGE-1003 traegt dieser Token
+  // dasselbe `#002B51` wie die Leiste), ausgeklappt `bg-canvas` (weiss). Im hellen
   // Modus war der Unterschied unsichtbar, weil dort beide weiss sind — genau
   // deshalb ist das hier eine KLASSEN-Zusage und keine Farbzusage: in jsdom
   // gibt es kein Theme, und eine berechnete Farbe waere in beiden Faellen

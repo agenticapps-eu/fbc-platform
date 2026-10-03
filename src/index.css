@@ -190,14 +190,66 @@
      Die Sidebar sitzt am Rand, nicht schwebend — Entscheidung aus dem Meeting. */
   --sidebar-surface: #ffffff;
 
+  /* Der Fokusring der linken Leiste (AGE-1003). Eigener Token, und der Wert
+     hier ist KEINE Wahl: er ist zeichengleich mit `--color-accent`, also genau
+     das, was `ring-accent` vorher gezeichnet hat. Damit aendert sich im hellen
+     Modus kein Pixel, und das ist als Test prueffbar statt als Absicht notiert.
+
+     Im dunklen Modus muss er abweichen: `--color-accent` (#2F6BD1) traegt auf
+     der neuen Leistenflaeche #002B51 nur 2,83:1 — unter den 3:1, die die Norm
+     fuer Bedienelemente verlangt, und schlechter als die 3,61:1 auf dem alten
+     #081527. Vier Stellen lesen ihn: die Wortmarke, die Abschnittsmarken in
+     `SidebarNav`, der Feedback-Knopf und der `leiste`-Zweig von `LeistenPill`.
+
+     Derselbe Befund wie bei der Chatleiste, nur eine Leiste weiter links — und
+     das ist die Regel, nicht die Ausnahme: wer eine Flaeche von sehr dunkel auf
+     mittel-dunkel hebt, nimmt jedem Element darauf Kontrast weg, und der Akzent
+     hatte die geringste Reserve. */
+  --leiste-focus: #2f6bd1;
+
+  /* Das Abzeichen der Leiste — der Zaehler offener Anfragen (AGE-1003,
+     BEFUND DES CODE-REVIEWS).
+
+     Die erste Fassung dieses Changes hat ihn uebersehen, und das ist der
+     lehrreiche Teil: `design.md` NENNT diese Stelle beim Namen, um damit eine
+     Alternative zu verwerfen — und misst sie dann nicht. Die Fuellung las
+     `bg-accent` (#2F6BD1) und faellt damit gegen die neue Leistenflaeche von
+     3,61:1 auf **2,83:1**. Das ist Ziffer fuer Ziffer dieselbe Zahl, mit der
+     derselbe Change den eigenen Fokus-Token begruendet hat.
+
+     Die Werte hier sind nicht neu erfunden: es sind die der Chatleiste
+     (`--thread-badge` / `--thread-badge-ink`), die AGE-1002 fuer genau dieses
+     Element auf genau dieser Flaeche gerechnet hat. Beide Leisten tragen jetzt
+     dieselbe Flaeche, also auch dasselbe Abzeichen.
+
+       hell: #2F6BD1 auf Weiss 5,07:1, Ziffer #FFFFFF darauf 5,07:1 — die
+             heutigen Werte, Zeichen fuer Zeichen (`bg-accent` + `text-chrome`,
+             und `--color-chrome` ist im Hellen weiss).
+       navy: #5B90E0 gegen #002B51 4,45:1, Ziffer #00172B darauf 5,62:1. */
+  --leiste-badge: #2f6bd1;
+  --leiste-badge-ink: #ffffff;
+
   /* ── Die Nachrichtenleiste rechts (AGE-1002) ─────────────────────────────
      EIN Token fuer die Flaeche, ein- und ausgeklappt. Bis AGE-1002 war die
      Leiste zweifarbig (Chrome eingeklappt, canvas ausgeklappt); Detlev hat im
      Meeting am 03.10. eine durchgehende Flaeche verlangt.
 
-     Bewusst NICHT `--color-chrome`: daran haengt die linke Navigation, und die
-     soll hier gerade nicht mitwandern (offene Frage E7 an Detlev). Faellt sie
-     mit Ja aus, ist es dort ein Einzeiler.
+     Bewusst NICHT `--color-chrome`, aber die Begruendung dafuer ist mit
+     AGE-1003 BERICHTIGT. Hier stand, daran haenge die linke Navigation. Das
+     ist gemessen falsch: kein Element der linken Leiste liest `--color-chrome`
+     (die Utility `bg-chrome`); ihre Flaeche kommt aus `--sidebar-surface`, die
+     Topbar aus `bg-canvas/85`. Aus der Chrome-FAMILIE liest die Leiste sehr
+     wohl: `--color-chrome-active`, `--color-chrome-elevated` und
+     `--color-chrome-border` — nur eben nicht den Grundton selbst.
+     Der Satz hatte die Absicht der Entwurfsvorlage uebernommen
+     (`docs/design-system.html`: „--color-chrome — Sidebar- und Topbar-Flaeche"),
+     nicht den gebauten Zustand.
+
+     Was `--color-chrome` im dunklen Modus wirklich faerbt: die Vollflaechen von
+     `/onboarding` und `/willkommen` (`min-h-screen bg-chrome`),
+     `Button variant="secondary"` und — als `text-chrome` — die Ziffer auf den
+     `bg-accent`-Zaehlern. Ein eigener Token fuer die Leiste verschont also nicht
+     die linke Navigation, sondern DIESE DREI.
 
      Die `--thread-*`-Tokens sind die Farben, die `ThreadList` und die
      Kopfzeilen der Leiste lesen. Hier auf :root stehen sie auf den
@@ -263,16 +315,47 @@ html[data-variant="navy"] {
   --color-on-chrome-active: #ffffff;
   --color-accent-on-chrome: #5b90e0;
 
-  --sidebar-surface: #081527;
+  /* AGE-1003: dieselbe Flaeche wie die Nachrichtenleiste rechts. Donald hat
+     Frage E7 aus AGE-1002 am 03.10. mit Ja beantwortet — die beiden
+     angedockten Leisten rahmen die Seite jetzt in EINER Farbe.
+
+     `--color-chrome` bleibt daneben ausdruecklich `#081527` und wandert NICHT
+     mit; es faerbt `/onboarding`, `/willkommen` und den sekundaeren Knopf. Ein
+     Waechter in `index.chatleiste-tokens.test.ts` haelt das fest.
+
+     Was auf dieser Flaeche gemessen wurde (vorher auf #081527 → jetzt):
+       #9FB4D2 inaktiver Eintrag      8,66:1 → 6,78:1  ✓
+       #8FA5C4 Abschnittsmarke        7,28:1 → 5,70:1  ✓
+       #FFFFFF aktiv, Marke, Hover   18,31:1 → 14,34:1 ✓
+       #5B90E0 Punkte der Wortmarke   5,68:1 → 4,45:1  ✓
+       #2F6BD1 Fokusring `ring-accent` 3,61:1 → 2,83:1 ✗  → `--leiste-focus`
+       #1F53B0 Aktivfuellung          2,55:1 → 2,00:1  s. u.
+       #0E1F38 Hover-Flaeche          1,11:1 → 1,15:1  s. u.
+
+     Die beiden letzten halten die 3:1 nicht, und beide sind bewusst so:
+     die Hover-FLAECHE hob sich schon vorher nicht ab (1,11:1) — das Signal ist
+     die Schrift, die auf Weiss wechselt (16,51:1 darauf). Die Aktivfuellung
+     hielt die Schwelle nie; der Zustand traegt weisse halbfette Schrift
+     (7,19:1 auf der Fuellung), einen weissen Linksbalken und ein weisses
+     Symbol. Beides ist als Zusage geprueft, damit die Zahlen beim naechsten
+     Griff an die Farben nicht blind „behoben" oder blind verteidigt werden. */
+  --sidebar-surface: #002b51;
+  --leiste-focus: #b9cce6;
+  --leiste-badge: #5b90e0;
+  --leiste-badge-ink: #00172b;
 }
 
 /* Die Nachrichtenleiste im dunklen Modus (AGE-1002).
  *
  * `#002B51` ist gemessen, nicht gewaehlt: Detlev hat im Meeting am 03.10. das
  * Blau der DK-Real-Invest-Website benannt, und dort steht es im
- * Elementor-`post-12.css` (Fussbereich und Flaechen). Es ist ABSICHTLICH nicht
- * das `#081527` der linken Navigation — dass die beiden Leisten sich
- * unterscheiden, ist die Vorgabe, solange Frage E7 offen ist.
+ * Elementor-`post-12.css` (Fussbereich und Flaechen).
+ *
+ * AGE-1003: Bis dahin stand hier, die Farbe sei ABSICHTLICH nicht das
+ * `#081527` der linken Navigation — der Unterschied sei die Vorgabe, „solange
+ * Frage E7 offen ist". Sie ist nicht mehr offen: Donald hat sie am 03.10. mit
+ * Ja beantwortet, und `--sidebar-surface` traegt denselben Wert. Die beiden
+ * Leisten tragen jetzt EINE Flaeche.
  *
  * Der Selektor ist die halbe Zusage: die `--thread-*`-Tokens stehen auf
  * `.fbc-chat-rail` und NICHT auf `html[data-variant="navy"]`. Stuenden sie

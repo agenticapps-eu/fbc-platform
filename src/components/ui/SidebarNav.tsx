@@ -150,7 +150,10 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               type="button"
               onClick={() => umschalten(section.title as string)}
               aria-expanded={offen}
-              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              // Fokusring auf `--leiste-focus` statt `ring-accent` (AGE-1003):
+              // auf der Leistenflaeche `#002B51` traegt der Akzent nur 2,83:1.
+              // Im hellen Modus ist der Token zeichengleich mit dem Akzent.
+              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]"
             >
               {/* Aus dem Icon-Satz, nicht inline gezeichnet: `icons.test.ts`
                   hält fest, dass jeder wiederverwendbare Glyph dort steht — ein
@@ -228,7 +231,13 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome",
+                        // `--leiste-badge` statt `bg-accent`/`text-chrome`
+                        // (AGE-1003, Befund des Code-Reviews): die Fuellung
+                        // #2F6BD1 traegt gegen die neue Leistenflaeche nur
+                        // 2,83:1 — dieselbe Zahl, mit der dieser Change seinen
+                        // Fokus-Token begruendet. Im Hellen fallen beide Tokens
+                        // auf genau die alten Werte zurueck.
+                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--leiste-badge)] px-1.5 text-xs font-semibold text-[color:var(--leiste-badge-ink)]",
                         collapsed ? "absolute -top-0.5 right-0.5" : "ml-auto",
                       )}
                     >
