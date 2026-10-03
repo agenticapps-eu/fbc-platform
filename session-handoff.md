@@ -1,117 +1,118 @@
-# Session Handoff — 2026-09-29 (AGE-969 Stufen nur noch Club)
+# Session Handoff — 2026-10-03 (V5 FINAL: V5F-1 Rechte, V5F-2 Chatleiste)
 
-> **Scope dieser Übergabe: AGE-969.** Fremde offene Punkte stehen hier nicht.
-> AGE-927 ist ebenfalls abgeschlossen und auf PROD (PR #440, #442).
-
-> ## ✅ ABGESCHLOSSEN UND AUF PROD
->
-> PR #443 gemergt (`10c86ff`), Deploy grün, keine Migration nötig.
-> **Es ist nichts offen.** Wer hier weiterarbeitet, fängt bei einem neuen
-> Vorgang an — und darf diesen Worktree mit `wt remove` abräumen, ebenso
-> `mitglied-anlegen` und `stufen-v5`.
-
-## ⚠ Eine Sache braucht noch deine Entscheidung
-
-**Die AGB § 3.2 ist mitgeändert.** Ein Reviewer hat dagegen einen HIGH-Befund
-erhoben: ein Anwaltsdokument gehöre vor dem Ausrollen einer Kanzlei vorgelegt.
-Der Einwand ist berechtigt; die Entscheidung war deine vom 29.09., deshalb ist
-sie drin. **Soll eine Kanzlei zuerst schauen, nehme ich `src/content/legal/agb.ts`
-einzeln wieder heraus** — der Rest des Change hängt nicht daran.
-
-Was dort steht: die Aufzählung nennt Discover · Focus · Impact statt der sechs.
-Das ist eine **Berichtigung** (sie führte noch *Basic* und *Exchange*, die es
-seit AGE-903 nicht gibt) **und** eine Kürzung. Getragen wird sie vom Text
-selbst: „derzeit insbesondere folgende" plus Einführungsvorbehalt.
+> **Scope dieser Übergabe: AGE-1000 und AGE-1002**, beide gemergt. Dazu der
+> Vorgang, den V5F-1 aufgemacht hat (**AGE-1001**), und eine Frage, die aus der
+> vorigen Übergabe offen geblieben ist.
+> Fremde offene Punkte stehen hier nicht.
 
 ## Accomplished
 
-| | |
-|---|---|
-| Vitest | **256 Dateien, 2996 Zusagen** |
-| `tsc --noEmit` · `eslint` · `pnpm build` | sauber |
-| `openspec validate --all` | 35/0 |
-| CI auf `8279154` | verify, migrations, edge-functions, pr-title grün |
-| Deploy `36565950210` | alle vier Jobs grün |
-| Ausgeliefertes Bündel | `10c86ff…` = Kopf von `main` |
+**AGE-1000 (V5F-1) — Rechte werden Konfiguration.** PR #450, gemergt `dc50198`.
+`public.berechtigungen` (zehn Rechte mit Mindestrang), `darf(schluessel)`,
+`meine_rechte()`, `useDarf()` im Client. Vier Schwellen sind gewandert:
+Verzeichnis-Suche und Events anlegen (samt Vorlagen) auf Rang 6,
+`offers`/`needs` und `matches` auf Rang 5.
 
-**Vorher der Bestand:** drei Konten auf ACTIVE über `admin_set_tier` mit
-Begründung auf DISCOVER gehoben (Spur dreimal `active → discover`). PROD danach:
-**5 × discover, 73 × impact.** Ohne das wäre das Ausblenden Kaschierung gewesen.
+**AGE-1002 (V5F-2) — Chatleiste dunkelblau.** PR #451, gemergt `0510554`. Die
+rechte Leiste trägt im Modus `navy` `#002B51`, ein- und ausgeklappt. Keine
+Migration.
 
-**Live nachgemessen:** „Sechs Stufen" ist weg, „Der Club beginnt bei" steht da,
-`Boost` kommt im Hauptbündel nicht vor. Die fünf `Connect`-Treffer dort sind
-Bibliothekscode (`secureConnection`, `connectEnd`) — kein Stufenname. Im
-`levels`-Chunk stehen `Active` und `Boost` weiterhin, **und das ist richtig so**:
-`levels.ts` behält alle sechs Labels, `genannterName` gibt sie nur nie zurück.
+**AGE-999** steht jetzt im Projekt „Live-Schaltung V5", In Progress, als Dach.
 
 ## Decisions
 
-**Sichtbarkeit und Recht bekommen zwei Konstanten.** `GENANNTE_STUFEN` wird
-NICHT aus `CLUB_RANK` abgeleitet, obwohl beide heute dieselbe Menge ergeben.
-*Warum:* jene Zahl steht als `has_level(4)` in den SQL-Policies. Wer BOOST
-später wieder nennen will, müsste sie senken — dann liefen Oberfläche und RLS
-auseinander, das Verzeichnis sähe erreichbar aus und die Datenbank verweigerte.
-
-**Kein Ersatzname unterhalb des Clubs**, sondern ein Satz, der die Sackgasse
-benennt und einen Weg nennt (Support › Feedback). *Warum:* das ist die einzige
-Gruppe, die wächst — Selbstregistrierungen landen dort, der Kaufweg ruht.
-
-**Der Bündel-Wächter wurde verworfen, bevor er gebaut war.** Die drei Namen
-müssen im Bündel bleiben; ein Test darüber wäre ab dem ersten Bau rot gewesen.
+- **Die Clubschwelle Rang 4 bleibt `has_level(4)`** und ist per
+  Check-Constraint aus `berechtigungen` ausgeschlossen (ADR-0008). AGE-903 hat
+  sie gerade zu *einer* Zahl für *eine* Tür zusammengezogen; zwölf
+  funktionierende Aufrufer für null Verhaltensänderung umzuhängen wären zwölf
+  Gelegenheiten, etwas zu brechen. Preis: zwei Mechanismen, festgeschrieben in
+  `access-control`.
+- **Anlegen fällt, Pflegen bleibt.** Die `ALL`-Policies sind in INSERT (mit
+  Recht) und UPDATE/DELETE (nur Eigentum) geteilt. Ein abgestiegener Host sagt
+  seinen Termin ab.
+- **Ein Ladezustand ist ein Moment, ein Fehler ist ein Zustand** (im Kopf von
+  `useDarf`). Routen-Gate: laden zeigt nichts, Fehler lässt durch. Aktionsknopf:
+  laden verbirgt, Fehler zeigt. Filter: beides fällt offen.
+- **Der Ort entscheidet, nicht ein Argument** (Chatleiste). `ThreadList` hat
+  kein Variantenargument; die Tokens werden nur innerhalb von `.fbc-chat-rail`
+  überschrieben. Wer die Liste auf eine dritte dunkle Fläche stellt, setzt die
+  Tokens dort.
+- **Keine Fremdreviewer für V5F-2** (Donalds Regel vom 26.08.: nur bei Schema,
+  Rechten, Sicherheit). Steht samt Begründung in der archivierten `REVIEWS.md`.
 
 ## Files modified
 
-`src/config/levels.ts` (+`GENANNTE_STUFEN`, `genannterName`, `waehlbareStufen`,
-`KEIN_CLUBZUGANG_SATZ`) · `TierBadge` · `MembershipSummary` · `ProfileHero` ·
-`MemberDirectory` · `MemberDashboard` · `AppShell` · `MemberLookup` ·
-`EinstellungenPage` · `HomePage` · `PublicProfilePage` · `AdminMitglied(er)Page` ·
-`MitgliedschaftPage` · `agb.ts` · `release-geschichten.ts` · `lastenheft.md` ·
-zwei neue Testdateien.
+Alles auf `main`. Die Einzelheiten stehen in den beiden PR-Texten; hier nur, wo
+man nachsieht:
+
+- `supabase/migrations/20261003100000_berechtigungen.sql` — Tabelle, `darf()`,
+  `meine_rechte()`
+- `supabase/migrations/20261003100100_rechte_v5_schwellen.sql` — die vier
+  Schwellen, `search_directory` neu
+- `supabase/migrations/20261003120000_vorlagen_und_policy_kommentare.sql` —
+  Vorlagen folgen den Events, Kommentare auf allen neuen Policies
+- `supabase/tests/rechte_v5_test.sql` — 60 Zusagen, Rang 3/4/5/6 plus ein nicht
+  aktiviertes Rang-6-Konto
+- `src/config/berechtigungen.ts`, `src/hooks/useDarf.ts`,
+  `src/lib/berechtigungen.ts` — der Client-Weg
+- `src/index.css` + `src/index.chatleiste-tokens.test.ts` — die Leisten-Tokens
+  und die gerechneten Kontraste
+- `docs/decisions/0008-rechte-als-konfiguration-mit-einer-ausnahme.md`
+- `docs/lastenheft.md`, `docs/technisches-handbuch.md`
 
 ## Next session: start here
 
-**Nichts aus AGE-969.** Zwei Dinge liegen bereit:
+**Zuerst: `migrate-prod` steht aus.** `drift-gate` blockt seit dem Merge von
+#450 **jeden** Deploy, auch den von #451 (der selbst keine Migration mitbringt).
+Drei Migrationen warten. Der Weg: `gh workflow run "Migrate PROD" --ref main`,
+dann den blockierten Deploy-Lauf mit `gh run rerun --failed` wiederholen.
+**Das braucht Donalds ausdrückliches Wort** — die stehende Merge-Freigabe deckt
+es nicht.
 
-1. **Die drei Neuigkeiten-Entwürfe** vom 29.09. (Artifact, privat) — Tutorials,
-   Konto löschen, Stufen. Sie sind noch **nicht zugestellt**. Der Entwurf zu den
-   Stufen sollte jetzt die AGB-Änderung erwähnen.
-2. **AGE-928** — `/mitgliedschaft` als reine Anzeige. Sie liest dann
-   `GENANNTE_STUFEN`; die Naht steht.
+Danach ist **V5F-3 (Navigation)** der nächste Schritt aus
+`261003_Plan_GoLive_V5-FINAL.md`; der Prompt liegt daneben und setzt V5F-1 auf
+`main` voraus, was erfüllt ist. V5F-4 und V5F-5 hängen ebenfalls nur an V5F-1.
 
-## Fallen, die diese Sitzung gekostet haben
-
-* **Ein Wächter kann den eigenen Anforderungen widersprechen.** Ich schrieb im
-  selben Entwurf, dass `levels.ts` alle Labels behält — und zwei Abschnitte
-  später, dass die Wörter im Bündel nicht vorkommen. opencode hat es gefunden,
-  nicht ich.
-* **Eine Begründung, die ins Delta wandert, muss stimmen.** Meine zu `CLUB_RANK`
-  war falsch (das Gating bliebe hart; auseinander liefen UI und RLS).
-* **Ein `{tier}` in JSX rutscht durch jede Wortsuche.** Zwei Fundstellen, beide
-  erst vom Quelltext-Wächter gefunden — nicht vom Lesen, nicht von drei
-  Reviewern.
-* **Ein Wächter über generiertem Inhalt fällt an der eigenen Erklärung:** der
-  Archiveintrag zu AGE-969 nennt `LEVEL_ORDER`, weil er erklärt, dass die Leiter
-  bleibt. Ausnahme mit Grund.
-* **opencode kann ins Rate-Limit laufen** („Too Many Requests"). Dann zählt der
-  Reviewer nicht — codex nehmen, der bei kleineren Artefaktsätzen durchläuft.
-* **Eine ausgenommene, unerreichbare Seite ist eine Zeitbombe.** Besser die eine
-  Zeile ändern als eine Ausnahme führen.
-
-## Zustand der Umgebung
-
-* **Lokaler Stack:** 28 Profile, 0 Tokens — Stand vor der Sichtprobe.
-  `.env.local` gelöscht, vite beendet, Browser freigegeben.
-* `20260925120000_release_backfill.sql` (AGE-905) fehlt lokal und bricht ab —
-  **fremde Migration, nicht anfassen**.
-* Im **Haupt-Checkout** liegt fremde ungesicherte Arbeit (AGE-907).
-* Screenshots: `.gstack/age969/` und `.gstack/neuigkeiten/` (gitignored).
+Vier Worktrees sind abräumbar: `rechte-v5-final`, `chatleiste-blau`,
+`stufen-nur-club`, `mitglied-anlegen`.
 
 ## Open questions
 
-* **Die AGB** — siehe oben, deine Entscheidung.
-* **Die Selbstregistrierung bleibt offen.** Wer sich registriert, landet weiter
-  unterhalb des Clubs und kommt von dort nicht hoch, solange Stripe ruht. Ob der
-  Knopf „Noch kein Konto? Registrieren" bleiben soll, ist eine Produktfrage und
-  ein eigener Vorgang.
-* **Diese Änderung ist Oberflächenkosmetik.** Das Repo ist öffentlich; alle
-  sechs Stufen stehen weiterhin in `levels.ts` und in der Historie.
+1. **AGE-1001 — der Rohzugriff ist offen.** `profiles` und `profiles_public`
+   sind für jedes Clubmitglied als *Menge* lesbar. „DISCOVER darf nicht gezielt
+   suchen" gilt damit an der Oberfläche und an `search_directory`, **nicht** am
+   direkten Tabellenzugriff. Bestand, nicht neu — aber V5F-7 verlangt den
+   Nachweis zweifach, also blockiert es die Abnahme. Umfang gemessen: 20
+   Abfragestellen, alle schon kennungsgebunden. Drei pgTAP-Zusagen nageln den
+   heutigen Zustand fest und **müssen dort umgedreht werden**.
+2. **E2 — die echten Stufen des Bestands.** PROD trägt 74 von 78 Konten auf
+   `impact`. Bis Detlev die bezahlten Stufen liefert, ist die Differenzierung
+   gebaut und belegt, aber für fast niemanden spürbar. Das blockiert den
+   Go-live, nicht den Bau.
+3. **E7 — zieht die linke Navigation auf `#002B51` nach?** Bis dahin
+   unterscheiden sich die beiden Leisten sichtbar; das steht als Anforderung so
+   drin, damit es niemand für einen Fehler hält. Ein Ja ist ein Einzeiler in
+   `--sidebar-surface`.
+4. **Aus der vorigen Übergabe, weiter offen: AGB § 3.2.** Ein Reviewer hat
+   einen HIGH-Befund erhoben, ein Anwaltsdokument gehöre vor dem Ausrollen einer
+   Kanzlei vorgelegt. Soll eine Kanzlei zuerst schauen, lässt sich
+   `src/content/legal/agb.ts` einzeln wieder herausnehmen.
+5. **Drei Release-Beiträge warten auf Zustellung** (Artifact-Seite, Version 5)
+   und sind unabhängig voneinander. Dazu gibt es jetzt zwei neue
+   Neuigkeiten-Einträge aus den heutigen Changes — beide in Mitglieder-Sprache
+   und zum Zustellen gedacht, nicht zum Überspringen. **Zugestellt wird nichts
+   ohne ausdrückliche Ansage.**
+
+## Fallen, die heute Zeit gekostet haben
+
+- `git checkout -- <datei>` holt die **committete** Fassung und nimmt
+  ungesicherte Arbeit mit. Hat eine fertige Änderung gelöscht, während eine
+  Probe zurückgenommen wurde. Für Proben stattdessen eine Kopie im Scratchpad.
+- Der lokale Stack lag mit dem Schema **vor** der Historie (eine frühere
+  Sitzung hatte Rümpfe von Hand eingespielt). `supabase migration repair
+  --status applied --local <version>` statt `db reset` — der Stack ist geteilt.
+- Ein Test, der nur prüft, was man schon getan hat, bewacht nichts: der
+  Kontrast-Test las genau die zwei Tokens, die umgelegt waren, und sah deshalb
+  nicht, dass der Hover-Zustand auf 1,0:1 stand.
+- `try_as(...) = 'OK'` belegt bei UPDATE/DELETE **nichts** — ein Treffer von
+  null Zeilen ist kein Fehler. Immer die Wirkung nachmessen.
