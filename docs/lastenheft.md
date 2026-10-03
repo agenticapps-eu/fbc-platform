@@ -217,11 +217,80 @@ Modell ist im Repository als verbindliche Spezifikation hinterlegt
 **Der FBC beginnt erst bei DISCOVER.** ACTIVE, BOOST und CONNECT liegen
 ausserhalb des Clubs und werden nur technisch vorgehalten.
 
+### Die drei Clubstufen unterscheiden sich in Rechten (V5 FINAL, AGE-1000)
+
+Bis zum 03.10.2026 trugen DISCOVER, FOCUS und IMPACT **dieselben** Rechte:
+gemessen am Katalog von PROD lautete jede Clubschwelle `has_level(4)`, und es
+gab keine einzige auf Rang 5 oder 6. Detlevs SPEC 01 (V5 FINAL, 01.10.2026)
+unterscheidet sie, und die Go-live-Checkliste führt das unter A3 als kritisch.
+
+| Recht | DISCOVER (4) | FOCUS (5) | IMPACT (6) |
+|---|---|---|---|
+| Feed, Inhalte, Academy ansehen | ✓ | ✓ | ✓ |
+| An Events teilnehmen | ✓ | ✓ | ✓ |
+| Ein einzelnes Profil lesen, Kontaktanfrage senden | ✓ | ✓ | ✓ |
+| Business-Profil, berufliche Rollen | – | ✓ | ✓ |
+| Eine Organisation administrieren | – | ✓ | ✓ |
+| SUCHE/BIETE einstellen und fremde lesen | – | ✓ | ✓ |
+| Match-Vorschläge | – | ✓ | ✓ |
+| **Mitglieder gezielt suchen (Verzeichnis)** | – | – | ✓ |
+| Eigene Events erstellen | – | – | ✓ |
+| Eigene Communities, Projekte | – | – | ✓ |
+| Academy-Angebote einstellen | – | – | ✓ |
+| Offizielle FBC-Formate initiieren | – | – | ✓ |
+
+**Rechte sind Konfiguration, keine Zahl im Code.** Die Tabelle
+`public.berechtigungen (schluessel, min_rank, beschreibung)` hält sie; das
+Prädikat `public.darf(schluessel)` liest sie, und `public.meine_rechte()`
+beantwortet dem Client in einem Zug, was er darf. Eine Schwelle zu verschieben
+ist damit eine Migration und **keine** Frontend-Änderung. Ein unbekannter
+Schlüssel ergibt `false` — ein Tippfehler in einer Policy schliesst die Tür,
+statt sie zu öffnen.
+
+> **Die Clubschwelle Rang 4 ist davon ausgenommen und bleibt `has_level(4)`.**
+> Ein Check-Constraint verbietet jeden Eintrag mit `min_rank <= 4`. Grund: AGE-903
+> hat sie gerade erst aus zwei Rängen zu **einer** Zahl für **eine** Tür
+> zusammengezogen; sie je Tabelle konfigurierbar zu machen, dreht das zurück und
+> schafft eine zweite Kopie derselben Zahl. Es gibt damit zwei Mechanismen, und
+> die Zuordnung ist festgeschrieben: `has_level(n)` entscheidet über die Tür,
+> `darf(schluessel)` über jedes Recht dahinter.
+
+> **Suchen und Lesen sind ab jetzt zwei Zusagen.** Liste und Suche des
+> Verzeichnisses verlangen IMPACT; ein **einzelnes** Profil über `/p/:id` bleibt
+> für jedes Clubmitglied lesbar. Entscheidung E4 des Go-live-Plans: Kontakt über
+> Kontext — Feed, Event, Chat, Vorschlag — bleibt offen, nur die gezielte Suche
+> fällt weg.
+
+> **Anlegen fällt, Pflegen bleibt.** Wer Events, Angebote oder Gesuche hat und
+> dessen Stufe sinkt, kann sie weiter ändern und zurückziehen. Nur das
+> **Neuanlegen** verlangt das Recht. Das Gegenteil wäre eine Datensperre, die
+> wie ein Rechtemodell aussieht.
+
+> **Was noch offen ist, und es blockiert den Start:** PROD trägt 74 Konten auf
+> `impact` und 4 auf `discover`, weil der WordPress-Import pauschal `impact`
+> schrieb (gemessen 03.10.2026). Solange das so bleibt, wirkt die
+> Differenzierung für fast niemanden. Detlev muss die tatsächlich bezahlte Stufe
+> je Mitglied liefern (Entscheidung E2); der Admin setzt sie dann per
+> `admin_set_tier` mit Begründung.
+
+> **Und was dieser Schritt NICHT leistet:** die Schwelle `verzeichnis.suchen`
+> wirkt auf die Suchfunktion `search_directory` und auf die Oberfläche. Die
+> Rohtabellen `profiles` und `profiles_public` bleiben für jedes Clubmitglied
+> als Menge lesbar — `profiles_select_self_or_discover` erlaubt jede fremde
+> Zeile ab Rang 4, und die Sicht trägt gar keine Rangprüfung. Ein direkter
+> Tabellenzugriff liefert also weiter eine Mitgliederliste. Der Verschluss ist
+> ein eigener Schritt (Change `verzeichnis-dicht`): beide Leserechte entziehen
+> und zwanzig Abfragestellen über kennungsgebundene Funktionen führen. Bis
+> dahin gilt „DISCOVER darf nicht gezielt suchen" an der Oberfläche und an der
+> RPC — nicht am Rohzugriff.
+
 > **Seit dem 29.09.2026 nennt die Oberfläche sie nicht mehr** (AGE-969, Donald).
 > Gesprochen wird nur noch über DISCOVER, FOCUS und IMPACT — in der Anwendung,
 > in der mobilen Hülle und im Blog. Die Tabelle oben bleibt gültig: die
-> Datenbank führt weiterhin sechs Stufen, das Gating ist unverändert
-> `has_level(4)`, und **gelöscht wurde nichts**. Die drei kommen später wieder.
+> Datenbank führt weiterhin sechs Stufen, und **gelöscht wurde nichts**. Die
+> drei kommen später wieder. Das Gating lautete bis AGE-1000 überall
+> `has_level(4)`; seither hält diese Zahl nur noch die Clubschwelle, und die
+> Rechte darüber stehen in `berechtigungen` (siehe den Abschnitt darunter).
 >
 > Ein Konto unterhalb des Clubs trägt deshalb **keine Plakette** und bekommt
 > auch keinen Ersatznamen — an die Stelle der Stufe tritt eine Aussage über den

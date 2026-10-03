@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  BERECHTIGUNGEN,
+  BERECHTIGUNG_STUFE,
+  type Berechtigung,
+} from "../../config/berechtigungen";
+import { LEVEL_RANK } from "../../config/levels";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HeaderSearch from "./HeaderSearch";
@@ -24,12 +30,41 @@ vi.mock("../../lib/supabase", () => ({
 // Datei stillschweigend unter die Schwelle gesetzt, und die Zustaende „Treffer"
 // und „Nulltreffer" waeren beide zum Wandzustand geworden.
 let auth: { user: { id: string } | null; levelRank: number | null; tierLoading: boolean } = {
+  // AGE-1000: Rang 6 statt 4. Gemeint war immer „ein Konto, das suchen darf",
+  // und das ist seit dem Recht `verzeichnis.suchen` IMPACT. Die Kennung
+  // behaelt ihren Namen, damit die Zusagen ueber den Identitaetswechsel
+  // weiter lesbar bleiben.
   user: { id: "u-discover" },
-  levelRank: 4,
+  levelRank: 6,
   tierLoading: false,
 };
 vi.mock("../../providers/auth-context", () => ({
   useAuth: () => auth,
+}));
+
+/* AGE-1000: Der Sucheinstieg fragt nicht mehr nach einem Rang, sondern nach
+   dem Recht `verzeichnis.suchen`. Der Mock LEITET die Rechte aus `levelRank`
+   ab, statt sie je Fall von Hand zu setzen — so bleibt jede bestehende
+   `auth = …`-Zeile eine Aussage ueber eine Stufe, und die Zuordnung Rang →
+   Recht ist dieselbe wie in der Datenbank (ueber `BERECHTIGUNG_STUFE`, das
+   `berechtigungen.guard.test.ts` gegen den Seed der Migration haelt).
+
+   `tierLoading` wird zu `laedt`: der Fall „noch unklar" ist derselbe, nur
+   heisst die Quelle jetzt anders. */
+function rechteFuerRang(rang: number | null): Berechtigung[] {
+  if (rang === null) return [];
+  return BERECHTIGUNGEN.filter((k) => LEVEL_RANK[BERECHTIGUNG_STUFE[k]] <= rang);
+}
+vi.mock("../../hooks/useDarf", () => ({
+  useMeineRechte: () => ({
+    rechte: rechteFuerRang(auth.levelRank),
+    laedt: auth.tierLoading,
+    fehler: false,
+  }),
+  useDarf: (k: Berechtigung) => ({
+    darf: rechteFuerRang(auth.levelRank).includes(k),
+    laedt: auth.tierLoading,
+  }),
 }));
 
 function member(name: string, overrides: Partial<DirectoryMember> = {}): DirectoryMember {
@@ -125,7 +160,7 @@ function suchbegriffe(): unknown[] {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  auth = { user: { id: "u-discover" }, levelRank: 4, tierLoading: false };
+  auth = { user: { id: "u-discover" }, levelRank: 6, tierLoading: false };
   rpc.mockReset();
   rpc.mockResolvedValue({ data: [member("Anna Beispiel")], error: null });
 });
@@ -285,20 +320,26 @@ describe("Die fünf Zustände", () => {
     expect(screen.getByRole("button", { name: /Verzeichnis/i })).toBeInTheDocument();
   });
 
-  it("zeigt unterhalb discover bei leerer Antwort den Aufstiegs-Hinweis", async () => {
+  // AGE-1000: Der Hinweis nennt jetzt IMPACT und fuehrt auf den Weg ueber
+  // Support statt auf einen Aufstieg — seit AGE-903 ruht Stripe, seit AGE-969
+  // laesst sich eine Stufe hier nicht selbst buchen.
+  it("zeigt ohne Suchrecht bei leerer Antwort den Stufen-Hinweis", async () => {
     auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     rpc.mockResolvedValue({ data: [], error: null });
     renderSuche();
     tippe("anna");
     await entprellen();
 
-    expect(await screen.findByText(/Discover/)).toBeInTheDocument();
+    expect(await screen.findByText(/ab Impact/)).toBeInTheDocument();
+    expect(screen.getByText(/Support/)).toBeInTheDocument();
     expect(screen.queryByText(/Kein Mitglied gefunden/i)).not.toBeInTheDocument();
   });
 
-  it("zeigt unterhalb discover die eigene Zeile trotzdem an", async () => {
-    // Der Rang formuliert NUR den leeren Fall. Blendete er Treffer aus, wäre er
-    // eine zweite Zugriffskontrolle im Frontend — Kulisse vor einem echten Gate.
+  it("zeigt ohne Suchrecht die eigene Zeile trotzdem an", async () => {
+    // Das Recht formuliert NUR den leeren Fall. Blendete es Treffer aus, wäre
+    // es eine zweite Zugriffskontrolle im Frontend — Kulisse vor einem echten
+    // Gate. Die eigene Zeile kommt aus dem Selbst-Zweig von
+    // `search_directory` und ist ein gueltiger Treffer.
     auth = { user: { id: "u-basic" }, levelRank: 1, tierLoading: false };
     rpc.mockResolvedValue({ data: [member("Ich Selbst")], error: null });
     renderSuche();
@@ -306,7 +347,7 @@ describe("Die fünf Zustände", () => {
     await entprellen();
 
     expect(await screen.findByRole("option", { name: /Ich Selbst/ })).toBeInTheDocument();
-    expect(screen.queryByText(/Discover/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ab Impact/)).not.toBeInTheDocument();
   });
 
   it("rendert ausgeloggt gar nichts", () => {
@@ -450,7 +491,7 @@ describe("Identität und Zwischenspeicher", () => {
     tippe("anna");
     await entprellen();
 
-    await waitFor(() => expect(screen.getByText(/Discover/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/ab Impact/)).toBeInTheDocument());
     expect(screen.queryByRole("option", { name: /Anna Beispiel/ })).not.toBeInTheDocument();
   });
 

@@ -48,7 +48,33 @@ vi.mock("../../lib/supabase", () => ({
    Fortschreiben der 3 haette diese Datei stillschweigend unter die Schwelle
    gesetzt. */
 vi.mock("../../providers/auth-context", () => ({
-  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: 4 }),
+  useAuth: () => ({ user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: 6 }),
+}));
+
+/* AGE-1000: Die vier erweiterten Filter haengen jetzt am Recht `suche_biete`
+   und nicht mehr am Rang. Diese Datei misst, was die Filter TUN — welche
+   Argumente sie an die RPC schicken —, und braucht sie deshalb sichtbar.
+
+   Gemockt wird der Hook und nicht `ladeMeineRechte`: der echte Weg machte jede
+   Zusage hier asynchron und haengte sie an react-query, obwohl der Gegenstand
+   der Filterzustand ist. Der Hook hat sein eigenes Testfile
+   (`src/hooks/useDarf.test.tsx`), und dass ein Konto OHNE das Recht die Filter
+   nicht sieht, steht in `MemberDirectory.stufen.test.tsx` — die Gegenprobe
+   fehlt also nicht, sie steht woanders.
+
+   Die Stufe oben wandert von 4 auf 6 mit: `/mitglieder` verlangt seit AGE-1000
+   `verzeichnis.suchen` (IMPACT). Gemeint war immer „gerade eben ueber der
+   Schwelle". */
+vi.mock("../../hooks/useDarf", () => ({
+  useMeineRechte: () => ({
+    rechte: ["suche_biete", "vorschlaege", "verzeichnis.suchen"],
+    laedt: false,
+    fehler: false,
+  }),
+  useDarf: (k: string) => ({
+    darf: ["suche_biete", "vorschlaege", "verzeichnis.suchen"].includes(k),
+    laedt: false,
+  }),
 }));
 
 function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {

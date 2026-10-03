@@ -13,7 +13,9 @@ import { Input } from "../ui/Input";
 import { Stagger, StaggerItem } from "../ui/Motion";
 import { Select } from "../ui/Select";
 import { cn } from "../../lib/cn";
-import { CLUB_LEVEL, CLUB_RANK, genannterName, levelLabel } from "../../config/levels";
+import { genannterName, levelLabel } from "../../config/levels";
+import { BERECHTIGUNG_STUFE } from "../../config/berechtigungen";
+import { useDarf } from "../../hooks/useDarf";
 import {
   deriveFacets,
   DIRECTORY_QUERY_PARAM,
@@ -111,7 +113,7 @@ export default function MemberDirectory() {
   // Filterzustand und setzt ihn nicht zurück.
   const [reiter, setReiter] = useState<"alle" | "kontakte">("alle");
 
-  const { user, levelRank } = useAuth();
+  const { user } = useAuth();
   const uid = user?.id ?? null;
 
   // ── Welche Filter überhaupt etwas finden können (AGE-598 D5, AGE-903) ─────
@@ -128,24 +130,33 @@ export default function MemberDirectory() {
   //
   // Branche und Region stehen in `profiles_public` und bleiben deshalb.
   //
-  // **Seit AGE-903 ist das dieselbe Schwelle wie die der Seite selbst** (Rang 4
-  // in `nav.ts`), nicht mehr eine höhere: die zweistufige Trennung aus AGE-598
-  // (Liste ab Rang 2, erweiterte Felder ab Rang 3) ist entfallen. Die Prüfung
-  // bleibt trotzdem stehen, und zwar aus einem messbaren Grund: `MembershipGate`
-  // sperrt NICHT, solange die Stufe noch unbekannt ist (MembershipGate.tsx) —
-  // in diesem Fenster rendert die Fläche für jeden, und dann trägt sie.
+  // **Mit AGE-1000 hängen die vier an `suche_biete` (FOCUS), nicht mehr an der
+  // Clubschwelle.** Das ist keine Angleichung an die Seite, sondern die
+  // Herkunft der Daten: Kompetenz kommt aus `profiles`, Thema, Angebotsart und
+  // die beiden Chip-Gruppen aus `offers`/`needs`, und deren SELECT-Policy
+  // verlangt jetzt `darf('suche_biete')`.
   //
-  // **Eine unbekannte Stufe blendet deshalb NICHTS aus.** Vorher stand hier
+  // Praktisch fällt das heute mit der Seitenschwelle zusammen — wer
+  // `verzeichnis.suchen` (Rang 6) trägt, trägt auch `suche_biete` (Rang 5).
+  // Die Prüfung steht trotzdem auf dem RICHTIGEN Recht und nicht auf dem
+  // bequemen: verschiebt sich eine der beiden Schwellen in
+  // `berechtigungen`, soll die Fläche der Datenlage folgen und nicht einer
+  // Annahme über die andere.
+  //
+  // **Ein Ladezustand und ein Abruffehler blenden NICHTS aus.** Ein Filter ist
+  // keine Aktion: wer zu viel zeigt, findet höchstens nichts, und beides fällt
+  // deshalb offen — anders als der Anlegen-Knopf in `EventsList`, der im
+  // Ladefenster wartet. Vorher stand hier
   // `(levelRank ?? 0)`, und das machte aus „noch nicht geladen" ein „Rang 0":
   // ein Clubmitglied sah die vier Filter erst gar nicht und dann doch, sie
-  // erschienen also nachträglich. Das ist dieselbe Regel, die `MembershipGate`
-  // und `HeaderSearch` schon tragen — ein Ladezustand ist kein Ausschlussgrund,
-  // und eine Aussage erscheint erst, wenn sie stimmt. Ein Filter, der in diesem
-  // Fenster zu viel zeigt, findet höchstens nichts; einer, der zu wenig zeigt,
-  // nimmt einem Berechtigten eine Fähigkeit weg.
+  // erschienen also nachträglich. Dieselbe Regel wie in `MembershipGate` und
+  // `HeaderSearch` — ein Filter, der in diesem Fenster zu viel zeigt, findet
+  // höchstens nichts; einer, der zu wenig zeigt, nimmt einem Berechtigten eine
+  // Fähigkeit weg.
   //
   // Komfort, keine Grenze — die trägt die RPC.
-  const erweiterteFilter = levelRank === null || levelRank >= CLUB_RANK;
+  const { darf: darfSucheBiete, laedt: rechteLaden, fehler: rechteFehler } = useDarf("suche_biete");
+  const erweiterteFilter = rechteLaden || rechteFehler || darfSucheBiete;
   const contacts = useQuery({
     queryKey: contactsQueryKey(uid ?? ""),
     queryFn: () => fetchContactIds(uid!),
@@ -342,8 +353,8 @@ export default function MemberDirectory() {
             Wort, damit eine Umbenennung ein Einzeiler in `config/levels` bleibt. */}
                 {!erweiterteFilter && (
                   <p className="text-sm text-muted @[27rem]:col-span-2 @[41rem]:col-span-3">
-                    Ab {levelLabel(CLUB_LEVEL)} kommen Filter für Kompetenz, Thema und
-                    Angebote dazu.
+                    Ab {levelLabel(BERECHTIGUNG_STUFE["suche_biete"])} kommen Filter für Kompetenz,
+                    Thema und Angebote dazu.
                   </p>
                 )}
 

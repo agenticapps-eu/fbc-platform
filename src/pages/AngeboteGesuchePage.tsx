@@ -38,6 +38,9 @@ import {
   type MatchingProfileValues,
 } from "../lib/matching-profile";
 import { useAuth } from "../providers/auth-context";
+import { useDarf } from "../hooks/useDarf";
+import { BERECHTIGUNG_STUFE } from "../config/berechtigungen";
+import { levelLabel } from "../config/levels";
 
 const EMPTY_VALUES: MatchingProfileValues = { offers: [], needs: [] };
 
@@ -95,6 +98,8 @@ function MatchingProfileEditor({ uid }: { uid: string }) {
   const offers = useFieldArray({ control, name: "offers" });
   const needs = useFieldArray({ control, name: "needs" });
 
+  const { darf: darfPflegen, laedt: rechteLaden, fehler: rechteFehler } = useDarf("suche_biete");
+
   const mutation = useMutation({
     mutationFn: () => saveMatchingProfile(uid, getValues()),
     onError: (error) => {
@@ -118,7 +123,7 @@ function MatchingProfileEditor({ uid }: { uid: string }) {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || rechteLaden) {
     return <p className="text-sm text-muted">Such- &amp; Bieteprofil wird geladen…</p>;
   }
   if (isError) {
@@ -127,6 +132,24 @@ function MatchingProfileEditor({ uid }: { uid: string }) {
         Such- &amp; Bieteprofil konnte nicht geladen werden. Bitte neu laden.
       </p>
     );
+  }
+  // ══ OHNE DAS RECHT KEIN FORMULAR (AGE-1000) ══════════════════════════════
+  // `offers_insert_own` verlangt seit AGE-1000 `darf('suche_biete')` (FOCUS).
+  // Ein Formular mit einem Speichern-Knopf, der immer an der RLS scheitert,
+  // wäre ein Versprechen, das bei jeder Benutzung bricht — und bis zur
+  // Umstellung der Schreibreihenfolge in `saveMatchingProfile` kostete genau
+  // dieser Weg ein Mitglied seine Einträge (Befund des Diff-Reviews, CRITICAL).
+  //
+  // Die bestehenden Einträge werden GEZEIGT und nicht verschwiegen: sie sind
+  // nicht gelöscht, nur nicht mehr pflegbar. Ein Abstieg soll sichtbar sein,
+  // nicht spurlos.
+  //
+  // `rechteFehler` fällt hier offen (das Formular erscheint): der Zustand löst
+  // sich nicht von selbst auf, und ein FOCUS-Konto verlöre sonst den Editor,
+  // weil eine Abfrage schiefging. Schlägt das Speichern dann an der RLS fehl,
+  // bleibt der Bestand dank der neuen Reihenfolge unangetastet.
+  if (!darfPflegen && !rechteFehler) {
+    return <NurLesen werte={data ?? EMPTY_VALUES} />;
   }
 
   return (
@@ -442,5 +465,57 @@ function NeedRow({ index, register, control, errors, setValue, onRemove }: RowPr
         />
       </div>
     </ItemPanel>
+  );
+}
+
+/**
+ * Die Ansicht ohne `suche_biete`: zeigt den Bestand und sagt, ab welcher Stufe
+ * er sich pflegen lässt (AGE-1000).
+ *
+ * Kein Kaufknopf — seit AGE-903 ruht Stripe, seit AGE-969 lässt sich eine Stufe
+ * hier nicht selbst buchen. Der Weg führt über Support, und das steht da.
+ */
+function NurLesen({ werte }: { werte: MatchingProfileValues }) {
+  const stufe = levelLabel(BERECHTIGUNG_STUFE["suche_biete"]);
+  const hatEintraege = werte.offers.length > 0 || werte.needs.length > 0;
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <CardTitle className="text-base">Such- &amp; Bieteprofil ab {stufe}</CardTitle>
+        <CardDescription>
+          Angebote und Gesuche einzustellen gehört ab {stufe} zur Mitgliedschaft. Ein Wechsel der
+          Stufe läuft über Support › Feedback.
+          {hatEintraege
+            ? " Deine bisherigen Einträge bleiben erhalten und erscheinen wieder, sobald die Stufe es hergibt."
+            : ""}
+        </CardDescription>
+      </Card>
+
+      {hatEintraege && (
+        <Card className="flex flex-col gap-3">
+          <CardTitle className="text-base">Deine bisherigen Einträge</CardTitle>
+          {werte.offers.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-ink">Ich biete</p>
+              <ul className="mt-1 list-disc pl-5 text-sm text-muted">
+                {werte.offers.map((o, i) => (
+                  <li key={`o-${i}`}>{o.title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {werte.needs.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-ink">Ich suche</p>
+              <ul className="mt-1 list-disc pl-5 text-sm text-muted">
+                {werte.needs.map((n, i) => (
+                  <li key={`n-${i}`}>{n.title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
   );
 }

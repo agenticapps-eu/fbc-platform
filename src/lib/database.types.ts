@@ -1997,6 +1997,19 @@ export type Database = {
       // Nullability-Drift in unbeteiligten Typen mit und gehoert in einen
       // eigenen Change.
       is_activated: { Args: never; Returns: boolean };
+      // Feature-Rechte als Konfiguration (AGE-1000), aus
+      // 20261003100000_berechtigungen.sql. Von Hand gepflegt wie der Rest
+      // dieses Blocks — `supabase gen types` NICHT darueberlaufen lassen.
+      //
+      // `darf` steht hier, weil es in Policies UND fuer `authenticated`
+      // ausfuehrbar ist; aufgerufen wird es aus dem Client NICHT. Der Client
+      // fragt `meine_rechte` einmal und liest daraus — ein `darf`-Aufruf je
+      // gatender Stelle waere ein Rundlauf je Knopf.
+      darf: { Args: { p_schluessel: string }; Returns: boolean };
+      /** Nur die Schluessel, die der Aufrufer HAT. Leeres Array ohne Sitzung,
+       *  ohne Aktivierung und fuer DISCOVER — nie `null`, und nie ein
+       *  Mindestrang. */
+      meine_rechte: { Args: never; Returns: string[] };
       /** Ungelesene Nachrichten je Thread fuer den Aufrufer (AGE-583).
        *
        *  `unread_count` ist in der Datenbank `bigint` (der Typ von `count(*)`),

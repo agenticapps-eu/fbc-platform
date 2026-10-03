@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../ui/Button";
+import { useDarf } from "../../hooks/useDarf";
 import { Card } from "../ui/Card";
 import { useToast } from "../ui/toast-context";
 import { SerieErzeugen } from "./SerieErzeugen";
@@ -57,8 +58,7 @@ export function VorlagenPanel({
    *  Erzeugen und Bearbeiten verschiedene Fragen an dieselbe Zeile sind. */
   const [serie, setSerie] = useState<string | null>(null);
 
-  const invalidieren = () =>
-    queryClient.invalidateQueries({ queryKey: vorlagenListKey(hostId) });
+  const invalidieren = () => queryClient.invalidateQueries({ queryKey: vorlagenListKey(hostId) });
 
   const anlegen = useMutation({
     mutationFn: (input: VorlageInput) => createVorlage(hostId, input),
@@ -99,9 +99,25 @@ export function VorlagenPanel({
       toast({ variant: "error", title: "Löschen fehlgeschlagen", description: errMsg(error) }),
   });
 
+  // AGE-1000: Eine Vorlage anzulegen verlangt `events.erstellen` — dasselbe
+  // Recht wie das Event, weil `event_serie_erzeugen` SECURITY INVOKER ist und
+  // die Termine als Aufrufer anlegt. Ohne dieselbe Huerde liesse sich hier eine
+  // Vorlage samt Wiederholungsregel pflegen und beim Erzeugen scheitern — der
+  // Fehler kaeme nach der Arbeit.
+  //
+  // Laden verbirgt, Fehler zeigt — dieselbe Regel wie beim Anlegen-Knopf der
+  // Eventliste, begruendet im Kopf von `useDarf`. Das BEARBEITEN bestehender
+  // Vorlagen bleibt unberuehrt: Pflegen faellt nicht.
+  const {
+    darf: darfAnlegen,
+    laedt: rechteLaden,
+    fehler: rechteFehler,
+  } = useDarf("events.erstellen");
+  const zeigeAnlegen = !rechteLaden && (darfAnlegen || rechteFehler);
+
   return (
     <div className="space-y-4">
-      {offen === null && (
+      {offen === null && zeigeAnlegen && (
         <div className="flex justify-end">
           <Button size="sm" onClick={() => setOffen("neu")}>
             Vorlage anlegen
@@ -109,7 +125,7 @@ export function VorlagenPanel({
         </div>
       )}
 
-      {offen === "neu" && (
+      {offen === "neu" && zeigeAnlegen && (
         <Card>
           <VorlageForm
             submitLabel="Vorlage anlegen"

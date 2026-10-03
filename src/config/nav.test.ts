@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { navItems } from "./nav";
-import { CLUB_LEVEL, LEVEL_RANK } from "./levels";
+import { CLUB_LEVEL } from "./levels";
 
 /**
  * Die Go-Live-Navigation (AGE-494): sieben Einträge in zwei Gruppen. Reihenfolge
@@ -62,15 +62,20 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     }
   });
 
-  /* AGE-903 — die Schranke stand bis AGE-598 auf `discover`, dann auf
-     `connect`, und steht jetzt wieder auf `discover`. Das ist NICHT dieselbe
-     Stufe wie beim ersten Mal: `discover` hiess damals Rang 3 und heisst jetzt
-     Rang 4. Die Zusage lautet deshalb auf BEIDES — den Schlüssel und die Zahl —,
-     sonst wäre sie schon zweimal richtig gewesen, während die Schwelle wanderte. */
-  it("hält das Verzeichnis ab der untersten Clubstufe (Rang 4)", () => {
+  /* AGE-1000 — die Schranke stand bis AGE-598 auf `discover`, dann auf
+     `connect`, dann wieder auf `discover` (und das war NICHT dieselbe Stufe:
+     Rang 3 beim ersten, Rang 4 beim zweiten Mal). Jetzt ist sie überhaupt kein
+     Stufenname mehr, sondern das Recht `verzeichnis.suchen`.
+
+     Die Zusage lautet deshalb auf das Recht UND darauf, dass kein `minTier`
+     daneben steht: beides zugleich wäre eine Schwelle an zwei Orten, und die
+     Kette oben ist der Beleg dafür, dass genau so eine Drift entsteht. Wo das
+     Recht greift, steht in `berechtigungen` und wird dort gemessen
+     (`supabase/tests/rechte_v5_test.sql`), nicht hier. */
+  it("hält das Verzeichnis am Recht `verzeichnis.suchen` — und an keinem Rang", () => {
     const mitglieder = navItems.find((i) => i.path === "/mitglieder");
-    expect(mitglieder?.minTier).toBe(CLUB_LEVEL);
-    expect(LEVEL_RANK[mitglieder!.minTier!]).toBe(4);
+    expect(mitglieder?.darf).toBe("verzeichnis.suchen");
+    expect(mitglieder?.minTier).toBeUndefined();
   });
 
   /* AGE-903 — eine NEUE Zusage, keine Anhebung. Gemessen vor der Änderung: der
@@ -83,13 +88,34 @@ describe("Go-Live-Navigation (AGE-494)", () => {
     expect(academy?.requiresAuth).toBe(true);
   });
 
-  /* Die Gegenprobe zu den beiden darüber: `minTier` ist die AUSNAHME und nicht
-     die Regel. Ohne sie wäre „die Academy trägt jetzt eine Schwelle" auch dann
-     grün, wenn versehentlich jede Route eine bekommen hätte — und ein Feed oder
-     eine Aktivität hinter einer Stufenwand fiele beim Bauen niemandem auf. */
-  it("legt eine Stufenschwelle NUR auf /mitglieder und /academy", () => {
-    const mitSchwelle = navItems.filter((i) => i.minTier).map((i) => i.path).sort();
-    expect(mitSchwelle).toEqual(["/academy", "/mitglieder"]);
+  /* Die Gegenprobe zu den beiden darüber: eine Schwelle ist die AUSNAHME und
+     nicht die Regel. Ohne sie wäre „die Academy trägt jetzt eine Schwelle" auch
+     dann grün, wenn versehentlich jede Route eine bekommen hätte — und ein Feed
+     oder eine Aktivität hinter einer Wand fiele beim Bauen niemandem auf.
+
+     Seit AGE-1000 gibt es ZWEI Sorten Schwelle, und sie werden getrennt
+     gezählt: `minTier` ist die Clubschwelle, `darf` ein Feature-Recht. Eine
+     Route mit beiden wäre ein Fehler und fällt hier auf, weil sie dann in
+     beiden Listen stünde. */
+  it("legt die Clubschwelle NUR auf /academy", () => {
+    const mitStufe = navItems
+      .filter((i) => i.minTier)
+      .map((i) => i.path)
+      .sort();
+    expect(mitStufe).toEqual(["/academy"]);
+  });
+
+  it("legt ein Feature-Recht NUR auf /mitglieder", () => {
+    const mitRecht = navItems
+      .filter((i) => i.darf)
+      .map((i) => i.path)
+      .sort();
+    expect(mitRecht).toEqual(["/mitglieder"]);
+  });
+
+  it("legt auf keine Route beide Sorten zugleich", () => {
+    const beides = navItems.filter((i) => i.minTier && i.darf).map((i) => i.path);
+    expect(beides).toEqual([]);
   });
 
   /* AGE-494 — nichts wird gelöscht, es wird nur unerreichbar. Diese Routen

@@ -56,6 +56,20 @@ für die erweiterten Felder). Ein Beispiel, das eine Stufe beim Namen nennt,
 trägt deshalb ab jetzt immer den Rang mit — ein Schlüssel allein sagt nichts
 mehr: `discover` bezeichnete vor AGE-903 den Rang 3 und danach den Rang 4.
 
+**Geändert mit V5F-1 (SPEC 01 V5 FINAL, 01.10.2026): Rang 4 ist die Tür, nicht
+mehr die ganze Staffelung.** Die Einheitlichkeit von AGE-903 gilt weiter für
+das, was sie meinte — den **Eintritt** in den Club: Vollprofil, Profilbeiwerk,
+Kontaktanfrage und Event-Teilnahme liegen unverändert bei `has_level(4)`, an
+genau einer Zahl. Daneben SHALL es Rechte **oberhalb** der Tür geben, und die
+SHALL NOT als Zahl in einer Policy stehen, sondern als Zeile in
+`public.berechtigungen`, abgefragt über `darf(schluessel)`.
+
+Damit tragen zwei Mechanismen nebeneinander, und die Zuordnung SHALL eindeutig
+sein: `has_level(n)` entscheidet über die Clubschwelle, `darf(schluessel)` über
+jedes Recht dahinter. Eine Policy SHALL NOT beide für dieselbe Entscheidung
+nennen, und ein Recht SHALL NOT mit `min_rank <= 4` angelegt werden — das wäre
+eine Kopie der Türzahl.
+
 #### Scenario: Below-threshold member is excluded from the full directory
 
 - **WHEN** a member below the directory threshold selects another member's full
@@ -85,6 +99,17 @@ mehr: `discover` bezeichnete vor AGE-903 den Rang 3 und danach den Rang 4.
   `profile_badges` oder `profile_theme_scores` liest
 - **THEN** kommt keine Zeile zurück — Rang 3 liegt ausserhalb des Clubs, und
   genau dieser Fall war vor AGE-903 erlaubt
+
+#### Scenario: Ein Recht oberhalb der Tür steht nicht in der Policy
+
+- **WHEN** eine Policy eine Schwelle oberhalb Rang 4 durchsetzt
+- **THEN** ruft sie `darf('<schluessel>')` auf, und die Zahl 5 oder 6 steht
+  nirgends in ihrem Rumpf
+
+#### Scenario: Die Tür bleibt eine Zahl an einer Stelle
+
+- **WHEN** die Policies gezählt werden, die die Clubschwelle durchsetzen
+- **THEN** rufen sie alle `has_level(4)` und keine davon `darf('…')`
 
 ### Requirement: Contact data is never implicitly disclosed
 
@@ -316,9 +341,10 @@ zur Laufzeit und nur dort, wo niemand hinsieht.
 
 The system SHALL centralise every authorization decision in the
 server-controlled predicates `current_tier_rank()`, `has_level(int)`,
-`is_activated()`, `is_matching_manager()`, and `is_admin()`, sourced from
-`membership_tiers`/`profiles.tier`, `profiles.activated_at`,
-`profiles.disabled_at`, `profiles.deleted_at` and `staff_roles`.
+`darf(text)`, `is_activated()`, `is_matching_manager()`, and `is_admin()`,
+sourced from `membership_tiers`/`profiles.tier`, `public.berechtigungen`,
+`profiles.activated_at`, `profiles.disabled_at`, `profiles.deleted_at` and
+`staff_roles`.
 
 **Geändert mit AGE-581.** `is_activated()` und `is_activated_profile(uuid)`
 tragen seither die vollständige Zugangsbedingung — aktiviert, nicht deaktiviert,
@@ -327,6 +353,14 @@ Policies rufen sie, und diese Policies einzeln umzuhängen hiesse, die Bedingung
 vierzigmal neu zu schreiben und vierzig Gelegenheiten zu schaffen, sie falsch zu
 schreiben. Der Preis ist ein Name, der weniger sagt, als die Funktion tut, und
 er ist im Funktionskommentar auszugleichen.
+
+**Ergänzt mit V5F-1.** `darf(text)` ist hinzugekommen und ist die Hülle, die
+einen **Namen** vor eine Rangzahl stellt. Sie ersetzt `has_level()` nicht,
+sondern ruft dieselbe Rangquelle: ihr Rumpf ist
+`is_activated() and current_tier_rank() >= (select min_rank from
+public.berechtigungen where schluessel = p_schluessel)`. Ein unbekannter
+Schlüssel SHALL `false` ergeben.
+
 Policies SHALL call these predicates rather than duplicating thresholds, and
 elevated standing SHALL never derive from the member-writable `profiles.roles`.
 
@@ -351,6 +385,12 @@ entfernt — die Funktion existiert seit AGE-311 nicht mehr. `has_level(int)` un
 - **THEN** it calls `has_level(n)` (which encapsulates the `current_tier_rank()`
   comparison) rather than re-encoding the rank, so the threshold cannot drift
   between policies
+
+#### Scenario: Ein Feature-Recht hängt an seinem Namen, nicht an seiner Zahl
+
+- **WHEN** der Mindestrang eines Rechts in `public.berechtigungen` geändert wird
+- **THEN** wirkt die neue Schwelle an jedem Wirkort dieses Rechts, ohne dass
+  eine Policy angefasst wird
 
 #### Scenario: Die Aktivierung ist nicht vom Mitglied setzbar
 

@@ -27,6 +27,7 @@ import {
 import { fetchPlatformSettings, platformSettingsQueryKey } from "../lib/platform-settings";
 import { kompassAnzeige, type KompassAnzeige } from "../lib/kompass-anzeige";
 import { CLUB_LEVEL, LEVELS, genannterName } from "../config/levels";
+import { BERECHTIGUNG_STUFE } from "../config/berechtigungen";
 import { cn } from "../lib/cn";
 import { istGeplant } from "../lib/feed";
 import { useAuth } from "../providers/auth-context";
@@ -115,8 +116,13 @@ export default function PublicProfilePage() {
             {/* „Erfolgsradar" stand hier bis AGE-597 an erster Stelle. Eine Fähigkeit
                 zu bewerben, die es nicht mehr gibt, ist ein falsches Versprechen —
                 und es stünde ausgerechnet vor denen, die kaufen sollen. */}
-            Interessen, Kompetenzen und das Such-/Bieteprofil sind ab der Mitgliedsstufe{" "}
-            <span className="font-medium text-ink">{LEVELS.discover.label}</span> sichtbar.
+            Interessen und Kompetenzen sind ab der Mitgliedsstufe{" "}
+            <span className="font-medium text-ink">{LEVELS.discover.label}</span> sichtbar, das
+            Such-/Bieteprofil ab{" "}
+            <span className="font-medium text-ink">
+              {LEVELS[BERECHTIGUNG_STUFE["suche_biete"]].label}
+            </span>
+            .
           </p>
         </Card>
       )}

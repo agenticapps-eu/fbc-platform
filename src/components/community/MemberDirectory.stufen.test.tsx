@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import MemberDirectory from "./MemberDirectory";
 import { fetchDirectoryBaseline, searchDirectory, type DirectoryMember } from "../../lib/directory";
+import type { Berechtigung } from "../../config/berechtigungen";
+import type { MembershipLevel } from "../../config/levels";
+import { rechteFuerStufe } from "../../test/auth-fixtures";
 
 /**
  * AGE-598, Aufgabengruppe 4 — die Filter, die eine Stufe nicht bedienen kann.
@@ -35,15 +38,32 @@ vi.mock("../../lib/directory", async (importOriginal) => ({
   fetchDirectoryBaseline: vi.fn(),
 }));
 
-/* Die Stufe kommt aus `useAuth().levelRank` — derselbe Wert, den auch
-   `MembershipGate` liest. Veränderlich, weil jeder Fall in dieser Datei eine
-   andere Stufe braucht. */
+/* Seit AGE-1000 entscheidet nicht der Rang, sondern das Recht `suche_biete`.
+   `useAuth` liefert deshalb nur noch die Kennung; welche Rechte das Konto
+   traegt, steht in `rechte` und wird je Fall gesetzt.
+
+   Gemockt wird der HOOK und nicht `ladeMeineRechte`: der Gegenstand dieser
+   Datei ist die Flaeche, nicht der Hook. Ueber die echte Abfrage zu gehen
+   machte jede Zusage hier asynchron und haengte sie an react-query — der Hook
+   hat sein eigenes Testfile (`src/hooks/useDarf.test.tsx`). */
 let auth: { user: { id: string } | null; levelRank: number | null } = {
   user: { id: "00000000-0000-0000-0000-0000000000aa" },
-  levelRank: 4,
+  levelRank: null,
 };
 vi.mock("../../providers/auth-context", () => ({
   useAuth: () => auth,
+}));
+
+let rechte: Berechtigung[] = [];
+let rechteLaden = false;
+let rechteFehler = false;
+vi.mock("../../hooks/useDarf", () => ({
+  useMeineRechte: () => ({ rechte, laedt: rechteLaden, fehler: rechteFehler }),
+  useDarf: (k: Berechtigung) => ({
+    darf: rechte.includes(k),
+    laedt: rechteLaden,
+    fehler: rechteFehler,
+  }),
 }));
 
 function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
@@ -71,8 +91,11 @@ function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
  *  beiden Filter, die 4.3 als funktionsfähig zusagt, keine einzige Option. */
 const BASELINE = [member({ branche: "Handwerk", region: "Nord", competencies: ["Statik"] })];
 
-function renderDirectory(levelRank: number | null) {
-  auth = { user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank };
+function renderDirectory(stufe: MembershipLevel | "laedt" | "fehler") {
+  auth = { user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: null };
+  rechteLaden = stufe === "laedt";
+  rechteFehler = stufe === "fehler";
+  rechte = stufe === "laedt" || stufe === "fehler" ? [] : rechteFuerStufe(stufe);
   vi.mocked(searchDirectory).mockResolvedValue([]);
   vi.mocked(fetchDirectoryBaseline).mockResolvedValue(BASELINE);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -91,25 +114,25 @@ beforeEach(() => {
 });
 
 /**
- * AGE-903: die Schwelle ist von Rang 3 auf Rang 4 gestiegen, und damit wandern
- * ALLE Betrachter dieser Datei um einen Rang mit. Der gemessene Fall bleibt
- * derselbe — „gerade darunter" gegen „gerade darüber" —, und genau deshalb
- * stehen hier jetzt 3 und 4 statt 2 und 3.
+ * AGE-1000: die Schwelle der vier Filter ist von der Clubstufe auf das Recht
+ * `suche_biete` (FOCUS, Rang 5) gewandert, und damit wandern ALLE Betrachter
+ * dieser Datei mit. Der gemessene Fall bleibt derselbe — „gerade darunter"
+ * gegen „gerade darüber".
  *
- * Der Betrachter darunter steht bewusst auf Rang 3 und nicht auf Rang 1: Rang 3
- * ist der HÖCHSTE Rang ausserhalb des Clubs. Hielte die Ausblendung bei ihm
- * nicht, hielte sie nirgends, und eine Zusage über Rang 1 hätte das nicht
- * gezeigt.
+ * Der Betrachter darunter steht jetzt auf DISCOVER und nicht mehr auf Rang 3:
+ * Discover ist der höchste Rang ohne `suche_biete`, der diese Fläche überhaupt
+ * erreichen kann, und er steht dabei IM Club. Hielte die Ausblendung bei ihm
+ * nicht, hielte sie nirgends.
  *
- * Erreichbar ist diese Fläche für Rang 3 im Übrigen nur in einem Fenster:
- * `MembershipGate` sperrt `/mitglieder` seit AGE-903 ab Rang 4, sperrt aber
- * NICHT, solange die Stufe noch unbekannt ist. Genau dieses Fenster misst die
- * Datei — deshalb ist sie nach AGE-903 nicht überflüssig geworden, sondern
- * misst einen schmaleren Fall.
+ * Erreichbar ist die Fläche für ihn allerdings nur in einem Fenster:
+ * `MembershipGate` sperrt `/mitglieder` seit AGE-1000 am Recht
+ * `verzeichnis.suchen` (IMPACT), sperrt aber NICHT, solange die Rechte noch
+ * laden. Genau dieses Fenster misst die Datei — sie ist dadurch nicht
+ * überflüssig geworden, sondern misst einen schmaleren Fall.
  */
-describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-903)", () => {
-  it("zeigt einem Konto auf Rang 3 die vier maskierten Filter gar nicht", async () => {
-    renderDirectory(3);
+describe("Verzeichnis: Filter ohne `suche_biete` (AGE-598 4.1–4.3, AGE-1000)", () => {
+  it("zeigt einem Discover-Konto die vier maskierten Filter gar nicht", async () => {
+    renderDirectory("discover");
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Die drei Auswahlfelder auf maskierten Spalten …
@@ -122,18 +145,18 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
     expect(screen.queryByRole("group", { name: "Sucht" })).toBeNull();
   });
 
-  it("sagt einem Konto auf Rang 3, ab welcher Stufe es die Filter gibt", async () => {
-    renderDirectory(3);
+  it("sagt einem Discover-Konto, ab welcher Stufe es die Filter gibt", async () => {
+    renderDirectory("discover");
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Ausblenden ohne Hinweis wäre ein zweites Verschweigen (4.2). Die Stufe
     // muss BENANNT sein — „mehr Filter ab einer höheren Stufe" beantwortet die
     // Frage nicht, die das Fehlen aufwirft.
-    expect(screen.getByText(/ab Discover/i)).toBeInTheDocument();
+    expect(screen.getByText(/ab Focus/i)).toBeInTheDocument();
   });
 
-  it("lässt einem Konto auf Rang 3 den Branchenfilter — sichtbar und wirksam", async () => {
-    renderDirectory(3);
+  it("lässt einem Discover-Konto den Branchenfilter — sichtbar und wirksam", async () => {
+    renderDirectory("discover");
     await screen.findByLabelText(/Volltextsuche/i);
 
     // Sichtbar: er läuft seit 3c auf einem Basisfeld und findet etwas.
@@ -162,8 +185,8 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
    * Positivkontrolle. Ohne sie belegte die Datei nur, dass die Filter fehlen —
    * nicht, dass sie jemandem noch angeboten werden.
    */
-  it("zeigt einem Konto auf Rang 4 weiterhin alle Filter und keinen Hinweis", async () => {
-    renderDirectory(4);
+  it("zeigt einem Focus-Konto weiterhin alle Filter und keinen Hinweis", async () => {
+    renderDirectory("focus");
     await screen.findByLabelText(/Volltextsuche/i);
 
     expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
@@ -172,7 +195,7 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
     expect(screen.getByRole("group", { name: "Bietet" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Sucht" })).toBeInTheDocument();
 
-    expect(screen.queryByText(/ab Discover/i)).toBeNull();
+    expect(screen.queryByText(/ab Focus/i)).toBeNull();
   });
 
   /**
@@ -187,8 +210,25 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
    * Berechtigten eine Fähigkeit weg. Dieselbe Regel tragen `MembershipGate` und
    * `HeaderSearch` schon: ein Ladezustand ist kein Ausschlussgrund.
    */
-  it("blendet nichts aus, solange die Stufe noch nicht feststeht", async () => {
-    renderDirectory(null);
+  /**
+   * Der Fehlerfall, neben dem Ladefall und nicht statt ihm (Befund des
+   * Diff-Reviews, codex, MEDIUM). Ein Filter ist keine Aktion: wer zu viel
+   * zeigt, findet höchstens nichts. Und dieser Zustand löst sich NICHT von
+   * selbst auf — ein FOCUS-Konto verlöre die vier Filter dauerhaft, weil eine
+   * Abfrage schiefging.
+   */
+  it("blendet nichts aus, wenn der Abruf der Rechte gescheitert ist", async () => {
+    renderDirectory("fehler");
+    await screen.findByLabelText(/Volltextsuche/i);
+
+    expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Thema/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Sucht \/ bietet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/ab Focus/i)).toBeNull();
+  });
+
+  it("blendet nichts aus, solange die Rechte noch nicht feststehen", async () => {
+    renderDirectory("laedt");
     await screen.findByLabelText(/Volltextsuche/i);
 
     expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
@@ -196,6 +236,6 @@ describe("Verzeichnis: Filter unterhalb der Clubstufe (AGE-598 4.1–4.3, AGE-90
     expect(screen.getByLabelText(/Sucht \/ bietet/i)).toBeInTheDocument();
     // Und erst recht kein Hinweis, der eine Stufe nennt, die das Konto
     // vielleicht längst hat.
-    expect(screen.queryByText(/ab Discover/i)).toBeNull();
+    expect(screen.queryByText(/ab Focus/i)).toBeNull();
   });
 });

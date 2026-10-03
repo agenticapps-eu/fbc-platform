@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { ToastProvider } from "./ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
-import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
+import { AuthFixture, authAsTier, fakeAuthValue, seedeRechte } from "../test/auth-fixtures";
 
 afterEach(() => {
   localStorage.clear();
@@ -14,6 +14,11 @@ afterEach(() => {
 
 function renderAt(path: string, value: AuthContextValue) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // AGE-1000: Die Rechte des Fixtures in den Cache. `/mitglieder` haengt am
+  // Recht `verzeichnis.suchen`; ohne diese Zeile fragt `useDarf` die RPC,
+  // findet keinen Server und die Zusage unten maesse den fehlenden Abruf
+  // statt der Weiche.
+  seedeRechte(queryClient, value);
   return render(
     <AuthFixture value={value}>
       <QueryClientProvider client={queryClient}>
@@ -142,9 +147,7 @@ describe("Willkommensstrecke (AGE-538)", () => {
    *  oder falsch — nicht schnell oder langsam. */
   async function dashboardScheitern() {
     const dashboard = await import("../lib/dashboard");
-    return vi
-      .spyOn(dashboard, "fetchDashboard")
-      .mockRejectedValue(new Error("kein Netz im Test"));
+    return vi.spyOn(dashboard, "fetchDashboard").mockRejectedValue(new Error("kein Netz im Test"));
   }
 
   beforeEach(async () => {

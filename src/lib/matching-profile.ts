@@ -131,18 +131,38 @@ const emptyToNull = (s: string) => (s.trim() === "" ? null : s.trim());
 const tagsOrNull = (tags: string[]) => (tags.length > 0 ? tags : null);
 
 /**
- * Ersetzt die eigenen offers/needs durch die übergebenen Werte. Die Lösch-/
- * Einfüge-Schritte sind separate Calls (keine eine Transaktion): schlägt ein
- * Insert nach dem Delete fehl, bleibt die Sammlung leer, bis erneut gespeichert
- * wird. Für Phase 1 ausreichend (vgl. compass.ts).
+ * Ersetzt die eigenen offers/needs durch die übergebenen Werte.
+ *
+ * ══ EINFÜGEN, DANN LÖSCHEN — UND DAS IST DER GANZE PUNKT (AGE-1000) ═══════
+ * Bis hierher wurde zuerst gelöscht. Der Funktionskopf benannte die Schwäche
+ * selbst — „schlägt ein Insert nach dem Delete fehl, bleibt die Sammlung leer"
+ * — und nannte sie für Phase 1 hinnehmbar. Mit AGE-1000 ist sie es nicht mehr:
+ * `offers_insert_own` verlangt `darf('suche_biete')` (FOCUS), der DELETE
+ * braucht nur Eigentum. Für ein DISCOVER-Konto heisst die alte Reihenfolge
+ * also: Löschen gelingt, Einfügen wird mit 42501 abgewiesen, und seine
+ * Angebote und Gesuche sind **unwiederbringlich** fort — bei einer Korrektur
+ * an einem Titel, mit einem Fehler-Toast als einzigem Hinweis. Gefunden im
+ * Diff-Review (CRITICAL).
+ *
+ * Deshalb: erst die Kennungen des Bestands lesen, dann einfügen, dann **genau
+ * diese Kennungen** löschen. Ein abgelehnter Insert wirft, bevor etwas
+ * verschwindet. Gelöscht wird nach `id` und nicht nach `profile_id`, weil
+ * letzteres die eben eingefügten Zeilen mitnähme.
+ *
+ * Es bleiben separate Calls, also keine Transaktion. Der Preis ist jetzt ein
+ * anderer und der kleinere: bricht die Verbindung zwischen Insert und Delete,
+ * steht die Sammlung **doppelt** da statt leer. Doppelt ist sichtbar und von
+ * Hand zu bereinigen; leer ist weder sichtbar noch zurückzuholen.
  */
 export async function saveMatchingProfile(
   uid: string,
   values: MatchingProfileValues,
 ): Promise<void> {
+  const bestand: Record<"offers" | "needs", string[]> = { offers: [], needs: [] };
   for (const table of ["offers", "needs"] as const) {
-    const { error } = await supabase.from(table).delete().eq("profile_id", uid);
+    const { data, error } = await supabase.from(table).select("id").eq("profile_id", uid);
     if (error) throw error;
+    bestand[table] = (data ?? []).map((r) => r.id);
   }
 
   if (values.offers.length > 0) {
@@ -173,6 +193,13 @@ export async function saveMatchingProfile(
         source: n.source,
       })),
     );
+    if (error) throw error;
+  }
+
+  // Erst JETZT fällt der Bestand — nachdem das Einfügen durch ist.
+  for (const table of ["offers", "needs"] as const) {
+    if (bestand[table].length === 0) continue;
+    const { error } = await supabase.from(table).delete().in("id", bestand[table]);
     if (error) throw error;
   }
 
