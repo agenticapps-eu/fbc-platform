@@ -1,0 +1,149 @@
+# Tasks — die Mitgliederliste lässt sich nicht mehr am Verzeichnis vorbei abholen
+
+## 1. Den heutigen Zustand festnageln, bevor er sich ändert
+
+- [ ] 1.1 Die drei „OFFEN"-Zusagen in `supabase/tests/rechte_v5_test.sql`
+      umdrehen — sie halten heute ausdrücklich fest, dass Rang 4 `profiles`
+      und Rang 3/4 `profiles_public` ohne Filter lesen. **Das ist das RED
+      dieses Changes.**
+- [ ] 1.2 Neue Zusagen für die fünf Ersatzfunktionen, je Rang: `mein_profil`,
+      `meine_stufe`, `profil_karten`, `gespraechspartner_karten`,
+      `profil_detail`.
+- [ ] 1.3 Die Zusage, die der Umstellung von `search_directory` auf DEFINER
+      gilt: ein Konto **unterhalb** von Rang 4, das durch das Tor kommt (also
+      über den Selbst-Zweig), lernt **keine fremden** `competencies` — die
+      Maskierung hängt dann allein an der `where`-Klausel.
+- [ ] 1.4 Die Zusage für `feed_top_authors`: sie liefert nach dem Entzug
+      weiterhin Namen, und nur an aktivierte Aufrufer.
+- [ ] 1.5 Die Zusage für den Chat: ein Profil mit `is_public = false`, mit dem
+      der Aufrufer einen Faden teilt, kommt über `gespraechspartner_karten`
+      **mit** Namen zurück — und über `profil_karten` **nicht**. Das ist der
+      Unterschied, den Messung 4 gefunden hat.
+- [ ] 1.6 Die Zusage für die Schreibwege: nach dem Entzug hält `authenticated`
+      **weder** `select` **noch** `update` auf `profiles`, und ein Speichervorgang
+      gelingt trotzdem — über die neuen Funktionen. Dazu die Zusage, dass die
+      Rolle `profiles` auch nicht mehr **zählen** kann (`select count(*)`), denn
+      genau das wäre der Rückweg über ein spaltenweises `select(id)`.
+- [ ] 1.6b `supabase/tests/grants_test.sql` nachziehen: Zeile 90/91 (die beiden
+      entzogenen Grants) und Zeile 184 (die 17 `update`-Spalten). Der
+      Schnappschuss ist ein Wächter, kein Hindernis — er soll die Änderung
+      **zeigen**, nicht sie durchwinken.
+- [ ] 1.7 `anon`: die Sonde in `src/test/anon-sonde.ts` nachziehen; sie führt
+      `profiles_public` und muss nach dem Entzug etwas anderes erwarten.
+- [ ] 1.8 pgTAP laufen lassen und RED belegen (Ausgabe lesen, nicht annehmen).
+
+## 2. Die Migration
+
+> **Eine neue Datei, nie eine bestehende ändern.** Entzug und Ersatz stehen in
+> **derselben** Migration: ein Zwischenzustand, in dem das Leserecht weg und die
+> Funktion noch nicht da ist, wäre ein Ausfall des Verzeichnisses.
+
+- [ ] 2.1 `mein_profil()` — `returns setof public.profiles`, DEFINER,
+      `search_path = ''`, `where id = (select auth.uid())` **und die
+      Lebenszyklus-Prüfungen** (`is_activated()`, `activated_at is not null`,
+      `disabled_at is null`, `deleted_at is null`). Eine DEFINER-Funktion erbt
+      kein Prädikat; was die RLS ihr abgenommen hat, muss sie mitbringen.
+- [ ] 2.2 `meine_stufe()` — `(tier text, level_rank integer)`, ersetzt die
+      Einbettung `membership_tiers(level_rank)` in `AuthProvider`.
+- [ ] 2.3 `profil_karten(p_ids uuid[])` — die zehn Felder der Sicht, deren
+      Prädikat unverändert, `resolve_display_name` **aufgerufen**, nicht kopiert.
+- [ ] 2.4 `gespraechspartner_karten(p_ids uuid[])` — dieselben Felder, ohne
+      `is_public`, nur für Profile mit gemeinsamem Gesprächsfaden.
+- [ ] 2.5 `profil_detail(p_id uuid)` — die erweiterten Felder eines fremden
+      Profils, mit dem heutigen Gate `has_level(4)`.
+- [ ] 2.6 Obergrenzen auf den beiden Stapelfunktionen — im Kopf **als
+      Betriebsmittel** benannt, ausdrücklich nicht als Zugriffsschutz.
+- [ ] 2.7 `search_directory` auf `SECURITY DEFINER` umstellen, mit dem Grund im
+      Kopf.
+- [ ] 2.8 `feed_top_authors` **bleibt `SECURITY INVOKER`** und bekommt nur die
+      Namensauflösung über `profil_karten`. Sie zählt `posts` unter den Rechten
+      des Aufrufers; als DEFINER zählte sie auch terminierte und verborgene
+      Beiträge. Das Sichtbarkeits-Prädikat der Beiträge wird **nicht** in die
+      Funktion kopiert — eine Kopie läuft auseinander.
+- [ ] 2.9 `revoke select on public.profiles from authenticated` und dasselbe
+      für `public.profiles_public`, **dazu die 17 Spalten-Grants für `update`**.
+      **Alle vier Rollen namentlich nennen** (`public, anon, authenticated,
+    service_role`) — frische Instanzen vergeben rollenspezifisch, ein
+      `revoke … from public` entfernt dort nichts.
+      **KEIN `grant select (id)` als Ausweg** — gemessen stellt es die
+      Aufzählbarkeit wieder her.
+- [ ] 2.9b Vier Schreibfunktionen, je eine pro Schnitt, mit benannten Parametern
+      statt einem `jsonb`-Beutel: Entwicklungsschwerpunkt (`compass`),
+      Verzeichnis-Sichtbarkeit (`member-settings`), Profil speichern
+      (`profile.ts`), Onboarding-Felder (`member-onboarding`). Jede mit
+      `where id = (select auth.uid())` und den Lebenszyklus-Prüfungen.
+- [ ] 2.10 `grant execute` auf die fünf neuen Funktionen an `authenticated`,
+      davor `revoke … from public, anon, authenticated, service_role`.
+- [ ] 2.11 `comment on function` für jede neue Funktion: was sie ersetzt und
+      welches Prädikat sie trägt.
+
+## 3. Die Abfragestellen — 19, einzeln
+
+- [ ] 3.1 `providers/AuthProvider.tsx:169` → `meine_stufe()`. **Die Einbettung
+      entfällt**; damit auch die Falle, dass eine Einbettung ohne Grant die
+      ganze Abfrage mit 401 killt.
+- [ ] 3.2 `lib/dashboard.ts:220` und `lib/profile.ts:197` → `mein_profil()`.
+- [ ] 3.3 `lib/compass.ts:295`, `lib/member-settings.ts:174`,
+      `lib/member-onboarding.ts:36` → `mein_profil()`.
+- [ ] 3.4 `lib/chat.ts:317` → `gespraechspartner_karten()`. **Nicht**
+      `profil_karten` — den Grund trägt der Kommentar an der Stelle selbst.
+- [ ] 3.5 `lib/public-profile.ts:97` → `profil_karten`, `:102` →
+      `profil_detail`.
+- [ ] 3.6 Die sechs übrigen Stellen auf der Sicht: `lib/matching-hub.ts:189`,
+      `lib/contact-requests.ts:137`, `lib/feed.ts:516`, `lib/events.ts:345`,
+      `:521`, `:552` → `profil_karten()`.
+- [ ] 3.7 Die vier Schreibstellen (`compass:270`, `member-settings:213`,
+      `profile.ts:344`, `member-onboarding:54`) auf die neuen Funktionen
+      umstellen. **Nicht** nur die `.select()`-Ketten auflösen — das war der
+      widerlegte Entwurf.
+- [ ] 3.7b `supabase/functions/create-checkout-session/index.ts:58` →
+      `meine_stufe()`. Dieselbe Einbettung wie `AuthProvider`, derselbe Ersatz.
+      Stripe ist ruhend; das ist ein Grund, ruhig nachzuziehen, und keiner,
+      auszulassen.
+- [ ] 3.8 `src/lib/database.types.ts` von Hand nachziehen — die fünf neuen
+      Funktionen. **`gen types` NIE darüberlaufen lassen.**
+- [ ] 3.9 Gegenzählen über **beide** Wurzeln: kein `from("profiles")` und kein
+      `from("profiles_public")` mehr in `src/` **noch** in `supabase/functions/`,
+      ausser in Tests und `src/vision/`. Das Zählen über nur eine Wurzel ist der
+      Fehler, den die Plan-Review hier gefunden hat.
+
+## 4. Nachweisen
+
+- [ ] 4.1 pgTAP grün, volle Vitest-Suite, `lint`, `typecheck`, `build`. Nach dem
+      Build und vor jedem `git add`:
+      `git checkout -- src/content/release-entries.generated.ts`.
+- [ ] 4.2 **Integrationsbeleg gegen den lokalen Stack mit echten JWTs**: je ein
+      Konto auf Rang 3, 4, 5 und 6 durch PostgREST. Pro Rang: `profiles` und
+      `profiles_public` direkt (muss scheitern), die fünf Funktionen,
+      `search_directory`, `feed_top_authors`. Das ist die Naht, die weder pgTAP
+      noch vitest abdeckt.
+- [ ] 4.3 **Der Datenverlust-Pfad**: ein Profil speichern und nachmessen, dass
+      die Änderung wirklich steht. `try_as(...) = 'OK'` belegt bei UPDATE
+      nichts — null getroffene Zeilen sind kein Fehler.
+- [ ] 4.4 Sichtprobe: Feed-Seitenleiste („Die aktivsten Mitglieder"), ein
+      Gesprächsfaden mit einem zurückgezogenen Profil, ein fremdes Profil,
+      der Profil-Editor. Zählstände vorher/nachher, `.env.local` löschen.
+- [ ] 4.5 Zahlen vor und nach der Migration auf dem lokalen Stack
+      protokollieren — der Stack ist geteilt.
+- [ ] 4.6 **Die Probe zu gemini's Fremdschlüssel-Befund**: in eine Tabelle
+      schreiben, die auf `profiles(id)` verweist, nachdem `select` entzogen ist.
+      Erwartung: gelingt, weil die FK-Prüfung eine Systemprüfung ist und nicht
+      an den Rechten des Schreibenden hängt. Eine Annahme, die man messen kann,
+      soll man messen.
+- [ ] 4.7 Belegen, dass `feed_top_authors` **keine** terminierten Beiträge
+      mitzählt — die Zusage, die ihren Verbleib als INVOKER begründet.
+
+## 5. Abschliessen
+
+- [ ] 5.1 ADR in `docs/decisions/` — Nummer eins über der höchsten dort
+      vorhandenen, erst `ls`.
+- [ ] 5.2 `REVIEWS.md` mit **zwei** Fremdreviewern verschiedener Anbieter.
+      Schema, Rechte, Sicherheit — Donalds Regel vom 26.08. greift hier.
+- [ ] 5.3 Code-Review auf dem Diff.
+- [ ] 5.4 Befunde abarbeiten.
+- [ ] 5.5 `openspec validate --all` grün.
+- [ ] 5.6 Vorab-Sonde auf den Neuigkeiten-Eintrag **vor** dem Archivieren.
+- [ ] 5.7 Archivieren, `pnpm release:entries`, Diffgrösse messen.
+- [ ] 5.8 PR. **In den Text: nach dem Merge blockt `drift-gate` jeden Deploy,
+      bis `migrate-prod` dispatcht und der Lauf mit `gh run rerun --failed`
+      wiederholt ist.**
