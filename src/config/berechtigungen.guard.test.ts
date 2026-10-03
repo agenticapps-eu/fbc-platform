@@ -10,33 +10,54 @@ import { LEVEL_RANK } from "./levels";
  * `BERECHTIGUNG_STUFE` ist eine Kopie der Mindestränge aus
  * `berechtigungen`. Sie entscheidet nichts — aber sie SAGT etwas („ab IMPACT"),
  * und eine falsche Aussage über eine Stufe ist schlimmer als keine. Dieser Test
- * liest den Seed der Migration und vergleicht Schlüssel für Schlüssel.
+ * vergleicht sie Schlüssel für Schlüssel.
  *
- * Er liest absichtlich die MIGRATION und nicht die laufende Datenbank: der Test
- * läuft in `verify` ohne Stack, und der Seed ist die Quelle, aus der die
- * laufende Datenbank entstanden ist. Dass die Datenbank ihm entspricht, belegt
- * `supabase/tests/rechte_v5_test.sql` mit einem `results_eq` über die ganze
- * Tabelle.
+ * Er liest absichtlich eine Datei und nicht die laufende Datenbank: der Test
+ * läuft in `verify` ohne Stack. Welche Datei — und warum nicht die Migration —
+ * steht am Kopf von `erwartungAusPgtap`.
  */
 
-const MIGRATION = "supabase/migrations/20261003100000_berechtigungen.sql";
+/**
+ * Verglichen wird gegen die ERWARTUNG DES pgTAP-TESTS, nicht gegen eine
+ * Migration.
+ *
+ * Die erste Fassung las `20261003100000_berechtigungen.sql` — also den ERSTEN
+ * Seed. Das bricht genau die Zusage, um die es in diesem Change geht: „eine
+ * Verschiebung ist eine Migration und keine Frontend-Änderung". Sobald eine
+ * spätere, vorwärtsgerichtete Migration `update public.berechtigungen set
+ * min_rank = …` fährt, verglich der Wächter gegen einen überholten Stand — rot
+ * bei richtig nachgezogenem Client, grün bei falscher Stufenaussage. Befund des
+ * Diff-Reviews (IMPORTANT).
+ *
+ * Stattdessen hängt die Kette jetzt so: die **laufende Tabelle** wird in
+ * `supabase/tests/rechte_v5_test.sql` per `results_eq` gegen eine dort
+ * ausgeschriebene Liste geprüft, und dieser Test prüft `BERECHTIGUNG_STUFE`
+ * gegen dieselbe Liste. Verschiebt eine Migration eine Schwelle, wird der
+ * pgTAP-Test rot, bis die Liste nachgezogen ist — und dann dieser Test, bis der
+ * Client nachgezogen ist. Zwei rote Tests in der richtigen Reihenfolge statt
+ * eines grünen über einer Lüge.
+ */
+const PGTAP = "supabase/tests/rechte_v5_test.sql";
 
-/** Liest die Seed-Zeilen `('schluessel', rang, '…')` aus der Migration. */
-function seedAusMigration(): Map<string, number> {
-  const sql = readFileSync(MIGRATION, "utf8");
-  const insert = sql.slice(sql.indexOf("insert into public.berechtigungen"));
-  const zeilen = [...insert.matchAll(/\('([a-z_.]+)',\s*(\d+),/g)];
+/** Liest die `values ('schluessel'::text, rang)`-Liste aus dem pgTAP-Test. */
+function erwartungAusPgtap(): Map<string, number> {
+  const sql = readFileSync(PGTAP, "utf8");
+  const start = sql.indexOf("select results_eq(");
+  if (start < 0) throw new Error(`${PGTAP}: kein results_eq gefunden`);
+  const block = sql.slice(start, sql.indexOf("$$,", sql.indexOf("$$ values", start)));
+  const zeilen = [...block.matchAll(/\('([a-z_.]+)'::text,\s*(\d+)\)/g)];
+  if (zeilen.length === 0) throw new Error(`${PGTAP}: keine values-Zeilen erkannt`);
   return new Map(zeilen.map(([, schluessel, rang]) => [schluessel, Number(rang)]));
 }
 
-describe("Berechtigungen: Client-Text gegen DB-Seed", () => {
-  it("nennt genau die Schlüssel, die die Migration anlegt", () => {
-    const seed = seedAusMigration();
+describe("Berechtigungen: Client-Text gegen die pgTAP-Erwartung", () => {
+  it("nennt genau die Schlüssel, die der pgTAP-Test erwartet", () => {
+    const seed = erwartungAusPgtap();
     expect([...seed.keys()].sort()).toEqual([...BERECHTIGUNGEN].sort());
   });
 
-  it("ordnet jedem Schlüssel die Stufe zu, deren Rang die Migration setzt", () => {
-    const seed = seedAusMigration();
+  it("ordnet jedem Schlüssel die Stufe zu, deren Rang der pgTAP-Test erwartet", () => {
+    const seed = erwartungAusPgtap();
     for (const schluessel of BERECHTIGUNGEN) {
       const stufe = BERECHTIGUNG_STUFE[schluessel];
       expect(LEVEL_RANK[stufe], `${schluessel} → ${stufe}`).toBe(seed.get(schluessel));

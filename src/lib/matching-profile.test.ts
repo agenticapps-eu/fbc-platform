@@ -19,27 +19,40 @@ import {
 
 let rows: Record<string, Record<string, unknown>[]> = {};
 let inserted: Record<string, Record<string, unknown>[]> = {};
+let fehlerBeimEinfuegen: Record<string, boolean> = {};
 const ops: string[] = [];
 
 vi.mock("./supabase", () => ({
   supabase: {
     from: (name: string) => ({
       select: () => ({
-        eq: () => ({
-          order: async () => {
+        // `eq` ist BEIDES: awaitbar (der Kennungs-Abruf vor dem Einfuegen) und
+        // Traeger von `order` (der Formular-Abruf). Ohne das erste waere der
+        // neue Weg in `saveMatchingProfile` hier nicht nachstellbar.
+        eq: () => {
+          const antwort = () => {
             ops.push(`select:${name}`);
             return { data: rows[name] ?? [], error: null };
-          },
-        }),
+          };
+          const p = Promise.resolve(null).then(antwort);
+          return Object.assign(p, { order: async () => antwort() });
+        },
       }),
       delete: () => ({
         eq: async () => {
           ops.push(`delete:${name}`);
           return { error: null };
         },
+        in: async () => {
+          ops.push(`delete:${name}`);
+          return { error: null };
+        },
       }),
       insert: async (payload: Record<string, unknown>[]) => {
         ops.push(`insert:${name}`);
+        if (fehlerBeimEinfuegen[name]) {
+          return { error: { code: "42501", message: "new row violates row-level security" } };
+        }
         (inserted[name] ??= []).push(...payload);
         return { error: null };
       },
@@ -52,6 +65,7 @@ vi.mock("./matches", () => ({ recomputeMyMatches: vi.fn().mockResolvedValue(unde
 beforeEach(() => {
   rows = { offers: [], needs: [] };
   inserted = {};
+  fehlerBeimEinfuegen = {};
   ops.length = 0;
 });
 
@@ -154,12 +168,40 @@ describe("saveMatchingProfile", () => {
     });
   });
 
-  it("löscht vor dem Einfügen (Replace-Collection) und rechnet danach neu", async () => {
+  /**
+   * DIESE ZUSAGE IST UMGEDREHT (AGE-1000, Befund des Diff-Reviews, CRITICAL).
+   *
+   * Sie hiess „löscht vor dem Einfügen (Replace-Collection)" und beschrieb den
+   * Ist-Zustand, den der Funktionskopf selbst als Schwäche benannte: „schlägt
+   * ein Insert nach dem Delete fehl, bleibt die Sammlung leer". Seit AGE-1000
+   * ist das kein hypothetischer Fall mehr, sondern der Normalfall für ein
+   * DISCOVER-Konto — `offers_insert_own` verlangt `darf('suche_biete')`, der
+   * DELETE braucht nur Eigentum. Löschen gelingt, Einfügen wird mit 42501
+   * abgewiesen, und die Einträge des Mitglieds sind UNWIEDERBRINGLICH fort.
+   *
+   * Deshalb wird jetzt zuerst eingefügt und danach gelöscht, und zwar gezielt
+   * die vorher gelesenen Kennungen. Ein `delete … eq(profile_id)` am Ende
+   * nähme die eben eingefügten Zeilen mit.
+   */
+  it("fügt VOR dem Löschen ein — ein abgelehnter Insert darf nichts vernichten", async () => {
     rows.needs = [CHIP_NEED_ROW];
     const loaded = await fetchMatchingProfile("u1");
     await saveMatchingProfile("u1", loaded);
 
-    expect(ops.indexOf("delete:needs")).toBeLessThan(ops.indexOf("insert:needs"));
+    expect(ops.indexOf("insert:needs")).toBeLessThan(ops.indexOf("delete:needs"));
+  });
+
+  it("löscht GAR NICHT, wenn der Insert abgewiesen wird", async () => {
+    // Der Fall, der ohne diese Reihenfolge Daten vernichtet: ein Konto ohne
+    // `suche_biete` speichert. Die RLS lehnt den Insert ab — und der Bestand
+    // muss unangetastet bleiben.
+    rows.needs = [CHIP_NEED_ROW];
+    const loaded = await fetchMatchingProfile("u1");
+    fehlerBeimEinfuegen.needs = true;
+
+    await expect(saveMatchingProfile("u1", loaded)).rejects.toMatchObject({ code: "42501" });
+    expect(ops).not.toContain("delete:needs");
+    expect(ops).not.toContain("delete:offers");
   });
 
   it("setzt für eine im Editor angelegte Zeile 'editor'", async () => {

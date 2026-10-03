@@ -58,7 +58,7 @@
 --     `posts`, und das sahe wie eine Rechtegrenze aus.
 
 begin;
-select plan(52);
+select plan(60);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- `auth.users`-Insert feuert `handle_new_user()` und legt die
@@ -198,12 +198,33 @@ select is_empty(
   $$ select schluessel from public.berechtigungen where min_rank <= 4 $$,
   'Kein Recht sitzt auf der Clubschwelle — die ist eine Tuer, kein Recht');
 
-select alike(
-  (select pg_temp.try_as('a1000000-0000-0000-0000-000000000006',
-     $$insert into public.berechtigungen (schluessel, min_rank, beschreibung)
-       values ('test.klubschwelle', 4, 'darf nicht gehen')$$)),
-  'FEHLER:%',
-  'Ein Recht mit Mindestrang 4 laesst sich nicht anlegen');
+-- Als EIGENTUEMER der Transaktion und nicht unter `authenticated`, und auf den
+-- SQLSTATE und nicht auf „irgendein Fehler". Die erste Fassung lief als
+-- `authenticated`, dem die Migration ALLE Tabellenrechte entzogen hat: sie
+-- scheiterte mit 42501, BEVOR der Constraint ausgewertet wurde, und die Zusage
+-- lautete auf `alike(…, 'FEHLER:%')` — genau die Falle, die der Kopf dieser
+-- Datei beschreibt. Haette man den Constraint geloescht, waere sie gruen
+-- geblieben. Befund des Diff-Reviews (IMPORTANT).
+select throws_ok(
+  $$insert into public.berechtigungen (schluessel, min_rank, beschreibung)
+    values ('test.klubschwelle', 4, 'darf nicht gehen')$$,
+  '23514',
+  null,
+  'Ein Recht mit Mindestrang 4 laesst sich nicht anlegen — der Check-Constraint '
+  'greift, nicht ein fehlendes Tabellenrecht');
+
+-- Die Positivkontrolle dazu: dieselbe Einfuegung mit Rang 5 gelingt. Ohne sie
+-- waere die Zusage darueber auch von einem Constraint erfuellt, der ALLES
+-- ablehnt.
+select lives_ok(
+  $$insert into public.berechtigungen (schluessel, min_rank, beschreibung)
+    values ('test.oberhalb', 5, 'darf gehen')$$,
+  '… und mit Mindestrang 5 geht sie durch');
+
+-- Und sofort zurueck: die Zeile wuerde sonst in `meine_rechte()` auftauchen und
+-- die Mengen-Zusagen in Abschnitt 3 kippen. Gemessen, nicht vermutet — genau
+-- das ist beim ersten Lauf passiert.
+delete from public.berechtigungen where schluessel = 'test.oberhalb';
 
 select is(
   (select count(*)::int from information_schema.role_table_grants
@@ -357,6 +378,49 @@ select alike(
 
 update public.profiles set tier = 'impact' where id = 'a1000000-0000-0000-0000-000000000006';
 
+-- ══ 4b · Vorlagen folgen den Events ════════════════════════════════════════
+-- Eine Vorlage ist kein eigener Gegenstand, sondern ein Geraet zum Anlegen von
+-- Events: `event_serie_erzeugen` ist SECURITY INVOKER und legt die Termine als
+-- Aufrufer an. Ohne dieselbe Huerde koennte ein Konto eine Vorlage anlegen und
+-- daraus nichts erzeugen — eine Flaeche, die auf halbem Weg an der RLS endet.
+-- Befund des Diff-Reviews (LOW, als veralteter Policy-Kommentar gemeldet; die
+-- Unstimmigkeit dahinter war groesser als der Kommentar).
+
+select is(
+  (select pg_temp.try_as('a1000000-0000-0000-0000-000000000006',
+     $$insert into public.event_vorlagen
+         (id, host_id, title, visibility, ortszeit, zeitzone)
+       values ('a7000000-0000-0000-0000-000000000006',
+               'a1000000-0000-0000-0000-000000000006', 'Vorlage von Rang 6',
+               'members', '19:00', 'Europe/Berlin')$$)),
+  'OK', 'Rang 6 legt eine Vorlage an');
+
+select alike(
+  (select pg_temp.try_as('a1000000-0000-0000-0000-000000000004',
+     $$insert into public.event_vorlagen
+         (host_id, title, visibility, ortszeit, zeitzone)
+       values ('a1000000-0000-0000-0000-000000000004', 'Vorlage von Rang 4',
+               'members', '19:00', 'Europe/Berlin')$$)),
+  'FEHLER:42501%', 'Rang 4 legt keine Vorlage an — sie folgt dem Event');
+
+select is(
+  (select pg_temp.try_as('a1000000-0000-0000-0000-000000000006',
+     $$update public.event_vorlagen set title = 'Vorlage berichtigt'
+        where id = 'a7000000-0000-0000-0000-000000000006'$$)),
+  'OK', 'Der Host pflegt seine Vorlage weiter');
+
+select is(
+  (select title from public.event_vorlagen
+    where id = 'a7000000-0000-0000-0000-000000000006'),
+  'Vorlage berichtigt',
+  '… und die Berichtigung ist WIRKLICH angekommen');
+
+select is(
+  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000004',
+    $$select count(*)::int from public.event_vorlagen
+       where id = 'a7000000-0000-0000-0000-000000000006'$$),
+  0, 'Eine fremde Vorlage bleibt unsichtbar — das SELECT ist unveraendert eng');
+
 -- ══ 5 · Die Clubschwelle ist NICHT mitgewandert ════════════════════════════
 
 select is(pg_temp.als_text('a1000000-0000-0000-0000-000000000004',
@@ -457,15 +521,19 @@ select cmp_ok(
     $$select count(*)::int from public.search_directory()$$),
   '>', 1, 'Rang 6 bekommt mehr als die eigene Zeile aus dem Verzeichnis');
 
-select cmp_ok(
+-- `is(…, 1)` und nicht `cmp_ok(…, '<=', 1)`: `als_zahl` gibt im Fehlerfall -1
+-- zurueck, und -1 ist kleiner als 1 — eine Ausnahme haette sich als bestanden
+-- gelesen. Beide Konten sind `is_public` und bestaetigt, finden sich also ueber
+-- den Selbst-Zweig und sehen GENAU eine Zeile. Befund des Diff-Reviews (LOW).
+select is(
   pg_temp.als_zahl('a1000000-0000-0000-0000-000000000005',
     $$select count(*)::int from public.search_directory()$$),
-  '<=', 1, 'Rang 5 bekommt hoechstens die eigene Zeile');
+  1, 'Rang 5 bekommt genau die eigene Zeile');
 
-select cmp_ok(
+select is(
   pg_temp.als_zahl('a1000000-0000-0000-0000-000000000004',
     $$select count(*)::int from public.search_directory()$$),
-  '<=', 1, 'Rang 4 bekommt hoechstens die eigene Zeile');
+  1, 'Rang 4 bekommt genau die eigene Zeile');
 
 select isnt_empty(
   $$ select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -511,6 +579,28 @@ select cmp_ok(
     $$select count(*)::int from public.profiles_public$$),
   '>', 1,
   'OFFEN: Rang 4 liest `profiles_public` ohne Filter — derselbe Verschluss');
+
+-- Und die weitere Haelfte desselben Befunds, die bisher nicht festgenagelt war:
+-- `profiles_public` traegt GAR KEINE Rangpruefung, nur `is_activated()` des
+-- Aufrufers. Ein Konto AUSSERHALB des Clubs liest die Sicht also ebenso. Die
+-- Anforderung im `directory-search`-Delta sagt das („ohne Rücksicht auf seine
+-- Stufe"), ihr Szenario nannte aber Rang 4 — gemeldet im Diff-Review (LOW).
+select cmp_ok(
+  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000003',
+    $$select count(*)::int from public.profiles_public$$),
+  '>', 1,
+  'OFFEN: auch Rang 3 liest `profiles_public` ohne Filter — die Sicht traegt '
+  'keine Rangpruefung');
+
+-- Die Gegenprobe, die den Unterschied zwischen den beiden Relationen festhaelt:
+-- `profiles` traegt sehr wohl Rang 4, Rang 3 bekommt dort hoechstens die eigene
+-- Zeile. Ohne sie saehe der Befund nach „alles offen" aus, und der Verschluss
+-- in `verzeichnis-dicht` haette zwei verschiedene Probleme als eines behandelt.
+select is(
+  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000003',
+    $$select count(*)::int from public.profiles$$),
+  1, 'Rang 3 bekommt aus `profiles` genau die eigene Zeile — DIESE Relation '
+     'traegt die Clubschwelle');
 
 select * from finish();
 rollback;

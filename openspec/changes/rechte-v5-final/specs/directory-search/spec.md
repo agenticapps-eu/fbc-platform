@@ -48,12 +48,31 @@ Ersatz sind deshalb ein Schritt und nicht zwei.
 - **THEN** greift das Rechte-Gate, und `search_directory` gäbe ihm ohnehin nur
   die eigene Zeile
 
-#### Scenario: Der Rohzugriff ist offen und das ist festgehalten
+#### Scenario: Der Rohzugriff auf die Sicht hängt an KEINEM Rang
 
-- **WHEN** ein aktiviertes Mitglied ab Rang 4 `select` auf `profiles_public`
-  oder `profiles` ohne Filter versucht
+<!-- Berichtigt nach dem Diff-Review: die erste Fassung nannte „ab Rang 4" für
+     beide Relationen. Das ist für `profiles` richtig und für `profiles_public`
+     zu eng — die Sicht prüft nur die Aktivierung des Aufrufers. Die
+     Anforderung oben sagte es schon („ohne Rücksicht auf seine Stufe"), ihr
+     Szenario nicht. -->
+
+- **WHEN** ein aktiviertes Mitglied **auf beliebiger Stufe**, auch ausserhalb
+  des Clubs, `select` auf `profiles_public` ohne Filter versucht
 - **THEN** kommen Zeilen zurück — der Zustand ist benannt, nicht behauptet
   behoben, und sein Verschluss ist ein eigener Change
+
+#### Scenario: Der Rohzugriff auf die Basistabelle hängt an Rang 4
+
+- **WHEN** ein aktiviertes Mitglied ab Rang 4 `select` auf `profiles` ohne
+  Filter versucht
+- **THEN** kommen fremde Zeilen zurück, einschliesslich der Profile mit
+  `is_public = false`
+
+#### Scenario: Unterhalb des Clubs gibt die Basistabelle nur die eigene Zeile
+
+- **WHEN** ein aktiviertes Mitglied auf Rang 3 dasselbe versucht
+- **THEN** kommt genau die eigene Zeile zurück — die beiden Relationen sind
+  nicht derselbe Fall, und der Verschluss muss beide getrennt behandeln
 
 ### Requirement: Liste und erweiterte Spalten tragen dieselbe Schwelle
 

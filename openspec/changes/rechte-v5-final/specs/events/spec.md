@@ -58,3 +58,45 @@ Die Teilnahme SHALL davon unberührt bleiben: sie liegt bei der Clubschwelle
 
 - **WHEN** ein Mitglied ohne `events.erstellen` die Eventliste öffnet
 - **THEN** erscheint kein „Event anlegen" und kein Formular dafür
+
+### Requirement: Eine Vorlage folgt dem Event, das sie erzeugt
+
+Das System SHALL einen INSERT in `public.event_vorlagen` an dasselbe Recht
+binden wie das Event selbst: `events.erstellen` (`min_rank = 6`). UPDATE, DELETE
+und SELECT eigener Vorlagen SHALL unverändert beim Eigentum bleiben.
+
+**Der Grund ist eine Kette, kein Prinzip.** `event_serie_erzeugen` ist
+`SECURITY INVOKER` und legt die Termine als **Aufrufer** an. Ein Konto ohne
+`events.erstellen` könnte also eine Vorlage anlegen, eine Wiederholungsregel
+pflegen — und beim Erzeugen an der RLS scheitern. Das wäre eine Fläche, die auf
+halbem Weg endet, und der Fehler erschiene erst nach der Arbeit.
+
+Die abgelöste Policy `vorlagen_write_host` SHALL nicht mehr existieren; ihr
+Kommentar nannte ausdrücklich, dass „Rechte wie bei Events" damals „aktiviert
+und eigene Zeile" bedeute — und dieser Satz ist mit der neuen Insert-Schwelle
+falsch geworden.
+
+#### Scenario: Ein IMPACT-Konto legt eine Vorlage an
+
+- **GIVEN** ein aktiviertes Mitglied, das `events.erstellen` trägt
+- **WHEN** es eine Vorlage mit sich selbst als Host anlegt
+- **THEN** gelingt der INSERT
+
+#### Scenario: Ein DISCOVER-Konto legt keine an
+
+- **GIVEN** ein aktiviertes Mitglied auf Rang 4
+- **WHEN** es dasselbe versucht
+- **THEN** wird der INSERT abgelehnt
+
+#### Scenario: Ein abgestiegener Host pflegt seine Vorlage weiter
+
+- **GIVEN** ein Host mit einer bestehenden Vorlage, dessen Stufe anschliessend
+  auf Rang 4 gesetzt wird
+- **WHEN** er sie berichtigt
+- **THEN** gelingt es, und die Änderung steht in der Zeile
+
+#### Scenario: Eine fremde Vorlage bleibt unsichtbar
+
+- **WHEN** ein beliebiges aktiviertes Mitglied die Vorlage eines anderen Hosts
+  liest
+- **THEN** kommt keine Zeile zurück — das SELECT ist unverändert eng

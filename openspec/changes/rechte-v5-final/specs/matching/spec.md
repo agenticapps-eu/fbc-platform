@@ -65,6 +65,16 @@ Die Zeilen eines Kontos, dessen Stufe unter Rang 5 liegt, SHALL in der Datenbank
 bleiben. Ein Aufstieg SHALL sie wieder sichtbar machen, ohne dass das Matching
 erneut laufen muss.
 
+**Eine Nebenwirkung, die benannt sein will.** Eine Kontaktanfrage kann sich auf
+einen Vorschlag berufen (`contact_requests.match_id`), und die Oberfläche
+ermittelt diesen Bezug, indem sie `matches` liest. Ohne das Recht kommt dort
+keine Zeile, die Anfrage entsteht also **unverknüpft**, und
+`handle_contact_request_change` hebt den Status des Vorschlags nie an. Das SHALL
+als hinnehmbar gelten und nicht als Fehler: ein Konto ohne `vorschlaege` sieht
+Vorschläge gar nicht und kann sich deshalb auch nicht sinnvoll auf einen
+berufen. Die Anfrage selbst gelingt unverändert — Entscheidung E4 hält
+Kontaktanfragen ab Rang 4 offen. Gefunden im Diff-Review.
+
 #### Scenario: Participant with the right reads their match
 
 - **WHEN** a member holding `vorschlaege` selects `matches` where they are

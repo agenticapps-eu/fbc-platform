@@ -1,8 +1,12 @@
 ## 1. Fundament in der Datenbank
 
-- [x] 1.1 pgTAP-Datei `supabase/tests/berechtigungen_test.sql` anlegen und in die
-      Dateiliste von `.github/workflows/ci.yml` eintragen; RED, weil
-      `public.berechtigungen` noch nicht existiert
+- [x] 1.1 pgTAP-Datei anlegen und in die Dateiliste von
+      `.github/workflows/ci.yml` eintragen; RED, weil `public.berechtigungen`
+      noch nicht existiert. **Berichtigt:** geplant war eine eigene
+      `berechtigungen_test.sql`; entstanden ist Abschnitt 1 von
+      `supabase/tests/rechte_v5_test.sql`, und nur diese Datei steht in
+      `ci.yml`. Eine zweite Datei für fünf Zusagen über dieselbe Tabelle hätte
+      zwei Fixture-Blöcke gebraucht
 - [x] 1.2 Migration `supabase/migrations/<ts>_berechtigungen.sql`: Tabelle
       `berechtigungen (schluessel pk, min_rank, beschreibung)`, Seed mit den
       zehn Zeilen aus SPEC 01, RLS an, **kein** Tabellenrecht für `anon`/
@@ -14,7 +18,11 @@
       Schlüssel sortiert, leeres Array ohne Sitzung/Aktivierung
 - [x] 1.5 Check-Constraint `min_rank >= 5` auf `berechtigungen`, damit die
       Clubschwelle nicht als Recht hineinrutschen kann
-- [x] 1.6 `supabase db reset` lokal, pgTAP GRÜN für 1.1
+- [x] 1.6 pgTAP GRÜN für 1.1. **Berichtigt:** kein `db reset` — der lokale
+      Stack ist mit anderen Sitzungen geteilt, und ein Reset nimmt deren Daten
+      mit. Stattdessen `supabase migration up`, plus `migration repair` für
+      zwei Migrationen, deren Rümpfe eine frühere Sitzung von Hand eingespielt
+      hatte (Schema voraus, Historie hinterher — dokumentierte Falle)
 
 ## 2. Schwellen in der Datenbank
 
@@ -38,8 +46,10 @@
 
 ## 3. Den Restbefund festschreiben, nicht beheben
 
-- [x] 3.1 `src/types/database.types.ts` von Hand nachziehen: `darf`,
-      `meine_rechte` (kein `gen types` darüberlaufen lassen)
+- [x] 3.1 `src/lib/database.types.ts` von Hand nachziehen: `darf`,
+      `meine_rechte` (kein `gen types` darüberlaufen lassen). **Berichtigt:**
+      die Aufgabe nannte `src/types/…`; die handgepflegte Datei liegt unter
+      `src/lib/`
 - [x] 3.2 Linear-Issue für `verzeichnis-dicht` anlegen, unter AGE-999, mit der
       gemessenen Liste der 20 Abfragestellen und den zwei Fallen (Einbettung
       `membership_tiers(level_rank)`, `update().select()`) — **AGE-1001**
@@ -63,9 +73,44 @@
 - [x] 4.7 `MemberDirectory`: erweiterte Filter an `useDarf("suche_biete")`
 - [x] 4.8 `EventsList`: „Event anlegen" und das Formular an
       `useDarf("events.erstellen")`
-- [x] 4.9 `PublicProfilePage`: SUCHE/BIETE-Abschnitt an `useDarf("suche_biete")`
+- [x] 4.9 `PublicProfilePage`: **kein Gate, nur der Erklärsatz berichtigt.**
+      Die Abschnitte „Ich biete" und „Ich suche" hängen an
+      `zeigt(biete)`/`zeigt(suche)` — eine leere RLS-Antwort lässt sie ganz
+      entfallen, es entsteht also keine Überschrift über nichts, und ein Gate
+      wäre eine zweite Prüfung vor einer, die hält. Geändert wurde der Satz, der
+      das Such-/Bieteprofil ab DISCOVER versprach; er nennt jetzt FOCUS
 - [x] 4.10 Vitest je Stelle aus 4.4–4.9, jeweils mit und ohne Recht
 - [x] 4.11 `pnpm lint`, `pnpm typecheck`, `pnpm test` grün
+
+## 4b. Befunde der beiden Reviews (nachgezogen)
+
+- [x] 4b.1 `useDarf` gibt `laedt` und `fehler` getrennt heraus; die Regel „ein
+      Ladezustand ist ein Moment, ein Fehler ein Zustand" steht im Kopf des
+      Hooks, und jede Fläche folgt ihr nach ihrer Art
+- [x] 4b.2 `MembershipGate.rechte.test.tsx` (neu): laden zeigt nichts, Fehler
+      lässt durch
+- [x] 4b.3 **CRITICAL:** `saveMatchingProfile` fügt jetzt VOR dem Löschen ein
+      und löscht nach Kennung. Vorher: Löschen gelingt (nur Eigentum),
+      Einfügen scheitert (braucht `suche_biete`) — ein DISCOVER-Konto verlor
+      seine Angebote und Gesuche endgültig
+- [x] 4b.4 `AngeboteGesuchePage`: ohne `suche_biete` kein Formular, sondern der
+      Bestand lesend plus der Weg über Support
+- [x] 4b.5 `event_vorlagen`: Anlegen folgt dem Event (`events.erstellen`),
+      Pflegen bleibt beim Eigentum; dazu `VorlagenPanel` und eine eigene
+      Testdatei. Grund: `event_serie_erzeugen` ist SECURITY INVOKER
+- [x] 4b.6 Kommentare auf allen neuen Policies — die abgelöste
+      `events_write_host` trug einen, und derselbe Verlust ist einmal zuvor
+      protokolliert
+- [x] 4b.7 Der Check-Constraint wird jetzt wirklich gemessen (`throws_ok` mit
+      `23514` als Eigentümer, plus Positivkontrolle). Vorher scheiterte die
+      Einfügung am fehlenden Tabellenrecht, bevor der Constraint griff
+- [x] 4b.8 Der Drift-Wächter vergleicht gegen die pgTAP-Erwartung statt gegen
+      die erste Migration — sonst bräche die Kernzusage bei der ersten
+      Verschiebung. Gegenprobe gefahren: eine verschobene Schwelle macht ihn rot
+- [x] 4b.9 `cmp_ok(… '<=', 1)` ersetzt durch `is(…, 1)`, weil `als_zahl` im
+      Fehlerfall `-1` liefert und eine Ausnahme sich als bestanden las
+- [x] 4b.10 `EventsList.vorlagen.test.tsx` mockt das Recht ausdrücklich — es war
+      grün, weil der Abruffehler offen fällt, nicht weil ein Recht da war
 
 ## 5. Dokumentation und Abschluss
 
@@ -74,7 +119,13 @@
 - [x] 5.2 ADR in `docs/decisions/`: warum zwei Mechanismen (Tür vs. Recht) und
       warum `profiles_public` kennungsgebunden statt stufengebunden
 - [x] 5.3 `openspec validate --all` grün
-- [x] 5.4 Sichtprobe gegen den lokalen Stack mit je einem Konto auf Rang 4, 5, 6
+- [x] 5.4 Probe gegen den lokalen Stack mit je einem echten Konto auf Rang 4, 5
+      und 6 — **durch PostgREST**, nicht gegen einen Mock. Sie schliesst die
+      Lücke zwischen pgTAP (Datenbank) und Vitest (Oberfläche gegen einen
+      geseeten Cache): dass PostgREST die Funktionen sieht und dass
+      `rpc("meine_rechte")` ein ARRAY liefert und keine Zeilenmenge, belegt
+      keines von beiden. Ergebnis in der PR-Beschreibung; danach 28 Profile und
+      28 Konten wie vorher
 - [ ] 5.5 Code-Review auf dem Diff, Befunde abarbeiten
 - [ ] 5.6 Verifikation: jede Zusage aus den Deltas gegen die laufende Datenbank
       belegt, Zahlen protokolliert

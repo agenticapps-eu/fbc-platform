@@ -43,6 +43,21 @@ vi.mock("../../providers/auth-context", () => ({
   useAuth: () => ({ user: angemeldet ? { id: UID } : null }),
 }));
 
+/* AGE-1000: „Vorlage anlegen" haengt am Recht `events.erstellen`. Dieses
+   Fixture traegt es, weil die Zusagen dieser Datei Vorlagen messen und nicht
+   Stufen.
+
+   Ohne diesen Mock waere die Datei trotzdem gruen gewesen — der Hook haette
+   ohne Server einen Abruffehler gemeldet, und ein Fehler faellt nach der Regel
+   im Kopf von `useDarf` offen. Gruen aus dem falschen Grund also: der Knopf
+   waere erschienen, weil nichts bekannt war, nicht weil ein Recht da war. Dass
+   ein Konto OHNE das Recht ihn nicht bekommt, steht in
+   `EventsList.anlegen.test.tsx`. */
+vi.mock("../../hooks/useDarf", () => ({
+  useMeineRechte: () => ({ rechte: ["events.erstellen"], laedt: false, fehler: false }),
+  useDarf: (k: string) => ({ darf: k === "events.erstellen", laedt: false, fehler: false }),
+}));
+
 function vorlage(teil: Partial<VorlageItem> & { id: string; title: string }): VorlageItem {
   return {
     hostId: UID,
@@ -111,7 +126,10 @@ beforeEach(() => {
 
 describe("Vorlagen-Reiter", () => {
   it("steht als vierter Reiter in der Leiste und zählt die eigenen Vorlagen", async () => {
-    renderEvents([vorlage({ id: "v1", title: "Stammtisch" }), vorlage({ id: "v2", title: "Jour fixe" })]);
+    renderEvents([
+      vorlage({ id: "v1", title: "Stammtisch" }),
+      vorlage({ id: "v2", title: "Jour fixe" }),
+    ]);
 
     const leiste = await screen.findByRole("tablist");
     const reiter = within(leiste).getAllByRole("tab");
