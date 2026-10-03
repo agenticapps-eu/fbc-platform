@@ -968,7 +968,11 @@ export default function AppShell() {
             // Wirkung. Kein Thread wird hier geladen — die Zahl führt
             // `useUngelesen` ohnehin getrennt.
             <div className="flex h-16 shrink-0 items-center justify-center border-b border-[color:var(--thread-line)] px-2">
-              <span className="relative p-2 text-[color:var(--thread-muted)]">
+              {/* `--thread-chrome-ink`: im hellen Modus genau das alte
+                  `text-on-chrome` (#475569). `--thread-muted` waere dort
+                  #626f85 und damit sichtbar heller — die Zusage lautet „kein
+                  Pixel". Befund des Code-Reviews. */}
+              <span className="relative p-2 text-[color:var(--thread-chrome-ink)]">
                 <Icon name="messages" className="h-5 w-5" />
                 {(ungelesenFehlt || ungelesen.gesamt > 0) && (
                   // `aria-hidden`: die Zahl steht schon im Satz darunter.

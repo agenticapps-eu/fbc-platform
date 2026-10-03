@@ -36,10 +36,38 @@ const LEISTEN_TOKENS = [
   "--thread-line",
   "--thread-badge",
   "--thread-badge-ink",
+  "--thread-focus",
+  "--thread-chrome-ink",
+  "--thread-chrome-ink-hover",
 ] as const;
+
+/**
+ * Die Tokens, die der sekundäre Knopf in der Leiste liest — ALLE fünf.
+ *
+ * Die erste Fassung dieses Tests prüfte `--color-chrome` und
+ * `--color-on-chrome`, also genau die zwei, die umgelegt WAREN. Sie konnte
+ * deshalb nicht sehen, dass `hover:bg-chrome-elevated` auf dem navy-Wert stehen
+ * geblieben war und die Schrift beim Überfahren mit 1,0:1 verschwand. Ein Test,
+ * der nur prüft, was man schon getan hat, ist kein Wächter.
+ */
+const KNOPF_TOKENS = [
+  "--color-chrome",
+  "--color-on-chrome",
+  "--color-chrome-elevated",
+  "--color-chrome-border",
+  "--color-soft",
+] as const;
+
+/**
+ * CSS ohne Blockkommentare. `block()` zählt rohe Klammern; eine `{` in einem
+ * Kommentar verschöbe den Schnitt still. Heute enthält keiner eine — geprüft —,
+ * aber „heute keiner" ist keine Zusage über morgen. Befund des Code-Reviews.
+ */
+const CSS_OHNE_KOMMENTARE = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** Schneidet den Rumpf einer Regel heraus, deren Selektor exakt so beginnt. */
 function block(selektor: string): string {
+  const CSS = CSS_OHNE_KOMMENTARE;
   const i = CSS.indexOf(selektor);
   if (i < 0) throw new Error(`Selektor nicht gefunden: ${selektor}`);
   const auf = CSS.indexOf("{", i);
@@ -121,6 +149,52 @@ describe("Nachrichtenleiste: die Tokens sind gesetzt", () => {
     }
   });
 
+  it("laesst den hellen Modus unveraendert — Wert fuer Wert", () => {
+    // Die Spec sagt „im hellen Modus ändert sich NICHTS, kein Pixel". Das ist
+    // eine Zusage und keine Absicht, also wird sie geprüft: jeder Rückfall im
+    // `@theme`-Block muss GENAU der Wert sein, den die Fläche vorher trug.
+    //
+    // Das ist stärker als ein Screenshot: ein Bild belegt einen Moment, diese
+    // Liste belegt jeden künftigen auch. Der Code-Review hat zu Recht
+    // angemerkt, dass die Sichtprobe nur den dunklen Modus gemessen hat — und
+    // dabei zwei echte Abweichungen gefunden (Symbol und Pill im eingeklappten
+    // Rail), die jetzt über `--thread-chrome-ink` behoben sind.
+    const theme = block("@theme");
+    const paare: [string, string][] = [
+      ["--chat-rail-surface", "#ffffff"],
+      ["--thread-ink", "#1e2a3a"],
+      ["--thread-muted", "#626f85"],
+      ["--thread-hover", "#f6f8fb"],
+      ["--thread-line", "#e2e8f0"],
+      ["--thread-badge", "#2f6bd1"],
+      ["--thread-badge-ink", "#ffffff"],
+      ["--thread-focus", "#2f6bd1"],
+      // Die zwei, an denen die Zusage zuerst gebrochen war: vorher las das
+      // Symbol im Rail und der Pill `--color-on-chrome` (#475569) mit Hover
+      // `--color-on-chrome-active` (#1f53b0).
+      ["--thread-chrome-ink", "#475569"],
+      ["--thread-chrome-ink-hover", "#1f53b0"],
+    ];
+    for (const [name, soll] of paare) {
+      expect(wert(theme, name)?.toLowerCase(), `${name} im hellen Modus`).toBe(soll);
+    }
+  });
+
+  it("rechnet die helle Aktivflaeche richtig aus `accent-soft/40`", () => {
+    // Der frühere Wert war `bg-accent-soft/40`, also #EFF5FD zu 40 % auf Weiss.
+    // Die erste Fassung schrieb #F6FBFE — Grün und Blau richtig, Rot um 3
+    // daneben, in einem Kommentar, der behauptet, die Zahl sei ausgerechnet.
+    // Befund des Code-Reviews.
+    const mischen = (v: number) => Math.round(0.4 * v + 0.6 * 255);
+    const soll =
+      "#" +
+      [0xef, 0xf5, 0xfd]
+        .map(mischen)
+        .map((v) => v.toString(16).padStart(2, "0"))
+        .join("");
+    expect(wert(block("@theme"), "--thread-active")?.toLowerCase()).toBe(soll);
+  });
+
   it("überschreibt sie im dunklen Modus, und zwar NUR innerhalb der Leiste", () => {
     // Der Selektor ist die halbe Zusage: stünden die Tokens auf
     // `html[data-variant="navy"]`, färbte sich `ThreadList` auch auf `/chat`.
@@ -144,6 +218,45 @@ describe("Nachrichtenleiste: die Tokens sind gesetzt", () => {
     expect(wert(block('html[data-variant="navy"]'), "--sidebar-surface")?.toLowerCase()).toBe(
       "#081527",
     );
+  });
+
+  it("die Thread-Liste liest die Tokens wirklich", () => {
+    // Der Befund, der diesen Fall erzwingt: ohne ihn liesse sich `ThreadList`
+    // auf `text-ink` / `hover:bg-soft` / `divide-line` zurückdrehen, und die
+    // GANZE Testsuite bliebe grün — genau die Regression, gegen die dieser
+    // Change existiert. Die Flächenklasse der Leiste allein belegt nichts über
+    // die Liste darin.
+    const quelle = readFileSync("src/components/chat/ThreadList.tsx", "utf8");
+    for (const token of [
+      "--thread-ink",
+      "--thread-muted",
+      "--thread-hover",
+      "--thread-active",
+      "--thread-line",
+      "--thread-badge",
+      "--thread-badge-ink",
+      "--thread-focus",
+    ]) {
+      expect(quelle, `ThreadList liest ${token} nicht`).toContain(`var(${token})`);
+    }
+    // Und die Gegenprobe: keine Inhaltsfarbe mehr im Klassentext.
+    const ohneKommentare = quelle.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    for (const klasse of ["text-ink", "text-muted", "bg-soft", "divide-line", "bg-accent"]) {
+      expect(ohneKommentare, `ThreadList traegt noch ${klasse}`).not.toContain(`"${klasse}`);
+    }
+  });
+
+  it("jedes Leisten-Token wird von mindestens einer Quelldatei gelesen", () => {
+    // Ein Token, das niemand liest, ist tote Konfiguration — und ein Test, der
+    // nur „irgendeines wird benutzt" prüft, ist von einer einzigen Datei
+    // erfüllt.
+    const quellen = dateien("src")
+      .filter((p) => !/\.test\.[tj]sx?$/.test(p))
+      .map((p) => readFileSync(p, "utf8"))
+      .join("\n");
+    for (const token of LEISTEN_TOKENS) {
+      expect(quellen, `${token} wird nirgends gelesen`).toContain(`var(${token})`);
+    }
   });
 
   it("benutzt kein Token, das es nicht gibt", () => {
@@ -192,9 +305,14 @@ describe("Nachrichtenleiste: die Kontraste halten auf ALLEN drei Flächen", () =
     }
   });
 
-  it("das Ungelesen-Abzeichen hebt sich mit 3:1 von der Fläche ab", () => {
-    const v = kontrast(token("--thread-badge"), token("--chat-rail-surface"));
-    expect(auf2(v), `Abzeichen gegen Flaeche: ${auf2(v)}:1`).toBeGreaterThanOrEqual(3);
+  it("das Ungelesen-Abzeichen hebt sich auf ALLEN drei Flaechen mit 3:1 ab", () => {
+    // Es sitzt in der Thread-Zeile und wandert also mit ihr durch Hover und
+    // Aktivzustand. Die erste Fassung prüfte nur die Grundfläche — Befund des
+    // Code-Reviews.
+    for (const [wo, flaeche] of Object.entries(flaechen())) {
+      const v = kontrast(token("--thread-badge"), flaeche);
+      expect(auf2(v), `Abzeichen auf ${wo}: ${auf2(v)}:1`).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it("die Ziffer auf dem Abzeichen erfüllt 4,5:1", () => {
@@ -202,19 +320,60 @@ describe("Nachrichtenleiste: die Kontraste halten auf ALLEN drei Flächen", () =
     expect(auf2(v), `Ziffer auf Abzeichen: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("der sekundaere Knopf im Leerzustand hebt sich ab und ist lesbar", () => {
+  it("legt ALLE fuenf Tokens um, die der sekundaere Knopf liest", () => {
+    // `Button variant="secondary"` liest `border-chrome-border bg-chrome
+    // text-on-chrome hover:bg-chrome-elevated` und, aus `base`,
+    // `ring-offset-soft`. Fünf, nicht zwei — und zwei Knöpfe, nicht einer:
+    // „Mitglieder entdecken" im Leerzustand und „Weitere Gespräche" beim
+    // Blättern.
+    const leiste = block('html[data-variant="navy"] .fbc-chat-rail');
+    for (const name of KNOPF_TOKENS) {
+      expect(wert(leiste, name), `${name} ist in der Leiste nicht umgelegt`).not.toBeNull();
+    }
+  });
+
+  it("der sekundaere Knopf hebt sich ab und ist lesbar — ruhend UND unter dem Zeiger", () => {
     // „Noch kein Gespräch … Mitglieder entdecken" ist für ein neues Mitglied
-    // der Normalfall dieser Leiste. `Button variant="secondary"` trägt
-    // `bg-chrome text-on-chrome`; das unveränderte `#081527` hätte sich mit
-    // 1,3:1 von `#002B51` abgehoben, also praktisch nicht.
-    const flaeche = token("--color-chrome");
+    // der Normalfall dieser Leiste. Ohne Umlegung hätte sich `#081527` mit
+    // 1,3:1 von `#002B51` abgehoben; mit NUR den beiden ersten Tokens wäre die
+    // Schrift beim Überfahren auf `#0E1F38` gelandet — 1,0:1, also weg.
     const schrift = token("--color-on-chrome");
-    const gegenLeiste = kontrast(flaeche, token("--chat-rail-surface"));
-    const aufKnopf = kontrast(schrift, flaeche);
-    expect(auf2(gegenLeiste), `Knopf gegen Leiste: ${auf2(gegenLeiste)}:1`).toBeGreaterThanOrEqual(
-      3,
-    );
-    expect(auf2(aufKnopf), `Schrift auf Knopf: ${auf2(aufKnopf)}:1`).toBeGreaterThanOrEqual(4.5);
+    const flaechen = {
+      ruhend: token("--color-chrome"),
+      "unter dem Zeiger": token("--color-chrome-elevated"),
+    };
+    for (const [wo, flaeche] of Object.entries(flaechen)) {
+      const gegenLeiste = kontrast(flaeche, token("--chat-rail-surface"));
+      const aufKnopf = kontrast(schrift, flaeche);
+      expect(
+        auf2(gegenLeiste),
+        `Knopf ${wo} gegen Leiste: ${auf2(gegenLeiste)}:1`,
+      ).toBeGreaterThanOrEqual(3);
+      expect(auf2(aufKnopf), `Schrift auf Knopf ${wo}: ${auf2(aufKnopf)}:1`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
+  });
+
+  it("der Fokusring ist auf allen drei Flaechen sichtbar", () => {
+    // `ring-accent` trug auf `#002B51` nur 2,8:1 — unter den 3:1 für
+    // Bedienelemente, und schlechter als vor dieser Änderung (3,6:1 auf dem
+    // Chrome-Rail, 5,1:1 auf Weiss). Der Pill ist der EINZIGE Weg, die Leiste
+    // wieder einzuklappen.
+    const ring = token("--thread-focus");
+    for (const [wo, flaeche] of Object.entries(flaechen())) {
+      const v = kontrast(ring, flaeche);
+      expect(auf2(v), `Fokusring auf ${wo}: ${auf2(v)}:1`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("die chrome-artige Schrift der Leiste ist lesbar", () => {
+    // Das Symbol im eingeklappten Rail und der Pill. Sie lesen eigene Tokens,
+    // damit der HELLE Modus unverändert bleibt — hier geht es um den dunklen.
+    for (const name of ["--thread-chrome-ink", "--thread-chrome-ink-hover"] as const) {
+      const v = kontrast(token(name), token("--chat-rail-surface"));
+      expect(auf2(v), `${name}: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("die Trennlinie ist sichtbar — mindestens 1,3:1", () => {

@@ -112,11 +112,28 @@ ein Randfall.
 `.fbc-chat-rail`** umgelegt: `#D7E4F2` auf `#0C2043`, also ein heller Knopf auf
 dunkler Leiste (11,1:1 und 12,5:1).
 
-Das ist eine breite Keule für einen Knopf, und sie ist nur deshalb vertretbar,
-weil nach den übrigen Änderungen dieses Changes **kein anderer Verbraucher** von
-`--color-chrome` in der Leiste übrig ist: die Kopfzeilen und der
-Ungelesen-Punkt lesen `--thread-*`. Das steht als Vorbehalt im CSS-Kommentar,
-und die zwei Verhältnisse stehen als Test.
+**Berichtigt nach dem Code-Review — die erste Fassung dieses Absatzes war an
+zwei Stellen falsch, und beide hingen zusammen.**
+
+Sie behauptete „die beiden Chrome-Tokens" und „der einzige Verbraucher". Der
+Knopf liest **fünf** (`--color-chrome-border`, `--color-chrome`,
+`--color-on-chrome`, `--color-chrome-elevated` und, aus `base`,
+`--color-soft` als Versatz des Fokusrings), und es sind **zwei** Knöpfe:
+„Mitglieder entdecken" im Leerzustand und „Weitere Gespräche" beim Blättern.
+
+Die Folge war kein Schönheitsfehler: `hover:bg-chrome-elevated` blieb auf dem
+navy-Wert `#0E1F38`, und die Schrift `#0C2043` darauf trägt **1,0:1**. Beim
+Überfahren wäre die Aufschrift schlicht verschwunden — derselbe Fehler, gegen
+den die Umlegung existiert, nur einen Zustand weiter.
+
+Und der Test konnte es nicht sehen, weil er genau die zwei Tokens prüfte, die
+umgelegt **waren**. Ein Wächter, der nur nachsieht, was man schon getan hat,
+bewacht nichts. Er prüft jetzt alle fünf und beide Zustände des Knopfes.
+
+Die Keule bleibt vertretbar, aber aus einem schwächeren Grund als behauptet:
+nicht weil nur ein Element betroffen ist, sondern weil alle betroffenen
+Elemente derselbe Knopf in zwei Vorkommen sind und die Umlegung die Leiste
+nicht verlässt — was `/chat` im Bild belegt.
 
 Verworfen: den Knopf im Leerzustand zu einem Textlink machen. Er steht derselbe
 auf `/chat`, und dort ist der Knopf richtig — eine Komponente mit zwei

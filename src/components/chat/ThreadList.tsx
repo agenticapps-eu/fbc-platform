@@ -50,6 +50,13 @@ export function ThreadList({
               }
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+                // Vor AGE-1002 trug diese Zeile GAR KEINEN sichtbaren Fokus —
+                // sie verliess sich auf den Standardumriss des Browsers. Auf
+                // heller Flaeche ging das durch; auf der dunkelblauen Leiste
+                // ist es eine Zumutung. Der Ring liest denselben Token wie der
+                // Pill. Befund des Code-Reviews (als Altlast gemeldet, hier
+                // behoben, weil diese Aenderung sie verschaerft).
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--thread-focus)]",
                 active ? "bg-[var(--thread-active)]" : "hover:bg-[var(--thread-hover)]",
               )}
             >

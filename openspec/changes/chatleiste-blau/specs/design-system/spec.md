@@ -13,6 +13,14 @@ unterscheiden, ist ausdrücklich gewollt, solange Frage E7 offen ist.
 Im Modus `hell` SHALL die Leiste **unverändert** weiss bleiben — SPEC 12 verlangt
 „dieselbe Grundwirkung wie die linke Navigation", und die ist dort weiss.
 
+**Und zwar Wert für Wert**, nicht nur dem Eindruck nach: jeder Rückfall SHALL
+genau der Wert sein, den die betroffene Fläche vorher trug. Das betrifft
+besonders die Elemente, die vorher **Chrome**-Farben trugen und nicht
+Inhaltsfarben — das Symbol im eingeklappten Rail und der Einklapp-Pill
+(`#475569`, Hover `#1F53B0`). Sie SHALL eigene Tokens führen und SHALL NOT auf
+den Vorschautext-Token fallen, der `#626F85` ist und im hellen Modus sichtbar
+anders aussähe.
+
 Die Fläche SHALL über **einen** Token `--chat-rail-surface` gesetzt werden, nicht
 über `--color-chrome`: die linke Navigation hängt an `--color-chrome`, und sie
 soll hier gerade nicht mitwandern.
@@ -37,6 +45,19 @@ SHALL in beiden Modi hell bleiben.
 
 - **WHEN** ein Mitglied im Modus `hell` die Leiste in beiden Zuständen ansieht
 - **THEN** ist sie weiss, wie die linke Navigation dort
+
+#### Scenario: Auch die Schrift im hellen Modus ist unverändert
+
+- **WHEN** die Rückfallwerte der Leisten-Tokens geprüft werden
+- **THEN** trägt jeder genau den Wert, den die betroffene Fläche vor der
+  Änderung hatte — einschliesslich des Symbols im eingeklappten Rail und des
+  Pills, die Chrome-Farben trugen und keine Inhaltsfarben
+
+#### Scenario: Der Fokus ist auf der Leiste sichtbar
+
+- **WHEN** ein Mitglied den Einklapp-Pill oder eine Zeile der Thread-Liste im
+  Modus `navy` mit der Tastatur erreicht
+- **THEN** hebt sich der Ring mit mindestens 3:1 von der Fläche ab
 
 #### Scenario: Die Chat-Fenster bleiben hell
 
@@ -66,20 +87,46 @@ Die Werte für `navy` und die gerechneten Verhältnisse SHALL festgehalten sein:
 |---|---|---|---|---|
 | Name, Kopfzeile | `#FFFFFF` | 14,3:1 | 12,1:1 | 10,1:1 |
 | Vorschautext, Zeitstempel | `#B9CCE6` | 8,8:1 | 7,4:1 | 6,2:1 |
-| Ungelesen-Abzeichen (Fläche) | `#5B90E0` | 4,5:1 | — | — |
+| Ungelesen-Abzeichen (Fläche) | `#5B90E0` | 4,4:1 | 3,8:1 | 3,1:1 |
 | Ziffer auf dem Abzeichen | `#00172B` | 5,6:1 auf dem Abzeichen | — | — |
 
 Hover SHALL `rgb(255 255 255 / 0.06)` sein, die aktive Zeile
 `rgb(255 255 255 / 0.12)`, die Trennlinie `rgb(255 255 255 / 0.16)`.
 
 **Der Leerzustand gehört dazu, und er ist der Normalfall.** „Noch kein
-Gespräch … Mitglieder entdecken" sieht jedes neue Mitglied, und sein
-sekundärer Knopf trägt `bg-chrome text-on-chrome`. Im dunklen Modus ist Chrome
-`#081527` und hebt sich von `#002B51` mit **1,3:1** ab — praktisch nicht. Die
-beiden Chrome-Tokens SHALL deshalb **innerhalb der Leiste** umgelegt werden, auf
-einen hellen Knopf (`#D7E4F2`, 11,1:1 gegen die Fläche) mit dunkler Schrift
-(`#0C2043`, 12,5:1 darauf). Diese Umlegung SHALL auf die Leiste beschränkt
-bleiben und SHALL NOT auf `html[data-variant="navy"]` stehen.
+Gespräch … Mitglieder entdecken" sieht jedes neue Mitglied, und sein sekundärer
+Knopf trägt `bg-chrome text-on-chrome`. Im dunklen Modus ist Chrome `#081527`
+und hebt sich von `#002B51` mit **1,3:1** ab — praktisch nicht.
+
+Die Tokens dieses Knopfes SHALL deshalb **innerhalb der Leiste** umgelegt
+werden, und zwar **alle fünf, die er liest**: `--color-chrome` (`#D7E4F2`,
+11,1:1 gegen die Fläche), `--color-on-chrome` (`#0C2043`, 12,5:1 darauf),
+`--color-chrome-elevated` (der Zustand unter dem Zeiger, `#C3D6EC`),
+`--color-chrome-border` und `--color-soft` (der Versatz des Fokusrings, der auf
+die Fläche **dahinter** gehört, also auf die Leiste).
+
+**Die Teilmenge ist der Fehler, vor dem diese Aufzählung warnt.** Eine Umlegung
+nur der ersten beiden verschiebt den Defekt in den Hover-Zustand: die Schrift
+`#0C2043` stünde dann auf dem unveränderten `#0E1F38` und wäre mit **1,0:1**
+weg. Ebenso SHALL die Zusage nicht auf **einen** Knopf lauten — neben dem
+Leerzustand steht „Weitere Gespräche", sobald die Liste blättert.
+
+Diese Umlegung SHALL auf die Leiste beschränkt bleiben und SHALL NOT auf
+`html[data-variant="navy"]` stehen.
+
+**Der Fokusring SHALL die Schwelle für Bedienelemente halten.** Der
+Einklapp-Pill ist der einzige Weg, die Leiste wieder einzuklappen; `ring-accent`
+(`#2F6BD1`) trägt auf `#002B51` nur **2,8:1** und wäre damit schlechter als vor
+dieser Änderung (3,6:1 auf dem Chrome-Rail, 5,1:1 auf Weiss). Die Leiste SHALL
+einen eigenen Fokus-Token führen (`#B9CCE6`, mindestens 3:1 auf allen drei
+Flächen), und die Zeilen der Thread-Liste SHALL ihn ebenfalls tragen — sie
+hatten vorher **gar keinen** sichtbaren Fokus und verliessen sich auf den
+Standardumriss des Browsers.
+
+**Was bewusst NICHT umgelegt wird:** der Avatar in der Thread-Zeile
+(`bg-accent-soft` mit `text-accent-strong`). Gerechnet: die Initialen stehen mit
+**6,5:1** auf der Scheibe, und die Scheibe hebt sich deutlich von der Leiste ab.
+Eine Umlegung wäre eine dritte Keule für ein Element, das die Schwelle hält.
 
 **Warum die Werte und nicht nur die Schwelle hier stehen:** die drei Flächen
 unterscheiden sich um wenige Prozent, und die naheliegende Wahl fällt durch. Eine

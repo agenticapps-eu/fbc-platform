@@ -44,7 +44,12 @@
 ## 4. Abschluss
 
 - [x] 4.1 `openspec validate --all` grün
-- [ ] 4.2 Code-Review auf dem Diff, Befunde abarbeiten
+- [x] 4.2 Code-Review auf dem Diff, Befunde abarbeiten — ein Reader, dreizehn
+      Befunde, der schwerste: `hover:bg-chrome-elevated` war nicht umgelegt, die
+      Knopfaufschrift waere beim Ueberfahren mit 1,0:1 verschwunden. Dazu der
+      Fokusring (2,8:1, eine Verschlechterung), zwei Abweichungen im HELLEN
+      Modus, und dass kein Test festhielt, dass `ThreadList` die Tokens
+      ueberhaupt liest. Alles behoben, die Gegenproben gefahren
 - [x] 4.3 `docs/technisches-handbuch.md` nachziehen: `--chat-rail-surface` in
       der Token-Tabelle, ein Absatz zur Kaskade samt der Falle „wer die Liste
       auf eine dritte dunkle Fläche stellt, setzt die Tokens dort". Dazu eine
