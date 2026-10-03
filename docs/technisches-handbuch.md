@@ -498,17 +498,44 @@ Zwei Themes über **ein** Vokabular an Gestaltungswerten. Das Theme wird vor
 dem ersten Bildaufbau gesetzt (kein Aufblitzen) und ist eine Einstellung des
 Mitglieds.
 
-> **„navy" ist kein Dunkelmodus.** Der navy-Block in `src/index.css:208–222`
-> überschreibt ausschließlich die Chrome-Werte — Seitenleiste und Kopfzeile.
-> Die Inhaltsschicht ist in beiden Themes identisch; die Spezifikation sagt
-> das ausdrücklich (`openspec/specs/design-system/spec.md:17-20`). Einen
+> **„navy" ist kein Dunkelmodus.** Der navy-Block in `src/index.css`
+> überschreibt die Chrome-Werte — Seitenleiste und Kopfzeile. Die
+> Inhaltsschicht ist in beiden Themes identisch; die Spezifikation sagt das
+> ausdrücklich (`openspec/specs/design-system/spec.md`). Einen
 > Dark-Reading-Mode gibt es seit AGE-499 bewusst nicht.
+>
+> **Eine zweite Ausnahme seit AGE-1002**, und sie ist eng: ein weiterer Block
+> färbt die rechte Nachrichtenleiste, und nur sie. Er steht auf
+> `html[data-variant="navy"] .fbc-chat-rail` und nicht auf
+> `html[data-variant="navy"]` — genau deshalb bleibt `/chat` hell. Siehe
+> darunter. (Die Zeilennummern, die hier bis AGE-1002 standen, sind entfallen:
+> sie waren bei jeder Änderung an der Datei falsch.)
 
 | Wert | Token | Gilt |
 |---|---|---|
 | Akzent | `--color-accent: #2f6bd1` | in **beiden** Themes gleich |
 | Akzent auf der Leiste | `--color-accent-on-chrome: #5b90e0` | nur navy-Chrome |
 | Fließtext | `--color-ink: #1e2a3a` | in beiden gleich — nie reines Schwarz |
+| Fläche der Nachrichtenleiste | `--chat-rail-surface: #002b51` | nur navy, nur die rechte Leiste |
+
+> **Die rechte Leiste ist seit AGE-1002 ein eigener Fall.** Sie trägt im
+> dunklen Modus `#002B51` — ein- und ausgeklappt dieselbe Fläche, und
+> ausdrücklich **nicht** das `#081527` der linken Navigation. Die Farbe ist auf
+> dkrealinvest.com gemessen und von Detlev im Meeting am 03.10.2026 benannt; ob
+> die linke Navigation nachzieht, ist die offene Frage E7.
+>
+> Alles in der Leiste liest `--thread-*`-Tokens, die im `@theme`-Block auf die
+> Inhaltsfarben zurückfallen und **nur innerhalb von `.fbc-chat-rail`**
+> überschrieben werden. Deshalb braucht `ThreadList` kein Variantenargument und
+> existiert nicht zweimal: dieselbe Komponente steht auf `/chat` auf heller
+> Fläche und in der Leiste auf dunkler. **Wer sie auf eine dritte, dunkle
+> Fläche stellt, setzt die Tokens dort** — sonst schreibt sie in Inhaltsfarben.
+>
+> Die Kontraste sind gerechnet und stehen als Test
+> (`src/index.chatleiste-tokens.test.ts`), nicht als Notiz. Eine Farbänderung,
+> die eine Schwelle reisst, wird dort rot — auch die der beiden Chrome-Tokens,
+> die innerhalb der Leiste für den sekundären Knopf im Leerzustand umgelegt
+> sind.
 
 Schriften Fraunces und Inter, **von der eigenen Domain ausgeliefert**.
 

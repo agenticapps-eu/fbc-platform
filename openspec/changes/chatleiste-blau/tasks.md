@@ -45,7 +45,11 @@
 
 - [x] 4.1 `openspec validate --all` grün
 - [ ] 4.2 Code-Review auf dem Diff, Befunde abarbeiten
-- [ ] 4.3 `docs/technisches-handbuch.md` nachziehen, wo es die Leisten-Flächen
-      nennt
+- [x] 4.3 `docs/technisches-handbuch.md` nachziehen: `--chat-rail-surface` in
+      der Token-Tabelle, ein Absatz zur Kaskade samt der Falle „wer die Liste
+      auf eine dritte dunkle Fläche stellt, setzt die Tokens dort". Dazu eine
+      Berichtigung: der Satz „der navy-Block überschreibt AUSSCHLIESSLICH die
+      Chrome-Werte" stimmte nach diesem Change nicht mehr, und die
+      Zeilennummern darin waren ohnehin bei jeder Änderung an der Datei falsch
 - [ ] 4.4 Archivieren samt Vorab-Sonde auf den Neuigkeiten-Eintrag, dann
       `pnpm release:entries`
