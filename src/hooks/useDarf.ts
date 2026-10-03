@@ -12,12 +12,30 @@ import { useAuth } from "../providers/auth-context";
  * damit zwei Änderungen an zwei Orten. Die Oberfläche fragt jetzt nach dem
  * Namen des Rechts; wo die Schwelle liegt, weiß nur die Datenbank.
  *
- * ══ DER LADEZUSTAND IST KEINE ABLEHNUNG ═══════════════════════════════════
- * `laedt` wird eigens herausgegeben, weil der häufigste Fehler dieses Repos
- * genau hier sitzt: `(levelRank ?? 0)` machte aus „noch nicht geladen" ein
- * „Rang 0" und zeigte einem berechtigten Mitglied für einen Moment die Wand
- * (AGE-903). Wer gaten will, behandelt `laedt` ausdrücklich — `darf` ist
- * während des Ladens `false`, und das allein ist keine Aussage.
+ * ══ EIN LADEZUSTAND IST EIN MOMENT, EIN FEHLER IST EIN ZUSTAND ════════════
+ * Beide heissen „ich weiss es nicht", und beide dürfen NICHT „nein" heissen —
+ * genau diese Verwechslung hat in AGE-903 einem berechtigten Mitglied die Wand
+ * gezeigt, weil `(levelRank ?? 0)` aus „noch nicht geladen" ein „Rang 0"
+ * machte. Sie sind aber nicht derselbe Fall, und der Diff-Review (codex,
+ * MEDIUM) hat zu Recht beanstandet, dass die erste Fassung sie gleich behandelte:
+ *
+ *  * `laedt` **löst sich von selbst auf.** Eine Fläche darf warten — eine
+ *    Aktion, die einen Augenblick später erscheint, ist kein Schaden.
+ *  * `fehler` **löst sich nicht auf.** Wer hier wartet, wartet für immer; und
+ *    wer ablehnt, nimmt einem berechtigten Mitglied dauerhaft eine Fähigkeit
+ *    weg, weil das Netz gewackelt hat.
+ *
+ * Deshalb gibt dieser Hook beide Felder einzeln heraus und entscheidet NICHT
+ * für seine Aufrufer. Die Regel, der sie folgen:
+ *
+ *  * **Routen-Gate** (`MembershipGate`): `laedt` zeigt nichts (kein Flackern),
+ *    `fehler` lässt durch — die RLS ist die Grenze, nicht diese Wand.
+ *  * **Aktionsknopf** (`EventsList`): `laedt` verbirgt ihn (er kommt gleich),
+ *    `fehler` zeigt ihn — dann scheitert höchstens der Schreibvorgang mit einer
+ *    benannten Meldung, statt dass die Funktion verschwindet.
+ *  * **Filter und Anzeige** (`MemberDirectory`, `HeaderSearch`): beide Fälle
+ *    fallen offen bzw. werden neutral formuliert. Ein Filter, der zu viel
+ *    zeigt, findet höchstens nichts.
  *
  * Ohne Sitzung wird gar nicht gefragt: `meine_rechte()` ist für `anon` nicht
  * ausführbar, jede Abfrage liefe in einen Rechtefehler.
@@ -35,12 +53,22 @@ export function useMeineRechte() {
   return {
     rechte: data ?? [],
     laedt: !!user && isPending,
-    fehler: isError,
+    fehler: !!user && isError,
   };
 }
 
-/** Trägt der Aufrufer dieses Recht? `laedt` ist kein `false`, sondern „noch unklar". */
-export function useDarf(schluessel: Berechtigung): { darf: boolean; laedt: boolean } {
-  const { rechte, laedt } = useMeineRechte();
-  return { darf: rechte.includes(schluessel), laedt };
+/**
+ * Trägt der Aufrufer dieses Recht?
+ *
+ * `laedt` und `fehler` sind beide KEIN `false` — siehe die Regel im
+ * Kopfkommentar. Wer nur `darf` liest und die anderen zwei ignoriert, baut die
+ * Verwechslung wieder ein.
+ */
+export function useDarf(schluessel: Berechtigung): {
+  darf: boolean;
+  laedt: boolean;
+  fehler: boolean;
+} {
+  const { rechte, laedt, fehler } = useMeineRechte();
+  return { darf: rechte.includes(schluessel), laedt, fehler };
 }

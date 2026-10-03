@@ -143,7 +143,10 @@ export default function MemberDirectory() {
   // `berechtigungen`, soll die Fläche der Datenlage folgen und nicht einer
   // Annahme über die andere.
   //
-  // **Ein Ladezustand blendet NICHTS aus.** Vorher stand hier
+  // **Ein Ladezustand und ein Abruffehler blenden NICHTS aus.** Ein Filter ist
+  // keine Aktion: wer zu viel zeigt, findet höchstens nichts, und beides fällt
+  // deshalb offen — anders als der Anlegen-Knopf in `EventsList`, der im
+  // Ladefenster wartet. Vorher stand hier
   // `(levelRank ?? 0)`, und das machte aus „noch nicht geladen" ein „Rang 0":
   // ein Clubmitglied sah die vier Filter erst gar nicht und dann doch, sie
   // erschienen also nachträglich. Dieselbe Regel wie in `MembershipGate` und
@@ -152,8 +155,8 @@ export default function MemberDirectory() {
   // Fähigkeit weg.
   //
   // Komfort, keine Grenze — die trägt die RPC.
-  const { darf: darfSucheBiete, laedt: rechteLaden } = useDarf("suche_biete");
-  const erweiterteFilter = rechteLaden || darfSucheBiete;
+  const { darf: darfSucheBiete, laedt: rechteLaden, fehler: rechteFehler } = useDarf("suche_biete");
+  const erweiterteFilter = rechteLaden || rechteFehler || darfSucheBiete;
   const contacts = useQuery({
     queryKey: contactsQueryKey(uid ?? ""),
     queryFn: () => fetchContactIds(uid!),
@@ -350,9 +353,8 @@ export default function MemberDirectory() {
             Wort, damit eine Umbenennung ein Einzeiler in `config/levels` bleibt. */}
                 {!erweiterteFilter && (
                   <p className="text-sm text-muted @[27rem]:col-span-2 @[41rem]:col-span-3">
-                    Ab {levelLabel(BERECHTIGUNG_STUFE["suche_biete"])} kommen Filter für
-                    Kompetenz, Thema und
-                    Angebote dazu.
+                    Ab {levelLabel(BERECHTIGUNG_STUFE["suche_biete"])} kommen Filter für Kompetenz,
+                    Thema und Angebote dazu.
                   </p>
                 )}
 

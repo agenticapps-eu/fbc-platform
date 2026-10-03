@@ -56,9 +56,14 @@ vi.mock("../../providers/auth-context", () => ({
 
 let rechte: Berechtigung[] = [];
 let rechteLaden = false;
+let rechteFehler = false;
 vi.mock("../../hooks/useDarf", () => ({
-  useMeineRechte: () => ({ rechte, laedt: rechteLaden, fehler: false }),
-  useDarf: (k: Berechtigung) => ({ darf: rechte.includes(k), laedt: rechteLaden }),
+  useMeineRechte: () => ({ rechte, laedt: rechteLaden, fehler: rechteFehler }),
+  useDarf: (k: Berechtigung) => ({
+    darf: rechte.includes(k),
+    laedt: rechteLaden,
+    fehler: rechteFehler,
+  }),
 }));
 
 function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
@@ -86,10 +91,11 @@ function member(overrides: Partial<DirectoryMember> = {}): DirectoryMember {
  *  beiden Filter, die 4.3 als funktionsfähig zusagt, keine einzige Option. */
 const BASELINE = [member({ branche: "Handwerk", region: "Nord", competencies: ["Statik"] })];
 
-function renderDirectory(stufe: MembershipLevel | "laedt") {
+function renderDirectory(stufe: MembershipLevel | "laedt" | "fehler") {
   auth = { user: { id: "00000000-0000-0000-0000-0000000000aa" }, levelRank: null };
   rechteLaden = stufe === "laedt";
-  rechte = stufe === "laedt" ? [] : rechteFuerStufe(stufe);
+  rechteFehler = stufe === "fehler";
+  rechte = stufe === "laedt" || stufe === "fehler" ? [] : rechteFuerStufe(stufe);
   vi.mocked(searchDirectory).mockResolvedValue([]);
   vi.mocked(fetchDirectoryBaseline).mockResolvedValue(BASELINE);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -204,6 +210,23 @@ describe("Verzeichnis: Filter ohne `suche_biete` (AGE-598 4.1–4.3, AGE-1000)",
    * Berechtigten eine Fähigkeit weg. Dieselbe Regel tragen `MembershipGate` und
    * `HeaderSearch` schon: ein Ladezustand ist kein Ausschlussgrund.
    */
+  /**
+   * Der Fehlerfall, neben dem Ladefall und nicht statt ihm (Befund des
+   * Diff-Reviews, codex, MEDIUM). Ein Filter ist keine Aktion: wer zu viel
+   * zeigt, findet höchstens nichts. Und dieser Zustand löst sich NICHT von
+   * selbst auf — ein FOCUS-Konto verlöre die vier Filter dauerhaft, weil eine
+   * Abfrage schiefging.
+   */
+  it("blendet nichts aus, wenn der Abruf der Rechte gescheitert ist", async () => {
+    renderDirectory("fehler");
+    await screen.findByLabelText(/Volltextsuche/i);
+
+    expect(screen.getByLabelText(/Kompetenz/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Thema/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Sucht \/ bietet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/ab Focus/i)).toBeNull();
+  });
+
   it("blendet nichts aus, solange die Rechte noch nicht feststehen", async () => {
     renderDirectory("laedt");
     await screen.findByLabelText(/Volltextsuche/i);

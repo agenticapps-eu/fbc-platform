@@ -119,8 +119,15 @@ export default function HeaderSearch() {
   // Formulierung bleibt neutral, und Enter geht ins Verzeichnis, wo
   // `MembershipGate` die richtige Wand zeigt, sobald der Zustand feststeht.
   // Dasselbe tut MembershipGate.tsx.
-  const { darf: darfSuchen, laedt: rechteLaden } = useDarf("verzeichnis.suchen");
-  const stufeUnbekannt = tierLoading || rechteLaden;
+  const {
+    darf: darfSuchen,
+    laedt: rechteLaden,
+    fehler: rechteFehler,
+  } = useDarf("verzeichnis.suchen");
+  // Drei Lagen, in denen der Zustand unklar ist: das Profil lädt, die Rechte
+  // laden, oder ihr Abruf ist gescheitert. Keine davon ist eine Ablehnung,
+  // und die dritte löst sich nicht von selbst auf (Befund des Diff-Reviews).
+  const stufeUnbekannt = tierLoading || rechteLaden || rechteFehler;
   const reichtStufe = stufeUnbekannt || darfSuchen;
 
   useEffect(() => {
@@ -460,8 +467,8 @@ function Ergebnisse({
       <div className="px-4 py-5 text-center">
         <p className="text-sm text-muted">
           Die gezielte Suche im Mitgliederverzeichnis ist ab{" "}
-          {levelLabel(BERECHTIGUNG_STUFE["verzeichnis.suchen"])} verfügbar. Ein Wechsel der
-          Stufe läuft über Support.
+          {levelLabel(BERECHTIGUNG_STUFE["verzeichnis.suchen"])} verfügbar. Ein Wechsel der Stufe
+          läuft über Support.
         </p>
         {/* AGE-907: hieß „Mitgliedschaft ansehen" und führte in den ruhenden
             Kaufweg. Beide Zweige tragen jetzt dasselbe Ziel und deshalb dieselbe

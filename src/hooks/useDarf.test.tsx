@@ -27,8 +27,11 @@ vi.mock("../lib/berechtigungen", () => ({
 }));
 
 function Sonde({ schluessel = "verzeichnis.suchen" as const }) {
-  const { darf, laedt } = useDarf(schluessel);
-  return <output>{laedt ? "laedt" : darf ? "ja" : "nein"}</output>;
+  const { darf, laedt, fehler } = useDarf(schluessel);
+  // Vier unterscheidbare Ausgaenge, nicht drei: „fehler" ist ein eigener Fall
+  // und darf nicht als „nein" ankommen (Befund des Diff-Reviews, codex).
+  const wort = laedt ? "laedt" : fehler ? "fehler" : darf ? "ja" : "nein";
+  return <output>{wort}</output>;
 }
 
 function zeige(value: AuthContextValue, kind: ReactNode = <Sonde />) {
@@ -91,7 +94,28 @@ describe("useDarf", () => {
     expect(laden).not.toHaveBeenCalled();
   });
 
-  // Der FEHLERPFAD steht in `src/lib/berechtigungen.test.ts` und nicht hier:
+  // ══ DER FEHLERFALL WIRD NICHT HIER GEMESSEN, UND DAS IST BENANNT ═════════
+  // Dreimal versucht, dreimal am Werkzeug gescheitert: eine abgelehnte Zusage
+  // hinter `useQuery` meldet vitest in dieser Datei als unbehandelten Fehler,
+  // obwohl react-query sie entgegennimmt — mit `mockRejectedValue`, mit
+  // `mockImplementation` und mit verzoegerter Ablehnung gleichermassen. Dass es
+  // an dieser Datei und nicht an react-query liegt, ist offen; andere Dateien
+  // im Repo tun dasselbe erfolgreich.
+  //
+  // Statt das Werkzeug zu biegen, steht die Zusage dort, wo sie etwas
+  // entscheidet. `fehler` ist in `useMeineRechte` das unveraenderte `isError`
+  // (eine Zeile, nachlesbar); was die Oberflaeche daraus macht, ist das
+  // Eigentliche, und das ist gemessen:
+  //
+  //   * `EventsList.anlegen.test.tsx` — ein Fehler ZEIGT den Anlegen-Knopf,
+  //     ein Ladezustand verbirgt ihn.
+  //   * `MembershipGate.rechte.test.tsx` — ein Fehler LAESST DURCH, ein
+  //     Ladezustand zeigt nichts.
+  //   * `MemberDirectory.stufen.test.tsx` — ein Fehler blendet die Filter NICHT
+  //     aus.
+  //
+  // Dass `ladeMeineRechte` bei einem RPC-Fehler WIRFT, steht in
+  // `src/lib/berechtigungen.test.ts` und nicht hier:
   // auf dieser Ebene laeuft er durch react-query, und eine abgelehnte Zusage
   // meldet vitest dort als unbehandelten Fehler, obwohl die Abfrage sie
   // entgegennimmt. Gemessen wird er deshalb an der Grenze, an der er entsteht —

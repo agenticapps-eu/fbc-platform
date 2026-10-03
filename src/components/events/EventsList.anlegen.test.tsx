@@ -44,9 +44,11 @@ vi.mock("../../providers/auth-context", () => ({
 }));
 
 let rechte: Berechtigung[] = [];
+let laedt = false;
+let fehler = false;
 vi.mock("../../hooks/useDarf", () => ({
-  useMeineRechte: () => ({ rechte, laedt: false, fehler: false }),
-  useDarf: (k: Berechtigung) => ({ darf: rechte.includes(k), laedt: false }),
+  useMeineRechte: () => ({ rechte, laedt, fehler }),
+  useDarf: (k: Berechtigung) => ({ darf: rechte.includes(k), laedt, fehler }),
 }));
 
 function zeige() {
@@ -68,6 +70,8 @@ describe("Eventliste: „Event anlegen“ hängt am Recht", () => {
   beforeEach(() => {
     user = { id: "u-1" };
     rechte = [];
+    laedt = false;
+    fehler = false;
   });
 
   it("zeigt den Knopf einem Konto mit `events.erstellen`", () => {
@@ -87,6 +91,41 @@ describe("Eventliste: „Event anlegen“ hängt am Recht", () => {
     // Normalfall für DISCOVER, und er darf nicht an einem Sonderweg
     // vorbeikommen.
     rechte = [];
+    zeige();
+    expect(knopf()).not.toBeInTheDocument();
+  });
+
+  // ══ LADEN UND FEHLER SIND NICHT DERSELBE FALL ════════════════════════════
+  // Befund des Diff-Reviews (codex, MEDIUM): die erste Fassung behandelte beide
+  // als „nein" und setzte `laedt` im Test immer auf `false` — der Unterschied
+  // war also weder gebaut noch gemessen.
+  it("verbirgt ihn, solange die Rechte laden — auch fuer ein berechtigtes Konto", () => {
+    rechte = ["events.erstellen"];
+    laedt = true;
+    zeige();
+    // Er kommt einen Augenblick spaeter. Ihn vorher zu zeigen fuehrte ein
+    // unberechtigtes Konto in ein Formular, das es ausfuellt und dann an der
+    // RLS verliert.
+    expect(knopf()).not.toBeInTheDocument();
+  });
+
+  it("zeigt ihn bei einem gescheiterten Abruf — der Zustand loest sich nicht auf", () => {
+    rechte = [];
+    fehler = true;
+    zeige();
+    // Ein IMPACT-Konto verloere sonst dauerhaft eine Faehigkeit, weil eine
+    // Abfrage schiefging. Scheitert das Anlegen dann an der RLS, sagt die
+    // bestehende Meldung „Anlegen fehlgeschlagen" — benannt, statt dass die
+    // Funktion verschwindet.
+    expect(knopf()).toBeInTheDocument();
+  });
+
+  it("verbirgt ihn, wenn Laden UND Fehler zusammentreffen — Laden gewinnt", () => {
+    // Die Reihenfolge ist eine Entscheidung und keine Nebenwirkung: solange
+    // noch geladen wird, ist der Fehler ein Zwischenstand.
+    rechte = [];
+    laedt = true;
+    fehler = true;
     zeige();
     expect(knopf()).not.toBeInTheDocument();
   });

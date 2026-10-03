@@ -38,14 +38,23 @@ export default function MembershipGate({
   const { user, levelRank, isLoading, tierLoading } = useAuth();
   // Unbedingt aufgerufen, weil Hooks das verlangen; ohne Sitzung fragt der Hook
   // von sich aus nicht.
-  const { rechte, laedt: rechteLaden } = useMeineRechte();
+  const { rechte, laedt: rechteLaden, fehler: rechteFehler } = useMeineRechte();
 
   // Kein Flackern — und `rechteLaden` ist hier KEINE Ablehnung. Genau diese
   // Verwechslung hat in AGE-903 einem berechtigten Mitglied für einen Moment
   // die Wand gezeigt.
   if (isLoading || (user && tierLoading) || (darf && rechteLaden)) return null;
 
-  const erlaubt = darf ? rechte.includes(darf) : !min || (levelRank ?? 0) >= LEVEL_RANK[min];
+  // Ein FEHLER beim Abruf der Rechte lässt durch, er mauert nicht. Begründung:
+  // die Wand ist Komfort, die Grenze ist die RLS. Wer hier mauert, nimmt einem
+  // berechtigten Mitglied den Bereich weg, weil das Netz gewackelt hat — und
+  // behauptet dabei etwas über seine Stufe, das er nicht weiss. Lässt er durch,
+  // rendert die Seite und zeigt ihren eigenen Fehler- oder Leerzustand; was sie
+  // nicht lesen darf, gibt die Datenbank ohnehin nicht heraus.
+  // (Befund des Diff-Reviews, codex, MEDIUM.)
+  const erlaubt = darf
+    ? rechte.includes(darf) || rechteFehler
+    : !min || (levelRank ?? 0) >= LEVEL_RANK[min];
   if (user && erlaubt) return <>{children}</>;
   // anon ODER eingeloggt-aber-nicht-berechtigt → Wand
   return <MembershipWall stufe={darf ? BERECHTIGUNG_STUFE[darf] : min} loggedIn={!!user} />;

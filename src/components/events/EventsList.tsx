@@ -41,11 +41,23 @@ export default function EventsList() {
   // `is_activated()` und den Host. Die Grenze trägt jetzt die Datenbank; dieser
   // Knopf hört auf, etwas zu versprechen, was sie ablehnt.
   //
-  // `laedt` ist dabei kein `false`: während die Rechte laden, bleibt der Knopf
-  // weg statt kurz aufzublitzen. Der umgekehrte Fehler — ihn im Ladefenster zu
-  // zeigen — führte ein berechtigtes Konto in ein Formular, das es gleich
-  // wieder verliert, und ein unberechtigtes in eine Ablehnung der RLS.
-  const { darf: darfAnlegen } = useDarf("events.erstellen");
+  // Lade- und Fehlerfall sind NICHT derselbe Fall (Befund des Diff-Reviews,
+  // codex, MEDIUM — die erste Fassung behandelte beide als „nein"):
+  //
+  //  * Während die Rechte LADEN, bleibt der Knopf weg. Er kommt einen
+  //    Augenblick später; ihn vorher zu zeigen führte ein unberechtigtes Konto
+  //    in ein Formular, das es ausfüllt und dann an der RLS verliert.
+  //  * Bei einem FEHLER erscheint er. Dieser Zustand löst sich nicht von
+  //    selbst auf, und ein IMPACT-Konto verlöre sonst dauerhaft eine Fähigkeit,
+  //    weil eine Abfrage schiefging. Scheitert das Anlegen dann an der RLS,
+  //    sagt die bestehende Meldung „Anlegen fehlgeschlagen" — benannt, statt
+  //    dass die Funktion verschwindet.
+  const {
+    darf: darfAnlegen,
+    laedt: rechteLaden,
+    fehler: rechteFehler,
+  } = useDarf("events.erstellen");
+  const zeigeAnlegen = !rechteLaden && (darfAnlegen || rechteFehler);
 
   const events = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
   // `enabled`, nicht nur ein verstecktes Ergebnis: eine Vorlage gehört immer
@@ -60,7 +72,7 @@ export default function EventsList() {
 
   return (
     <section className="space-y-6">
-      {user && darfAnlegen && !creating && (
+      {user && zeigeAnlegen && !creating && (
         <header className="flex justify-end">
           <Button size="sm" onClick={() => setCreating(true)}>
             Event anlegen
@@ -68,7 +80,7 @@ export default function EventsList() {
         </header>
       )}
 
-      {creating && user && darfAnlegen && (
+      {creating && user && zeigeAnlegen && (
         <Card>
           <CreateEvent hostId={user.id} onDone={() => setCreating(false)} />
         </Card>

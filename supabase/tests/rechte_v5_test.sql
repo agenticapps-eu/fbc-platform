@@ -43,13 +43,22 @@
 --   * Ein `alike(…, 'FEHLER:%')` allein waere gruen, sobald IRGENDETWAS
 --     schiefgeht. Deshalb traegt die Rueckgabe den SQLSTATE, und die
 --     Ablehnungen werden auf `FEHLER:42501%` geprueft.
+--   * **Und `try_as` = 'OK' belegt bei UPDATE/DELETE NICHT, dass etwas
+--     geschehen ist.** Ein UPDATE, das unter RLS null Zeilen trifft, ist kein
+--     Fehler — es tut nur nichts. Jede Pflege-Zusage unten prueft deshalb
+--     danach die WIRKUNG: den geaenderten Wert, oder das Fehlen der Zeile.
+--     Und zwar als Eigentuemer der Transaktion, also an der RLS vorbei:
+--     „ich sehe sie nicht mehr" ist nicht dasselbe wie „sie ist weg".
+--     Befund des Diff-Reviews (codex, MEDIUM) — ohne diese Nachmessung waeren
+--     vier Zusagen gruen gewesen, auch wenn die Pflege unmoeglich geworden
+--     waere.
 --   * Die Trigger auf `events` (`event_feed_post_sync`, `hinweis_neues_event`)
 --     sind SECURITY DEFINER — gemessen, nicht angenommen. Waeren sie INVOKER,
 --     scheiterte jeder Insert hier an der fehlenden INSERT-Berechtigung auf
 --     `posts`, und das sahe wie eine Rechtegrenze aus.
 
 begin;
-select plan(47);
+select plan(52);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- `auth.users`-Insert feuert `handle_new_user()` und legt die
@@ -321,9 +330,22 @@ select is(
   'OK', 'Ein abgestiegener Host aendert seinen bestehenden Termin');
 
 select is(
+  (select title from public.events where id = 'a3000000-0000-0000-0000-000000000001'),
+  'Abgesagt',
+  '… und die Aenderung ist WIRKLICH angekommen — `OK` allein heisst nur, dass '
+  'nichts geworfen wurde');
+
+select is(
   (select pg_temp.try_as('a1000000-0000-0000-0000-000000000006',
      $$delete from public.events where id = 'a3000000-0000-0000-0000-000000000006'$$)),
   'OK', 'Ein abgestiegener Host loescht seinen bestehenden Termin');
+
+select is(
+  (select count(*)::int from public.events
+    where id = 'a3000000-0000-0000-0000-000000000006'),
+  0,
+  '… und die Zeile ist WIRKLICH fort — gezaehlt als Eigentuemer, nicht unter '
+  'der RLS des Hosts');
 
 select alike(
   (select pg_temp.try_as('a1000000-0000-0000-0000-000000000006',
@@ -383,15 +405,33 @@ select is(
   'OK', 'Rang 4 berichtigt sein bestehendes Angebot');
 
 select is(
+  (select title from public.offers where id = 'a4000000-0000-0000-0000-000000000004'),
+  'Berichtigt',
+  '… und die Berichtigung steht WIRKLICH in der Zeile');
+
+select is(
   (select pg_temp.try_as('a1000000-0000-0000-0000-000000000004',
      $$delete from public.needs where id = 'a5000000-0000-0000-0000-000000000004'$$)),
   'OK', 'Rang 4 nimmt sein bestehendes Gesuch zurueck');
+
+select is(
+  (select count(*)::int from public.needs
+    where id = 'a5000000-0000-0000-0000-000000000004'),
+  0,
+  '… und das Gesuch ist WIRKLICH fort');
 
 select is(
   (select pg_temp.try_as('a1000000-0000-0000-0000-000000000005',
      $$insert into public.offers (profile_id, category, title)
        values ('a1000000-0000-0000-0000-000000000005', 'beratung', 'Neu von Rang 5')$$)),
   'OK', 'Rang 5 stellt ein neues Angebot ein');
+
+select is(
+  (select count(*)::int from public.offers
+    where profile_id = 'a1000000-0000-0000-0000-000000000005'
+      and title = 'Neu von Rang 5'),
+  1,
+  '… und die neue Zeile existiert WIRKLICH');
 
 -- ══ 7 · matches: Beteiligung UND Recht ═════════════════════════════════════
 
