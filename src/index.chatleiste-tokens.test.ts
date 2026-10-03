@@ -22,6 +22,12 @@ import { describe, expect, it } from "vitest";
  * laufenden Anwendung wirklich diese Farbe trägt. Das ist die Sichtprobe, und
  * sie ist eine eigene Aufgabe. Zwei verschiedene Fragen, zwei verschiedene
  * Belege.
+ *
+ * ══ SEIT AGE-1003 DECKT DIESE DATEI BEIDE LEISTEN ═════════════════════════
+ * Donald hat Frage E7 mit Ja beantwortet: die linke Navigation trägt dieselbe
+ * Fläche. Der Dateiname sagt weiter „chatleiste", weil ein Umbenennen die
+ * Historie der Datei für reine Namenskosmetik zerschneiden würde; der dritte
+ * `describe`-Block unten gehört der linken Leiste.
  */
 
 const CSS = readFileSync("src/index.css", "utf8");
@@ -56,6 +62,33 @@ const KNOPF_TOKENS = [
   "--color-chrome-elevated",
   "--color-chrome-border",
   "--color-soft",
+] as const;
+
+/**
+ * Die Tokens, die auf der LINKEN Leiste liegen (AGE-1003).
+ *
+ * `--sidebar-surface` ist ihre Fläche. Die übrigen sind Chrome-Tokens, die
+ * schon vorher dort lagen und mit dem Farbwechsel neu gerechnet werden
+ * mussten. `--leiste-focus` ist neu: `ring-accent` trägt auf `#002B51` nur
+ * 2,83:1 und fällt damit unter die 3:1 der Norm.
+ */
+const LINKE_LEISTE_TOKENS = [
+  "--sidebar-surface",
+  "--leiste-focus",
+] as const;
+
+/**
+ * Die vier Stellen, die den Fokusring der linken Leiste zeichnen.
+ *
+ * Vollständigkeit ist hier die halbe Zusage. Bei AGE-1002 war die Umlegung
+ * unvollständig, der Test prüfte genau die umgelegten Tokens, und der Defekt
+ * wanderte in einen Zustand, den niemand ansah.
+ */
+const FOKUS_STELLEN = [
+  "src/components/AppShell.tsx",
+  "src/components/ui/SidebarNav.tsx",
+  "src/components/feedback/FeedbackButton.tsx",
+  "src/components/LeistenPill.tsx",
 ] as const;
 
 /**
@@ -209,15 +242,20 @@ describe("Nachrichtenleiste: die Tokens sind gesetzt", () => {
     expect(wert(leiste, "--chat-rail-surface")?.toLowerCase()).toBe("#002b51");
   });
 
-  it("ist NICHT das #081527 der linken Navigation", () => {
-    // Die Unterscheidung ist der Kern der Vorgabe. Ohne diese Zeile wäre „die
-    // Leiste ist dunkel" auch von einem Gleichmachen mit der Navigation
-    // erfüllt — und genau das hat Detlev ausgeschlossen.
-    const leiste = block('html[data-variant="navy"] .fbc-chat-rail');
-    expect(wert(leiste, "--chat-rail-surface")?.toLowerCase()).not.toBe("#081527");
-    expect(wert(block('html[data-variant="navy"]'), "--sidebar-surface")?.toLowerCase()).toBe(
-      "#081527",
-    );
+  it("traegt DIESELBE Flaeche wie die linke Navigation", () => {
+    // UMGEDREHT mit AGE-1003. Bis dahin stand hier das Gegenteil: die Leiste
+    // dürfe NICHT das `#081527` der linken Navigation sein, und
+    // `--sidebar-surface` wurde auf genau diesen Wert festgenagelt. Das war
+    // richtig, solange Frage E7 offen war — Donald hat sie am 03.10. mit Ja
+    // beantwortet.
+    //
+    // Die Zusage ist jetzt die GLEICHHEIT, und zwar als Vergleich der beiden
+    // Tokens und nicht als zwei Zeilen mit demselben Literal: schriebe jemand
+    // nur eine der beiden um, bliebe ein Literal-Paar grün.
+    const rechts = wert(block('html[data-variant="navy"] .fbc-chat-rail'), "--chat-rail-surface");
+    const links = wert(block('html[data-variant="navy"]'), "--sidebar-surface");
+    expect(links?.toLowerCase()).toBe("#002b51");
+    expect(links?.toLowerCase()).toBe(rechts?.toLowerCase());
   });
 
   it("die Thread-Liste liest die Tokens wirklich", () => {
@@ -268,7 +306,7 @@ describe("Nachrichtenleiste: die Tokens sind gesetzt", () => {
     for (const pfad of dateien("src")) {
       if (pfad.endsWith("index.chatleiste-tokens.test.ts")) continue;
       const inhalt = readFileSync(pfad, "utf8");
-      for (const m of inhalt.matchAll(/var\((--(?:thread|chat-rail)-[a-z0-9-]+)/g)) {
+      for (const m of inhalt.matchAll(/var\((--(?:thread|chat-rail|leiste)-[a-z0-9-]+)/g)) {
         benutzt.add(m[1]);
       }
     }
@@ -402,6 +440,183 @@ describe("Nachrichtenleiste: die Kontraste halten auf ALLEN drei Flächen", () =
           0.15,
         );
       }
+    }
+  });
+});
+
+describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", () => {
+  // AGE-1003. Der navy-Block OHNE Leisten-Selektor — dort liegt
+  // `--sidebar-surface`, und dort liegen die Chrome-Tokens, die auf der Leiste
+  // sichtbar sind.
+  const navy = () => block('html[data-variant="navy"]');
+  const theme = () => block("@theme");
+  const token = (name: string, rumpf = navy()) => {
+    const v = wert(rumpf, name);
+    if (!v) throw new Error(`${name} fehlt`);
+    return parse(v);
+  };
+  const flaeche = () => token("--sidebar-surface");
+
+  it("fuehrt alle Tokens der linken Leiste mit einem Rueckfall im @theme-Block", () => {
+    for (const name of LINKE_LEISTE_TOKENS) {
+      expect(wert(theme(), name), `${name} fehlt auf :root`).not.toBeNull();
+    }
+  });
+
+  it("laesst den hellen Modus unveraendert — Wert fuer Wert", () => {
+    // Das ist die ganze Zusage fuer den hellen Modus, und sie ist staerker als
+    // „sieht gleich aus": `--leiste-focus` traegt dort GENAU den Wert, den
+    // `--color-accent` heute hat, also aendert sich links im Hellen kein Pixel.
+    const paare: [string, string][] = [
+      ["--sidebar-surface", "#ffffff"],
+      ["--leiste-focus", "#2f6bd1"],
+    ];
+    for (const [name, soll] of paare) {
+      expect(wert(theme(), name)?.toLowerCase(), `${name} im hellen Modus`).toBe(soll);
+    }
+    // Und die Begruendung dieses Wertes wird mitgeprueft: er IST der heutige
+    // Akzent. Driftet `--color-accent`, soll diese Zeile darauf hinweisen,
+    // statt den Gleichstand stillschweigend zu verlieren.
+    expect(wert(theme(), "--leiste-focus")?.toLowerCase()).toBe(
+      wert(theme(), "--color-accent")?.toLowerCase(),
+    );
+  });
+
+  it("setzt im dunklen Modus die Flaeche und einen eigenen Fokusring", () => {
+    expect(wert(navy(), "--sidebar-surface")?.toLowerCase()).toBe("#002b51");
+    expect(wert(navy(), "--leiste-focus")?.toLowerCase()).toBe("#b9cce6");
+  });
+
+  it("laesst `--color-chrome` im dunklen Modus auf #081527 stehen", () => {
+    // Die Regression, die Entscheidung 1 verhindert. `--color-chrome` faerbt
+    // NICHT die Leiste, sondern die Vollflaechen von `/onboarding` und
+    // `/willkommen` (`min-h-screen bg-chrome`), `Button variant="secondary"`
+    // und als `text-chrome` die Ziffer auf den Zaehlern. Wer es mitzieht,
+    // faerbt drei unbeteiligte Flaechen mit — gemessen, nicht vermutet.
+    expect(wert(navy(), "--color-chrome")?.toLowerCase()).toBe("#081527");
+  });
+
+  it("Schrift auf der Leiste erfuellt 4,5:1", () => {
+    for (const name of ["--color-on-chrome", "--color-on-chrome-muted", "--color-on-chrome-active"] as const) {
+      const v = kontrast(token(name), flaeche());
+      expect(auf2(v), `${name} auf der Leiste: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("die Punkte der Wortmarke halten 3:1", () => {
+    // Bedeutungstragende Grafik, nicht Text — deshalb 3:1 und nicht 4,5:1.
+    const v = kontrast(token("--color-accent-on-chrome"), flaeche());
+    expect(auf2(v), `Punkte der Wortmarke: ${auf2(v)}:1`).toBeGreaterThanOrEqual(3);
+  });
+
+  it("der Fokusring haelt 3:1 — in BEIDEN Modi", () => {
+    // Der Befund, der aus dem angekuendigten Einzeiler eine Aenderung mit
+    // Testbedarf macht: `ring-accent` (#2F6BD1) traegt auf #081527 3,61:1 und
+    // auf #002B51 nur 2,83:1. Beide Modi stehen hier, weil ein Token, der nur
+    // im Dunklen geprueft wird, im Hellen beliebig driften darf.
+    const dunkel = kontrast(token("--leiste-focus"), flaeche());
+    expect(auf2(dunkel), `Fokusring im navy-Modus: ${auf2(dunkel)}:1`).toBeGreaterThanOrEqual(3);
+    const hell = kontrast(token("--leiste-focus", theme()), token("--sidebar-surface", theme()));
+    expect(auf2(hell), `Fokusring im hellen Modus: ${auf2(hell)}:1`).toBeGreaterThanOrEqual(3);
+  });
+
+  it("der aktive Eintrag ist NICHT an seiner Fuellung erkennbar — und das ist belegt", () => {
+    // Die Fuellung `#1F53B0` traegt gegen die Leiste 2,00:1 und hielt die 3:1
+    // noch nie (vorher 2,55:1). Dieser Fall nagelt deshalb fest, worauf die
+    // Erkennbarkeit WIRKLICH beruht: die Schrift auf der Fuellung. Ohne ihn
+    // stuende in der Spec eine Zahl unter der Schwelle ohne Gegenstueck, und
+    // beim naechsten Griff an die Farben wuerde entweder blind „behoben" oder
+    // blind verteidigt.
+    const fuellung = token("--color-chrome-active");
+    const gegenLeiste = kontrast(fuellung, flaeche());
+    expect(auf2(gegenLeiste), "die Fuellung haelt die 3:1 bewusst nicht").toBeLessThan(3);
+
+    const schrift = kontrast(token("--color-on-chrome-active"), fuellung);
+    expect(auf2(schrift), `Schrift auf der Fuellung: ${auf2(schrift)}:1`).toBeGreaterThanOrEqual(
+      4.5,
+    );
+
+    // Und die zweiten Merkmale sind im Quelltext: der weisse Linksbalken im
+    // aufgeklappten Zustand, die halbfette Schrift.
+    const nav = readFileSync("src/components/ui/SidebarNav.tsx", "utf8");
+    expect(nav, "der weisse Linksbalken des aktiven Eintrags fehlt").toContain(
+      "bg-on-chrome-active",
+    );
+    expect(nav, "die halbfette Schrift des aktiven Eintrags fehlt").toContain(
+      "font-semibold text-on-chrome-active",
+    );
+  });
+
+  it("die Hover-Flaeche traegt das Signal NICHT, und der Beleg dafuer steht hier", () => {
+    // Vermutet war, der Farbwechsel mache den Hover-Zustand kaputt. Gerechnet:
+    // 1,11:1 auf #081527, 1,15:1 auf #002B51 — die Flaeche hat sich vorher
+    // schon nicht abgehoben. Das Signal ist die Schrift.
+    const hover = token("--color-chrome-elevated");
+    expect(auf2(kontrast(hover, flaeche())), "die Hover-Flaeche hebt sich kaum ab").toBeLessThan(
+      1.5,
+    );
+    const schrift = kontrast(token("--color-on-chrome-active"), hover);
+    expect(auf2(schrift), `Schrift auf der Hover-Flaeche: ${auf2(schrift)}:1`).toBeGreaterThanOrEqual(
+      4.5,
+    );
+  });
+
+  it("alle vier Stellen lesen den Fokus-Token wirklich", () => {
+    // Der Befund aus AGE-1002, hier vorweggenommen: ohne diesen Fall liesse
+    // sich jede der vier Klassen auf `ring-accent` zurueckdrehen, und die
+    // GANZE Suite bliebe gruen. Ein Token im CSS belegt nichts darueber, dass
+    // ihn jemand liest.
+    for (const pfad of FOKUS_STELLEN) {
+      expect(readFileSync(pfad, "utf8"), `${pfad} liest --leiste-focus nicht`).toContain(
+        "var(--leiste-focus)",
+      );
+    }
+  });
+
+  it("und die vier Stellen tragen den alten Ring nicht mehr", () => {
+    // Gegenprobe zur Zeile darueber: ein `var(--leiste-focus)` IRGENDWO in der
+    // Datei ist von einem zweiten Vorkommen erfuellt, waehrend die eigentliche
+    // Stelle auf `ring-accent` stehen bleibt.
+    //
+    // Je Datei genau die Stelle, die auf der Leiste liegt — AppShell hat sechs
+    // weitere `ring-accent` auf INHALTS-flaechen, und die bleiben.
+    const ohneSuffix = /focus-visible:ring-accent(?![-\w])/;
+
+    const nav = readFileSync("src/components/ui/SidebarNav.tsx", "utf8");
+    expect(ohneSuffix.test(nav), "SidebarNav traegt noch focus-visible:ring-accent").toBe(false);
+
+    const feedback = readFileSync("src/components/feedback/FeedbackButton.tsx", "utf8");
+    expect(ohneSuffix.test(feedback), "FeedbackButton traegt noch ring-accent").toBe(false);
+    // Der Ring IM Overlay bleibt: er steht nicht auf der Leiste.
+    expect(feedback, "der Ring im Overlay ist verschwunden").toContain("ring-accent-strong");
+
+    const shell = readFileSync("src/components/AppShell.tsx", "utf8");
+    expect(
+      /text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-\[color:var\(--leiste-focus\)\]/.test(
+        shell,
+      ),
+      "die Wortmarke in der Leiste liest den Token nicht",
+    ).toBe(true);
+
+    const pill = readFileSync("src/components/LeistenPill.tsx", "utf8");
+    expect(pill, "der chat-Zweig des Pills muss --thread-focus behalten").toContain(
+      "var(--thread-focus)",
+    );
+  });
+
+  it("die gerechneten Werte stehen in der Spec — Gegenprobe gegen die Tabelle", () => {
+    // Dieselbe Gegenprobe wie fuer die rechte Leiste: weicht die Rechnung von
+    // der Tabelle in `openspec` ab, ist eine der beiden falsch.
+    const erwartet: [string, number][] = [
+      ["--color-on-chrome", 6.78],
+      ["--color-on-chrome-muted", 5.7],
+      ["--color-on-chrome-active", 14.34],
+      ["--color-accent-on-chrome", 4.45],
+      ["--leiste-focus", 8.77],
+    ];
+    for (const [name, soll] of erwartet) {
+      const ist = kontrast(token(name), flaeche());
+      expect(Math.abs(ist - soll), `${name}: ${auf2(ist)} statt ${soll}`).toBeLessThan(0.02);
     }
   });
 });
