@@ -5,6 +5,19 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-10-03-rechte-v5-final",
+    "datum": "2026-10-03",
+    "titel": "Discover, Focus und Impact unterscheiden sich jetzt in den Rechten",
+    "linear": "AGE-1000",
+    "aenderungen": [
+      "Das Mitgliederverzeichnis mit Liste und Suche ist ab Impact verfügbar. Ein einzelnes Profil bleibt für alle Clubmitglieder lesbar — wer dir im Feed, in einem Event oder im Chat begegnet, ist weiter erreichbar, und eine Kontaktanfrage kannst du unverändert ab Discover senden.",
+      "„Ich biete\" und „Ich suche\" einzustellen und die Einträge anderer zu lesen gehört ab Focus zur Mitgliedschaft. Dasselbe gilt für die Vorschläge.",
+      "Eigene Events und Event-Vorlagen anzulegen gehört ab Impact zur Mitgliedschaft. An Events teilnehmen kannst du weiter ab Discover.",
+      "Es wird nichts gelöscht. Bestehende Einträge und Termine bleiben erhalten, bleiben sichtbar und bleiben änderbar — nur das Neuanlegen hängt an der Stufe. Wer aufsteigt, findet alles wieder vor.",
+      "Deine Stufe ändert sich dadurch nicht. Was sich ändert, ist nur, welche Funktionen an welcher Stufe hängen."
+    ]
+  },
+  {
     "slug": "2026-09-29-stufen-nur-club",
     "datum": "2026-09-29",
     "titel": "Die Fläche spricht nur noch von DISCOVER, FOCUS und IMPACT",

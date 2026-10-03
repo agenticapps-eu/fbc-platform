@@ -1,7 +1,25 @@
 # berechtigungen Specification
 
 ## Purpose
-TBD - created by archiving change rechte-v5-final. Update Purpose after archive.
+
+Feature-Rechte sind **Konfiguration**, nicht Zahlen im Code. Diese Capability
+hält, welche Rechte es gibt, ab welchem Rang sie gelten, wie die Datenbank
+danach fragt (`darf(schluessel)`) und wie der Client seine eigenen erfährt
+(`meine_rechte()`).
+
+Sie entstand mit AGE-1000 aus einem gemessenen Befund: am 03.10.2026 trug die
+Plattform **keine einzige** Schwelle oberhalb Rang 4 — DISCOVER, FOCUS und
+IMPACT unterschieden sich im Namen und sonst nirgends, obwohl Detlevs SPEC 01
+(V5 FINAL) sie nach Rechten trennt. Dazu stand jede Schwelle doppelt: als Zahl
+im Policy-Rumpf und als `minTier` im Frontend.
+
+**Die Abgrenzung, die diese Capability definiert:** sie führt die Rechte
+**oberhalb** der Clubschwelle. Die Clubschwelle selbst (Rang 4) gehört nicht
+dazu — sie ist `has_level(4)` und eine Tür, keine Funktion. Ein Eintrag mit
+`min_rank <= 4` wäre eine zweite Kopie dieser Zahl, und ein Check-Constraint
+verbietet ihn. Welche Schwelle welchen Mechanismus trägt, steht als Anforderung
+in `access-control`; die Begründung in `docs/decisions/0008`.
+
 ## Requirements
 ### Requirement: Ein Recht ist eine benannte Zeile mit einem Mindestrang
 
