@@ -232,25 +232,31 @@ select is(
 -- teuerste Fall — der höchste Rang ausserhalb des Clubs. Hielte die Schwelle
 -- dort nicht, wäre sie nirgends gehalten, und die Zusage über Rang 2 allein
 -- hätte das nicht gezeigt.
+--
+-- **Seit AGE-1001 über die Funktionen statt über die Relationen.** Der direkte
+-- Lesezugriff auf `profiles` und `profiles_public` ist entzogen; was hier
+-- gemessen wird, ist unverändert die SCHWELLE, nicht der Weg. Das ist der
+-- Sinn dieser vier Zusagen an dieser Stelle: ein Verschluss des Rohzugriffs
+-- darf die Clubschwelle weder heimlich mitnehmen noch heimlich aufweichen.
 select is(
   pg_temp.count_as('11111111-1111-1111-1111-111111111111',
-    'select count(*)::int from public.profiles_public where id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Active sieht Impact im öffentlichen Verzeichnis (profiles_public trägt keine Stufenschwelle)');
+    'select count(*)::int from public.profil_karten(array[''66666666-6666-6666-6666-666666666666'']::uuid[])'),
+  1, 'Active sieht Impact im öffentlichen Verzeichnis (die Basisfelder tragen keine Stufenschwelle)');
 
 select is(
   pg_temp.count_as('22222222-2222-2222-2222-222222222222',
-    'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
+    'select count(*)::int from public.profil_detail(''66666666-6666-6666-6666-666666666666'')'),
   0, 'Boost (Rang 2) liest KEINE fremde Vollzeile');
 
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
-    'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
+    'select count(*)::int from public.profil_detail(''66666666-6666-6666-6666-666666666666'')'),
   0, 'Connect (Rang 3) liest KEINE fremde Vollzeile — der höchste Rang '
      'ausserhalb des Clubs, und mit AGE-903 gekippt');
 
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
-    'select count(*)::int from public.profiles where id = ''66666666-6666-6666-6666-666666666666'''),
+    'select count(*)::int from public.profil_detail(''66666666-6666-6666-6666-666666666666'')'),
   1, 'Discover (Rang 4) liest die fremde Vollzeile — „vollständiges Verzeichnis" ab 300 €');
 
 -- Die Neben-Tabellen der erweiterten Profildaten müssen dieselbe Schwelle tragen.
@@ -715,13 +721,17 @@ begin
 end $$;
 
 -- 13.1 Fremddaten — der Kern der Zusage aus AGE-495.
+-- Seit AGE-1001 ueber die Funktionen: der Rohzugriff ist entzogen, das Gate
+-- steckt jetzt IN ihnen. Die Zusage ist unveraendert — ein nicht aktiviertes
+-- Konto bekommt nichts.
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
-  'select count(*)::int from public.profiles where id <> ''dddddddd-0000-0000-0000-00000000000d'''),
+  'select count(*)::int from public.profil_detail(''66666666-6666-6666-6666-666666666666'')'),
   0, 'Gate: nicht aktiviert sieht KEINE fremde Profilzeile');
 
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
-  'select count(*)::int from public.profiles_public'),
-  0, 'Gate: nicht aktiviert sieht das Verzeichnis nicht (View umgeht die Policies!)');
+  'select count(*)::int from public.profil_karten(array[''66666666-6666-6666-6666-666666666666'']::uuid[])'),
+  0, 'Gate: nicht aktiviert sieht das Verzeichnis nicht — die DEFINER-Funktion '
+     'fuehrt dasselbe Gate, das vorher in der View stand');
 
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.posts'), 0, 'Gate: keine Beiträge');
@@ -759,8 +769,12 @@ select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
 -- 13.3 Schreiben. Ein nicht aktiviertes Konto darf nichts veröffentlichen —
 -- sonst erscheint Inhalt unter dem echten Namen eines Mitglieds.
 select is(pg_temp.try_as('dddddddd-0000-0000-0000-00000000000d',
-  'update public.profiles set short_bio = ''gekapert'' where id = ''dddddddd-0000-0000-0000-00000000000d'''),
-  'OK', 'Gate: das UPDATE aufs eigene Profil wirft nicht (RLS filtert still) …');
+  'select public.profil_speichern(
+     ''Unbestaetigt'', '''', '''', ''gekapert'', null, null,
+     array[]::text[], array[]::text[], null, null, ''{}''::jsonb,
+     array[]::text[], null, null)'),
+  'OK', 'Gate: das Speichern aufs eigene Profil wirft nicht (das Praedikat '
+        'filtert still) …');
 select is(
   (select short_bio from public.profiles where id = 'dddddddd-0000-0000-0000-00000000000d'),
   null, '… ändert das Profil aber nicht');
@@ -832,10 +846,10 @@ select is(
 -- Mitglied darf das unbestätigte Profil nicht sehen — sonst ist die Zusage im
 -- Mailtext („für kein anderes Mitglied sichtbar") unwahr.
 select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
-  'select count(*)::int from public.profiles_public where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  'select count(*)::int from public.profil_karten(array[''dddddddd-0000-0000-0000-00000000000d'']::uuid[])'),
   0, 'Zielprofil-Gate: ein bestätigtes Mitglied sieht das unbestätigte NICHT im Verzeichnis');
 select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
-  'select count(*)::int from public.profiles where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  'select count(*)::int from public.profil_detail(''dddddddd-0000-0000-0000-00000000000d'')'),
   0, 'Zielprofil-Gate: … auch nicht die Vollzeile');
 
 -- 13.5 my_activation_state — die einzige Fläche, die offen bleibt.
@@ -989,7 +1003,7 @@ update public.profiles set activated_at = now()
  where id = 'dddddddd-0000-0000-0000-00000000000d';
 
 select cmp_ok(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
-  'select count(*)::int from public.profiles_public'),
+  'select count(*)::int from public.profil_karten(array[''66666666-6666-6666-6666-666666666666'']::uuid[])'),
   '>', 0, 'Nach der Bestätigung sieht dasselbe Konto das Verzeichnis');
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.profile_contacts'),
@@ -998,7 +1012,7 @@ select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.goals'),
   1, 'Nach der Bestätigung sind die eigenen Ziele wieder lesbar');
 select is(pg_temp.count_as('66666666-6666-6666-6666-666666666666',
-  'select count(*)::int from public.profiles_public where id = ''dddddddd-0000-0000-0000-00000000000d'''),
+  'select count(*)::int from public.profil_karten(array[''dddddddd-0000-0000-0000-00000000000d'']::uuid[])'),
   1, 'Nach der Bestätigung erscheint das Profil für die anderen im Verzeichnis');
 select is(pg_temp.count_as('dddddddd-0000-0000-0000-00000000000d',
   'select count(*)::int from public.my_activation_state() where activated = true'),
@@ -1542,16 +1556,18 @@ from (select pg_temp.rumpf_ohne_kommentare(
 
 select is(
   pg_temp.try_as('66666666-6666-6666-6666-666666666666',
-    'update public.profiles set cover_url = ''https://x/cover.webp''
-      where id = ''66666666-6666-6666-6666-666666666666'''),
-  'OK', 'Ein Mitglied schreibt sein eigenes cover_url');
+    'select public.profil_speichern(
+       ''Impact'', '''', '''', '''', null, null, array[]::text[], array[]::text[],
+       null, null, ''{}''::jsonb, array[]::text[], null, ''https://x/cover.webp'')'),
+  'OK', 'Ein Mitglied schreibt sein eigenes cover_url — seit AGE-1001 ueber '
+        '`profil_speichern`, weil der direkte Schreibweg mit dem Leserecht '
+        'gefallen ist');
 
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
-    'select count(*)::int from public.profiles_public
-      where id = ''66666666-6666-6666-6666-666666666666''
-        and cover_url = ''https://x/cover.webp'''),
-  1, 'cover_url erreicht die fremde Ansicht über profiles_public');
+    'select count(*)::int from public.profil_karten(array[''66666666-6666-6666-6666-666666666666'']::uuid[])
+      where cover_url = ''https://x/cover.webp'''),
+  1, 'cover_url erreicht die fremde Ansicht über `profil_karten`');
 
 -- Gegenprobe zur Neudeklaration: das Gate der Sicht muss sie überlebt haben.
 -- Ein Anhängen, das die beiden is_activated-Bedingungen beim Abschreiben
@@ -1570,8 +1586,9 @@ update public.profiles
 
 select is(
   pg_temp.count_as('c6c6c6c6-0000-0000-0000-00000000c6c6',
-    'select count(*)::int from public.profiles_public'),
-  0, 'Nach dem Anhängen von cover_url gilt das Gate der Sicht unverändert');
+    'select count(*)::int from public.profil_karten(array[''66666666-6666-6666-6666-666666666666'']::uuid[])'),
+  0, 'Nach dem Anhängen von cover_url gilt das Gate unverändert — es steht seit '
+     'AGE-1001 in der Funktion statt in der Sicht, und genau das misst dieser Fall');
 
 select is(
   (select profile_completion from public.profiles
