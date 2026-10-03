@@ -164,7 +164,9 @@ haben nur `authenticated` und, wo nötig, `service_role` — **niemals `anon`**.
 |---|---|---|
 | `is_activated()` | boolean | Konto des Aufrufers bestätigt, nicht gesperrt, nicht gelöscht |
 | `current_tier_rank()` | int (1–6) | Rang der eigenen Mitgliedsstufe |
-| `has_level(p_min_rank int)` | boolean | Eigener Rang ≥ Schwelle |
+| `has_level(p_min_rank int)` | boolean | Eigener Rang ≥ Schwelle — hält ab AGE-1000 nur noch die **Clubschwelle** (Rang 4) |
+| `darf(p_schluessel text)` | boolean | Trägt der Aufrufer dieses Feature-Recht? Mindestrang aus `public.berechtigungen`; unbekannter Schlüssel = `false` |
+| `meine_rechte()` | text[] | Die Feature-Rechte des Aufrufers, sortiert. Leeres Array ohne Sitzung, ohne Aktivierung und für DISCOVER |
 | `is_admin()` | boolean | Zeile in `staff_roles` mit Rolle `admin` |
 | `is_matching_manager()` | boolean | Zeile in `staff_roles` mit Rolle `matching_manager` |
 
@@ -277,7 +279,7 @@ Neben den Prüffunktionen aus 3.2:
 
 | Funktion | Zweck |
 |---|---|
-| `search_directory(...)` | Verzeichnissuche mit Facetten, inklusive Kompass-Filter |
+| `search_directory(...)` | Verzeichnissuche mit Facetten, inklusive Kompass-Filter. Eintrittstor ab AGE-1000: `darf('verzeichnis.suchen')` (Rang 6) statt `has_level(4)` |
 | `generate_matches_for(profile)` | Übereinstimmungen serverseitig erzeugen |
 | `recompute_my_matches()` | Eigene Matches neu berechnen |
 | `register_for_event(event)` | Anmeldung mit Kapazitätsprüfung |
