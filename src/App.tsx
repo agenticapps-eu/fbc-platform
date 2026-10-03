@@ -50,6 +50,11 @@ function gatedElement(item: NavItem) {
   // Inhalt gesperrt (Spec §1). Bewusst VOR der Section-Prüfung: /meine-chancen liegt
   // seit AGE-314 unter „mein-bereich", soll aber weiter mauern statt wegzuleiten.
   if (item.minTier) return <MembershipGate min={item.minTier}>{element}</MembershipGate>;
+  // AGE-1000: dasselbe fuer ein Feature-Recht. Bewusst eine eigene Zeile und
+  // kein zusammengefasster Ausdruck — `minTier` ist die Clubschwelle und `darf`
+  // ein Recht darueber; sie in einem Aufruf zu mischen hiesse, zwei Sorten
+  // Schwelle als eine zu behandeln.
+  if (item.darf) return <MembershipGate darf={item.darf}>{element}</MembershipGate>;
   // requiresAuth: ENTDECKEN mauert (Schaufenster bleibt sichtbar), persönliche
   // Bereiche leiten zum Login — dort gibt es ohne Konto nichts zu zeigen.
   if (item.requiresAuth) {

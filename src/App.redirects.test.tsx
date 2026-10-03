@@ -5,12 +5,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { ToastProvider } from "./components/ui/Toast";
 import type { AuthContextValue } from "./providers/auth-context";
-import { AuthFixture, authAsTier } from "./test/auth-fixtures";
+import { AuthFixture, authAsTier, seedeRechte } from "./test/auth-fixtures";
 
 afterEach(() => localStorage.clear());
 
 function renderAt(path: string, value: AuthContextValue) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // AGE-1000: Die Rechte des Fixtures in den Cache, sonst fragt `useDarf` die
+  // RPC, findet keinen Server und meldet „kein Recht" — der Test maesse dann
+  // das fehlende Netz statt der Stufe.
+  seedeRechte(queryClient, value);
   return render(
     <AuthFixture value={value}>
       <QueryClientProvider client={queryClient}>
@@ -53,8 +57,13 @@ describe("Redirects alter URLs", () => {
     expect(screen.getByRole("heading", { name: "Aktivität" })).toBeInTheDocument();
   });
 
-  it("/verzeichnis → /mitglieder (min Discover)", async () => {
-    renderAt("/verzeichnis", authAsTier("discover"));
+  // AGE-1000: `impact` statt `discover`. Die Weiterleitung selbst ist
+  // unveraendert — gemessen wird, wo sie LANDET, und das setzt voraus, dass die
+  // Zielseite auch rendert. Seit das Verzeichnis am Recht `verzeichnis.suchen`
+  // haengt, zeigt `discover` dort die Wand, und der Test maesse dann die Wand
+  // statt der Weiterleitung.
+  it("/verzeichnis → /mitglieder (Recht verzeichnis.suchen)", async () => {
+    renderAt("/verzeichnis", authAsTier("impact"));
 
     // "Verzeichnis" kommt aus MemberDirectory und rendert nur bei echtem
     // Seiteninhalt — die Wand zeigt nur den Hero-Titel ("Mitglieder").

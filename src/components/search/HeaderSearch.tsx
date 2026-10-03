@@ -4,7 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "../ui/Avatar";
 import { useOverlay } from "../ui/useOverlay";
-import { CLUB_LEVEL, CLUB_RANK, levelLabel } from "../../config/levels";
+import { levelLabel } from "../../config/levels";
+import { BERECHTIGUNG_STUFE } from "../../config/berechtigungen";
+import { useDarf } from "../../hooks/useDarf";
 import { useAuth } from "../../providers/auth-context";
 import { Icon } from "../ui/icons";
 import {
@@ -38,17 +40,26 @@ import {
  *    „Aufstieg nötig" erscheinen: ein Anmeldefehler, verkleidet als
  *    Verkaufsargument. Die stufenabhängige Formulierung greift deshalb erst
  *    NACH einer erfolgreichen, leeren Antwort.
- * 4. **Enter unterhalb `discover` führt NICHT ins Verzeichnis.** `/mitglieder`
- *    liegt hinter `MembershipGate min="discover"` (`nav.ts`, `App.tsx`); dort
- *    mountet `MemberDirectory` nie und der Begriff verschwände hinter einer
- *    Wand.
+ * 4. **Enter ohne `verzeichnis.suchen` führt NICHT ins Verzeichnis.**
+ *    `/mitglieder` liegt hinter `MembershipGate darf="verzeichnis.suchen"`
+ *    (`nav.ts`, `App.tsx`); dort mountet `MemberDirectory` nie und der
+ *    Begriff verschwände hinter einer Wand.
+ *
+ * ══ DIE SCHWELLE IST EIN RECHT, KEIN RANG (AGE-1000) ═════════════════════
+ * Bis AGE-1000 stand hier `(levelRank ?? 0) >= CLUB_RANK`. Detlevs SPEC 01
+ * (V5 FINAL) führt „Mitglieder gezielt suchen" als Recht allein für IMPACT,
+ * und wo diese Schwelle liegt, weiß ab jetzt nur die Datenbank. Dieser
+ * Einstieg fragt deshalb nach dem NAMEN des Rechts.
+ *
+ * Der Fall „unbekannt" bleibt dabei ein eigener Fall und wird NICHT zu
+ * „nein": `laedt` aus `useDarf` tritt an die Stelle von `tierLoading`. Die
+ * Begründung darunter gilt unverändert — nur die Quelle der Unklarheit hat
+ * gewechselt.
  */
-
-const DISCOVER_RANK = CLUB_RANK;
 const ENTPRELLUNG_MS = 300;
 
 export default function HeaderSearch() {
-  const { user, levelRank, tierLoading } = useAuth();
+  const { user, tierLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -96,21 +107,21 @@ export default function HeaderSearch() {
 
   const begriff = roh.trim();
   const langGenug = begriff.length >= HEADER_SEARCH_MIN_CHARS;
-  // `levelRank` ist `null` in ZWEI Lagen: solange das Profil lädt, und dauerhaft,
-  // wenn es nach drei Versuchen nicht geladen werden konnte
-  // (`activationLookupFailed`, AuthProvider.tsx:169). `(levelRank ?? 0)` machte
-  // aus beiden „unterhalb discover" — ein `impact`-Mitglied mit gescheitertem
-  // Profilabruf bekam den Aufstiegs-Hinweis und landete mit Enter auf
-  // `/mitgliedschaft`. Genau der Anmeldefehler, verkleidet als Verkaufsargument,
-  // den Punkt 3 oben für die Abfrage-Seite ausschließt — er kam durch die
-  // Stufen-Tür wieder herein (Befund des Code-Reviews).
+  // Der Zustand ist in ZWEI Lagen unklar: solange das Profil lädt, und
+  // solange die Rechte laden. Beide als „kein Recht" zu behandeln wäre der
+  // Fehler, den AGE-903 hier schon einmal hatte: ein `impact`-Mitglied mit
+  // gescheitertem Profilabruf bekam den Aufstiegs-Hinweis und landete mit
+  // Enter auf `/mitgliedschaft` — der Anmeldefehler, verkleidet als
+  // Verkaufsargument, den Punkt 3 oben für die Abfrage-Seite ausschließt
+  // (Befund des Code-Reviews zu AGE-903).
   //
-  // Unbekannt ist deshalb ein eigener Fall, kein „zu niedrig": die Formulierung
-  // bleibt neutral, und Enter geht ins Verzeichnis, wo `MembershipGate` die
-  // richtige Wand zeigt, sobald die Stufe wirklich feststeht. Dasselbe tut
-  // MembershipGate.tsx:24.
-  const stufeUnbekannt = tierLoading;
-  const reichtStufe = stufeUnbekannt || (levelRank ?? 0) >= DISCOVER_RANK;
+  // Unbekannt ist deshalb ein eigener Fall, kein „darf nicht": die
+  // Formulierung bleibt neutral, und Enter geht ins Verzeichnis, wo
+  // `MembershipGate` die richtige Wand zeigt, sobald der Zustand feststeht.
+  // Dasselbe tut MembershipGate.tsx.
+  const { darf: darfSuchen, laedt: rechteLaden } = useDarf("verzeichnis.suchen");
+  const stufeUnbekannt = tierLoading || rechteLaden;
+  const reichtStufe = stufeUnbekannt || darfSuchen;
 
   useEffect(() => {
     const id = setTimeout(() => setEntprellt(begriff), ENTPRELLUNG_MS);
@@ -448,7 +459,9 @@ function Ergebnisse({
     ) : (
       <div className="px-4 py-5 text-center">
         <p className="text-sm text-muted">
-          Das Mitgliederverzeichnis ist ab {levelLabel(CLUB_LEVEL)} verfügbar.
+          Die gezielte Suche im Mitgliederverzeichnis ist ab{" "}
+          {levelLabel(BERECHTIGUNG_STUFE["verzeichnis.suchen"])} verfügbar. Ein Wechsel der
+          Stufe läuft über Support.
         </p>
         {/* AGE-907: hieß „Mitgliedschaft ansehen" und führte in den ruhenden
             Kaufweg. Beide Zweige tragen jetzt dasselbe Ziel und deshalb dieselbe

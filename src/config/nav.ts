@@ -1,5 +1,6 @@
 import { lazy, type ComponentType } from "react";
 import type { MembershipLevel } from "./levels";
+import type { Berechtigung } from "./berechtigungen";
 import HomeRedirect from "../components/HomeRedirect";
 
 /**
@@ -46,8 +47,13 @@ export interface NavItem {
   Component: ComponentType;
   /** Gruppierung in der Sidebar. */
   section: NavSection;
-  /** Mindest-Mitgliedsstufe. Löst in App.tsx die „Mitglied werden"-Wand aus. */
+  /** Mindest-Mitgliedsstufe — die CLUBSCHWELLE. Löst in App.tsx die
+   *  „Mitglied werden"-Wand aus. */
   minTier?: MembershipLevel;
+  /** Feature-Recht aus `berechtigungen` (AGE-1000). Löst dieselbe Wand aus,
+   *  fragt aber nach dem NAMEN des Rechts statt nach einem Rang: wo seine
+   *  Schwelle liegt, weiß nur die Datenbank. Genau eines von beiden setzen. */
+  darf?: Berechtigung;
   /** Route nur für eingeloggte Nutzer (ohne Stufen-Anforderung). */
   requiresAuth?: boolean;
 }
@@ -107,21 +113,26 @@ export const navItems: NavItem[] = [
     label: "Mitglieder",
     Component: MitgliederPage,
     section: "entdecken",
-    // AGE-903: Liste UND erweiterte Felder tragen jetzt DIESELBE Schwelle,
-    // `discover` (Rang 4) — die unterste Clubstufe. Die zweistufige Trennung aus
-    // AGE-598 (Liste ab Rang 2, erweiterte Felder ab Rang 3) ist entfallen:
-    // unterhalb des Clubs gibt es kein Verzeichnis mehr, auch keins mit
-    // maskierten Spalten.
+    // AGE-1000: Liste UND Suche tragen jetzt das Recht `verzeichnis.suchen`
+    // (Mindestrang 6, IMPACT) statt der Clubschwelle. Detlevs SPEC 01
+    // (V5 FINAL) führt „Mitglieder gezielt suchen" als Recht allein für
+    // IMPACT — das Verzeichnis ist nicht mehr die Clubleistung.
+    //
+    // Hier steht deshalb KEIN `minTier` mehr. Der Unterschied ist nicht
+    // kosmetisch: `minTier` wäre eine zweite Kopie einer Schwelle, die in
+    // `berechtigungen` steht, und sie würde beim nächsten Verschieben
+    // auseinanderlaufen.
     //
     // Die Schranke folgt der Datenbank, sie führt sie nicht: die Zusage trägt
-    // `search_directory`, hier steht nur Komfort. Sie wird trotzdem mitgezogen,
-    // weil eine Fläche, die die RLS freigibt und die Navigation verbirgt,
-    // schlechter ist als beides zu.
+    // `search_directory`, hier steht nur Komfort. Sie wird trotzdem
+    // mitgezogen, weil eine Fläche, die die RLS freigibt und die Navigation
+    // verbirgt, schlechter ist als beides zu.
     //
-    // (Der Wert stand bis AGE-598 auf `discover`, dann auf `connect`, jetzt
-    // wieder auf `discover` — und das ist NICHT dieselbe Stufe wie beim ersten
-    // Mal: `discover` hiess damals Rang 3 und heisst jetzt Rang 4.)
-    minTier: "discover",
+    // (Der Wert stand bis AGE-598 auf `discover`, dann auf `connect`, dann
+    // wieder auf `discover` — und `discover` hiess dabei einmal Rang 3 und
+    // einmal Rang 4. Genau diese Kette ist der Grund, hier keinen
+    // Stufennamen mehr zu führen.)
+    darf: "verzeichnis.suchen",
   },
   { path: "/aktivitaet", label: "Aktivität", Component: AktivitaetPage, section: "entdecken" },
 

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "../App";
 import { ToastProvider } from "./ui/Toast";
 import type { AuthContextValue } from "../providers/auth-context";
-import { AuthFixture, authAsTier, fakeAuthValue } from "../test/auth-fixtures";
+import { AuthFixture, authAsTier, fakeAuthValue, seedeRechte } from "../test/auth-fixtures";
 import { REGISTRIEREN_PFAD } from "../pages/LoginPage";
 
 afterEach(() => localStorage.clear());
@@ -22,6 +22,10 @@ function authLoadingTier(): AuthContextValue {
 
 function renderAt(path: string, value: AuthContextValue) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // AGE-1000: Die Rechte des Fixtures in den Cache, sonst fragt `useDarf` die
+  // RPC, findet keinen Server und meldet „kein Recht" — der Test maesse dann
+  // das fehlende Netz statt der Stufe.
+  seedeRechte(queryClient, value);
   return render(
     <AuthFixture value={value}>
       <QueryClientProvider client={queryClient}>
@@ -89,15 +93,16 @@ describe("MembershipGate für Entdecken-Routen", () => {
   // AGE-450: /meine-chancen ist keine gegatete Route mehr (leitet auf /). Diese
   // beiden Fälle — „Zur Startseite" statt „Mitglied werden", und der Upgrade-Weg —
   // prüfen wir jetzt an /mitglieder, der verbleibenden stufen-gegateten Route.
-  // Die Schranke stand bis AGE-598 auf `discover`, dann auf `connect`, und seit
-  // AGE-903 wieder auf `discover` — bei gewandertem Rang (3 → 4). `active` liegt
-  // in jeder dieser Fassungen darunter, der Fall bleibt also derselbe; nur die
-  // Stufe im Wandtext wechselt mit.
+  // Die Schranke stand bis AGE-598 auf `discover`, dann auf `connect`, dann
+  // wieder auf `discover` (bei gewandertem Rang 3 → 4) und ist mit AGE-1000
+  // kein Stufenname mehr, sondern das Recht `verzeichnis.suchen` (Rang 6).
+  // `active` liegt in jeder dieser Fassungen darunter, der Fall bleibt also
+  // derselbe; nur die Stufe im Wandtext wechselt mit — jetzt IMPACT.
   it("zeigt einer zu niedrigen Stufe die Stufen-Wand mit „Zur Startseite“ statt CTA", () => {
     renderAt("/mitglieder", authAsTier("active"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Impact verfügbar" }),
     ).toBeInTheDocument();
     // Eingeloggt-aber-zu-niedrig: kein „Mitglied werden"-CTA, nur „Zur Startseite".
     // Seit AGE-616 ist der CTA ein Link — beide Rollen prüfen, sonst ginge eine
@@ -133,38 +138,55 @@ describe("MembershipGate für Entdecken-Routen", () => {
  * /verzeichnis und leitete zu niedrige Stufen weg. Als Top-Level-Eintrag „Mitglieder"
  * mauert es stattdessen (Spec §1) — die Zusage ist dieselbe, nur die Einlösung ist neu.
  */
-describe("Stufen-Gating für /mitglieder (min Discover)", () => {
+describe("Rechte-Gating für /mitglieder (verzeichnis.suchen)", () => {
   it("zeigt Active die Wand statt Mitgliederdaten", () => {
     renderAt("/mitglieder", authAsTier("active"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Impact verfügbar" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 
-  // AGE-903 — DIESE ZUSAGE IST UMGEDREHT, und sie ist die wichtigste der Datei.
-  //
-  // Sie hiess bis hierher „lässt Connect das Verzeichnis sehen — die neue
-  // Schwelle" und war mit AGE-598 entstanden. Jetzt sagt sie das Gegenteil zu,
-  // und zwar nicht, weil AGE-598 falsch war, sondern weil `connect` inzwischen
-  // ein anderer RANG ist: damals 2 und unter der Schranke, seit AGE-903 Rang 3
-  // und weiterhin unter ihr — nur liegt die Schranke jetzt bei 4 statt bei 2.
-  //
-  // Rang 3 ist damit der teuerste Fall der Datei: der höchste Rang ausserhalb
-  // des Clubs. Hielte die Wand bei ihm nicht, hielte sie nirgends, und die
-  // Zusage über `active` allein hätte das nicht gezeigt.
-  it("zeigt Connect die Wand — Rang 3 ist der höchste Rang ausserhalb des Clubs", () => {
-    renderAt("/mitglieder", authAsTier("connect"));
+  // Der Fall, den AGE-1000 NEU erzeugt: ein Konto IM Club, das das Verzeichnis
+  // trotzdem nicht sieht. Bis hierher gab es ihn nicht — Clubschwelle und
+  // Verzeichnisschwelle waren dieselbe Zahl.
+  it("zeigt Discover die Wand — im Club und trotzdem ohne Suchrecht", () => {
+    renderAt("/mitglieder", authAsTier("discover"));
 
     expect(
-      screen.getByRole("heading", { name: "Dieser Bereich ist ab Discover verfügbar" }),
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Impact verfügbar" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
   });
 
-  it("lässt Discover das Verzeichnis sehen", async () => {
-    renderAt("/mitglieder", authAsTier("discover"));
+  // AGE-1000 — DIESE ZUSAGE IST ZUM ZWEITEN MAL UMGEDREHT, und sie ist die
+  // wichtigste der Datei.
+  //
+  // Erste Fassung (AGE-598): „lässt Connect das Verzeichnis sehen".
+  // Zweite Fassung (AGE-903): „zeigt Connect die Wand" — nicht weil AGE-598
+  // falsch war, sondern weil `connect` ein anderer RANG wurde und die Schranke
+  // von 2 auf 4 stieg.
+  // Dritte Fassung (AGE-1000): der teuerste Fall ist nicht mehr `connect`,
+  // sondern **`focus`**. Die Schranke ist das Recht `verzeichnis.suchen`
+  // (Rang 6), und Rang 5 ist der höchste Rang ohne dieses Recht. Hielte die
+  // Wand bei ihm nicht, hielte sie nirgends — und eine Zusage über `connect`
+  // oder `active` zeigte das nicht, weil beide ausserhalb des Clubs liegen und
+  // schon an der Clubschwelle scheitern könnten.
+  it("zeigt Focus die Wand — Rang 5 ist der höchste Rang ohne das Suchrecht", () => {
+    renderAt("/mitglieder", authAsTier("focus"));
+
+    expect(
+      screen.getByRole("heading", { name: "Dieser Bereich ist ab Impact verfügbar" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Verzeichnis" })).not.toBeInTheDocument();
+  });
+
+  // Bis AGE-1000 hiess diese Zusage „lässt Discover das Verzeichnis sehen".
+  // Sie ist die Positivkontrolle zur Wand: ohne sie wären die Zusagen darüber
+  // auch von einem Gate erfüllt, das /mitglieder für ALLE zumacht.
+  it("lässt Impact das Verzeichnis sehen", async () => {
+    renderAt("/mitglieder", authAsTier("impact"));
 
     // AGE-642: Seite kommt asynchron nach.
     await screen.findByRole("heading", { name: "Verzeichnis" });

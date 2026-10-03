@@ -9,6 +9,7 @@ import { Input } from "../ui/Input";
 import { Tabs } from "../ui/Tabs";
 import { useToast } from "../ui/toast-context";
 import { useAuth } from "../../providers/auth-context";
+import { useDarf } from "../../hooks/useDarf";
 import {
   createEvent,
   EVENT_TYPE_OPTIONS,
@@ -35,6 +36,16 @@ export default function EventsList() {
   const { user } = useAuth();
   const uid = user?.id ?? null;
   const [creating, setCreating] = useState(false);
+  // AGE-1000: Ein Event anzulegen verlangt `events.erstellen` (IMPACT). Bis
+  // hierher durfte es JEDES aktivierte Konto — `events_write_host` prüfte nur
+  // `is_activated()` und den Host. Die Grenze trägt jetzt die Datenbank; dieser
+  // Knopf hört auf, etwas zu versprechen, was sie ablehnt.
+  //
+  // `laedt` ist dabei kein `false`: während die Rechte laden, bleibt der Knopf
+  // weg statt kurz aufzublitzen. Der umgekehrte Fehler — ihn im Ladefenster zu
+  // zeigen — führte ein berechtigtes Konto in ein Formular, das es gleich
+  // wieder verliert, und ein unberechtigtes in eine Ablehnung der RLS.
+  const { darf: darfAnlegen } = useDarf("events.erstellen");
 
   const events = useQuery({ queryKey: eventsListKey(uid), queryFn: () => fetchEvents(uid) });
   // `enabled`, nicht nur ein verstecktes Ergebnis: eine Vorlage gehört immer
@@ -49,7 +60,7 @@ export default function EventsList() {
 
   return (
     <section className="space-y-6">
-      {user && !creating && (
+      {user && darfAnlegen && !creating && (
         <header className="flex justify-end">
           <Button size="sm" onClick={() => setCreating(true)}>
             Event anlegen
@@ -57,7 +68,7 @@ export default function EventsList() {
         </header>
       )}
 
-      {creating && user && (
+      {creating && user && darfAnlegen && (
         <Card>
           <CreateEvent hostId={user.id} onDone={() => setCreating(false)} />
         </Card>
