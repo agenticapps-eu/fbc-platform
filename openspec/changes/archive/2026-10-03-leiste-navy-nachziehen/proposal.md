@@ -87,14 +87,15 @@ Die **Aktivfläche** hielt die 3:1 noch nie. Der Zustand ist durch weitere
 Merkmale erkennbar — aber **nicht durch dieselben in beiden Zuständen**, und
 die erste Fassung dieses Absatzes hat das verschwiegen:
 
-- **Aufgeklappt:** weisse halbfette Schrift (7,19:1 auf der Füllung) und der
-  weisse Linksbalken.
-- **Eingeklappt gibt es beide nicht.** Der Balken hängt an
-  `isActive && !collapsed`, die Beschriftung an `!collapsed`. Übrig bleiben die
-  **Farbe** des Symbols (`#FFFFFF` statt `#9FB4D2`, 14,34:1 statt 6,78:1 gegen
-  die Leiste) und seine **Form** — `NavIcon` schaltet von `line` auf `solid`.
-  Form und Farbe zusammen, nicht Farbe allein: genau das verlangt die bestehende
-  Anforderung „Farbe trägt nie allein eine Bedeutung".
+**Aufgeklappt** sind es die weisse halbfette Schrift (7,19:1 auf der Füllung)
+und der weisse Linksbalken.
+
+**Eingeklappt gibt es beide nicht.** Der Balken hängt an
+`isActive && !collapsed`, die Beschriftung an `!collapsed`. Übrig bleiben die
+**Farbe** des Symbols (`#FFFFFF` statt `#9FB4D2`, 14,34:1 statt 6,78:1 gegen die
+Leiste) und seine **Form** — `NavIcon` schaltet von `line` auf `solid`. Form und
+Farbe zusammen, nicht Farbe allein: genau das verlangt die bestehende
+Anforderung „Farbe trägt nie allein eine Bedeutung".
 
 Die Füllung ist in beiden Fällen Dekoration, nicht das Signal — und das gehört
 in die Spec, sonst wird beim nächsten Griff an die Farben eine Zahl verteidigt,
