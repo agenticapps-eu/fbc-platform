@@ -13,7 +13,7 @@
 -- pgTAP-Transaktion, nichts wird committet.
 
 begin;
-select plan(442);
+select plan(443);
 
 -- ── Fixtures (als Superuser-Testrolle → an der RLS vorbei) ───────────────────
 -- auth.users-Insert feuert handle_new_user() und legt die public.profiles-Zeile an.
@@ -264,7 +264,17 @@ select is(
     'select count(*)::int from public.profile_interests where profile_id = ''66666666-6666-6666-6666-666666666666'''),
   1, 'Discover (Rang 4) sieht fremde Interessen');
 
--- ── 3. offers — ab `discover` (Rang 4) ──────────────────────────────────────
+-- ── 3. offers — ab `suche_biete` (Rang 5, AGE-1000) ─────────────────────────
+-- **Die Schwelle ist gewandert, von Rang 4 auf Rang 5**, und sie steht nicht
+-- mehr als Zahl in der Policy: `offers_select` ruft `darf('suche_biete')`.
+-- Detlevs SPEC 01 (V5 FINAL) fuehrt „SUCHE/BIETE einstellen und lesen" als
+-- Recht ab FOCUS. Die Zusage „Discover (Rang 4) sieht fremde Angebote" hat ihre
+-- Aufgabe erfuellt und ist mit AGE-1000 rot geworden — genau dafuer stand sie.
+--
+-- Die Positivkontrolle laeuft ueber das Admin-Fixture (`impact`, Rang 6) und
+-- nicht ueber den Eigentuemer: eine EIGENE Zeile kommt ohne jedes Recht zurueck
+-- und belegte hier nichts. `offers_select` kennt keine Admin-Ausnahme, die
+-- Zeile kommt also wegen des Rangs.
 select is(
   pg_temp.count_as('33333333-3333-3333-3333-333333333333',
     'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
@@ -273,7 +283,14 @@ select is(
 select is(
   pg_temp.count_as('44444444-4444-4444-4444-444444444444',
     'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
-  1, 'Discover (Rang 4) sieht fremde Angebote');
+  0, 'Discover (Rang 4) sieht KEINE fremden Angebote mehr — SUCHE/BIETE ist ab '
+     'AGE-1000 ein FOCUS-Recht');
+
+select is(
+  pg_temp.count_as('aaaaaaaa-0000-0000-0000-000000000001',
+    'select count(*)::int from public.offers where profile_id = ''66666666-6666-6666-6666-666666666666'''),
+  1, 'Rang 6 sieht sie — ohne diese Zeile waere die Zusage darueber auch von '
+     'einer Policy erfuellt, die fremde Angebote fuer ALLE zumacht');
 
 -- open_contact steuert, ob Level-Gate + Welpenschutz gelten (AGE-455). Die Gate-Tests
 -- in Abschnitt 4–6 prüfen den GESCHLOSSENEN Modus (§2-Default); der Migrations-Seed

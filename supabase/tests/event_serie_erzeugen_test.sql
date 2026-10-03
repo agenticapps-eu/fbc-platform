@@ -45,8 +45,12 @@ insert into auth.users (id, aud, role, email) values
   ('c0000000-0000-0000-0000-000000000012', 'authenticated', 'authenticated', 'age630-rpc-fremd@test.fbc'),
   ('c0000000-0000-0000-0000-000000000013', 'authenticated', 'authenticated', 'age630-rpc-gast@test.fbc');
 
+-- `tier = 'impact'` seit AGE-1000: ein Event anzulegen verlangt das Recht
+-- `events.erstellen` (Mindestrang 6). Die Zusagen dieser Datei messen Serien,
+-- Vorlagen und Rundrufe — nicht die Stufenschwelle. Ohne diese Zeile scheitern
+-- sie an einer Grenze, die sie gar nicht untersuchen.
 update public.profiles
-   set activated_at = now()
+   set activated_at = now(), tier = 'impact'
  where id in ('c0000000-0000-0000-0000-000000000011',
               'c0000000-0000-0000-0000-000000000012',
               'c0000000-0000-0000-0000-000000000013');

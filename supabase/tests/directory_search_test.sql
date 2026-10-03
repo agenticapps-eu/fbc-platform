@@ -17,7 +17,7 @@
 -- Assertions als Superuser-Testrolle laufen. Alles in der pgTAP-Transaktion.
 
 begin;
-select plan(35);
+select plan(38);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- auth.users-Insert feuert handle_new_user() und legt public.profiles an.
@@ -31,7 +31,13 @@ insert into auth.users (id, aud, role, email) values
   -- Stufe ZWISCHEN der untersten und `impact`, und genau dort liegt die Grenze,
   -- die AGE-903 auf Rang 4 hebt.
   ('d1000000-0000-0000-0000-000000000006', 'authenticated', 'authenticated', 'frida@dir.test.fbc'),
-  ('d1000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'gero@dir.test.fbc');
+  ('d1000000-0000-0000-0000-000000000007', 'authenticated', 'authenticated', 'gero@dir.test.fbc'),
+  -- Hilde kam mit AGE-1000 dazu, aus demselben Grund wie Frida und Gero mit
+  -- AGE-598: die Datei kannte keine Stufe ZWISCHEN der Clubschwelle und
+  -- `impact`, und genau dort liegt die Grenze jetzt. Ohne sie belegte diese
+  -- Datei nur „Rang 4 nein, Rang 6 ja" und liesse offen, wo zwischen beiden
+  -- die Schwelle sitzt.
+  ('d1000000-0000-0000-0000-000000000008', 'authenticated', 'authenticated', 'hilde@dir.test.fbc');
 
 update public.profiles set tier = 'impact', name = 'Anna', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000001';
@@ -43,25 +49,34 @@ update public.profiles set tier = 'impact', name = 'Cem', is_public = false
 -- Dora trägt ein Angebot OHNE Kategorie: has_offers ja, offer_categories leer.
 update public.profiles set tier = 'impact', name = 'Dora', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000004';
--- Die drei Betrachter umschliessen die Grenze, und nach AGE-903 liegt sie
--- zwischen Rang 3 und Rang 4:
+-- Die Betrachter umschliessen die Grenze. **Mit AGE-1000 ist sie gewandert,**
+-- von „zwischen 3 und 4" auf „zwischen 5 und 6": Detlevs SPEC 01 (V5 FINAL)
+-- führt „Mitglieder gezielt suchen" als Recht allein für IMPACT.
 --
---   Egon  `active`   (Rang 1) — der unterste Rang, ausserhalb
---   Gero  `connect`  (Rang 3) — der HÖCHSTE Rang ausserhalb des Clubs, und
---                              damit der interessanteste Fall der Datei
---   Frida `discover` (Rang 4) — GENAU die unterste Clubstufe
+--   Egon  `active`   (Rang 1) — der unterste Rang, weit ausserhalb
+--   Gero  `connect`  (Rang 3) — ausserhalb des Clubs
+--   Frida `discover` (Rang 4) — IM Club und trotzdem ohne Suchrecht; sie war
+--                              bis AGE-1000 der interessante Fall von INNEN
+--                              und ist jetzt einer von zwei Fällen, die
+--                              drinnen stehen und nichts finden
+--   Hilde `focus`    (Rang 5) — der HÖCHSTE Rang ohne Suchrecht und damit
+--                              der interessanteste Fall der Datei: hielte
+--                              die Schwelle bei ihr nicht, wäre sie nirgends
+--                              gehalten
+--   Anna/Bea/Dora `impact` (Rang 6) — mit Suchrecht
 --
--- Frida trug bis AGE-903 `discover` auf Rang 3, Gero `connect` auf Rang 2. Beide
--- behalten ihre ROLLE (die eine gerade drinnen, der andere gerade draussen) und
--- wechseln dafür den Rang — die Grenze ist gewandert, nicht die Fragestellung.
--- Anna (impact, Rang 6) belegt Fridas Fall NICHT: sie liegt zwei Ränge darüber,
--- und eine Zusage, die bei Rang 6 hält, sagt über Rang 4 nichts.
+-- Dass Frida von „gerade drinnen, sieht alles" zu „drinnen, sieht nichts"
+-- wechselt, ist der Kern des Changes und keine Lockerung: das Verzeichnis ist
+-- nicht mehr die Clubleistung, sondern die IMPACT-Leistung. Was Frida behält,
+-- steht in rechte_v5_test.sql — Einzelprofil, Kontaktanfrage, Event-Teilnahme.
 update public.profiles set tier = 'active', name = 'Egon', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000005';
 update public.profiles set tier = 'discover', name = 'Frida', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000006';
 update public.profiles set tier = 'connect', name = 'Gero', is_public = true
   where id = 'd1000000-0000-0000-0000-000000000007';
+update public.profiles set tier = 'focus', name = 'Hilde', is_public = true
+  where id = 'd1000000-0000-0000-0000-000000000008';
 
 -- Annas Kompetenzen. Sie sind das erweiterte Feld, an dem sich die Rang-3-Grenze
 -- MESSEN lässt: `search_directory` gibt die Spalte heraus, und die profiles-RLS
@@ -149,7 +164,7 @@ end $$;
 -- Test die Umgebung mit und schlägt für den falschen Grund fehl — in der CI mit
 -- frischem `db reset` fiele das nie auf.
 create function pg_temp.fixtures() returns text[] language sql immutable as $$
-  select array['Anna','Bea','Cem','Dora','Egon','Frida','Gero']::text[];
+  select array['Anna','Bea','Cem','Dora','Egon','Frida','Gero','Hilde']::text[];
 $$;
 
 -- Anna (impact, rank 6) ist die Aufruferin der Sichtbarkeits-Fälle.
@@ -399,29 +414,46 @@ select isnt(
   null,
   'search_directory traegt nach dem drop/create wieder einen Kommentar');
 
--- ── 9. Positivkontrolle an der untersten Clubstufe ──────────────────────────
--- Die Wache über die Grenze, von INNEN. Sie war schon vor AGE-903 da und stand
--- damals auf Rang 3; sie steht jetzt auf Rang 4 und fragt dasselbe.
+-- ── 9. Positivkontrolle oberhalb der Grenze ─────────────────────────────────
+-- Die Wache über die Grenze, von INNEN. Sie war schon vor AGE-903 da, stand
+-- damals auf Rang 3, mit AGE-903 auf Rang 4 und steht mit AGE-1000 auf Rang 6.
+-- Sie fragt jedes Mal dasselbe.
 --
--- Warum sie nötig ist: AGE-903 hebt die Schwelle, lässt also WENIGER Zeilen
--- durch. „Weniger Zeilen kommen an" ist aber auch genau das Bild, das ein
--- versehentlich zu hoch gesetztes Gate erzeugt. Ohne 9.1 sähe der teuerste
--- denkbare Fehler dieses Changes wie sein Erfolg aus.
+-- Warum sie nötig ist: dieser Change hebt die Schwelle, lässt also WENIGER
+-- Zeilen durch. „Weniger Zeilen kommen an" ist aber auch genau das Bild, das
+-- ein versehentlich zu hoch gesetztes oder ganz geschlossenes Gate erzeugt.
+-- Ohne 9.1 sähe der teuerste denkbare Fehler dieses Changes wie sein Erfolg
+-- aus.
 --
 -- Die Datei sagt oben „RED vor GREEN". Diese ist die Ausnahme und darf es sein:
 -- sie ist eine Gegenprobe und muss grün stehen. Eine Gegenprobe, die erst rot
 -- ist, misst nichts.
+--
+-- Die Aufruferin ist Bea (`impact`, Rang 6) und nicht mehr Frida: Frida hat mit
+-- AGE-1000 kein Suchrecht mehr. Bea ist selbst Fixture und liest Annas Zeile —
+-- eine FREMDE, und genau darauf kommt es an.
 
--- 9.1 Frida steht auf `discover` (Rang 4) und bekommt Annas Kompetenzen
--- GEFÜLLT — die unterste Clubstufe sieht das Verzeichnis vollständig.
+-- 9.1 Bea trägt `verzeichnis.suchen` und bekommt Annas Kompetenzen GEFÜLLT.
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
     select array_to_string(competencies, ',') from public.search_directory()
      where name = 'Anna'
   $q$),
   'Bilanzanalyse',
-  'Rang 4 bekommt die fremden competencies gefüllt — die unterste Clubstufe '
-  'sieht das Verzeichnis vollstaendig');
+  'Rang 6 bekommt die fremden competencies gefüllt — mit dem Suchrecht ist '
+  'das Verzeichnis vollstaendig');
+
+-- 9.1b Hilde (`focus`, Rang 5) bekommt sie NICHT. Das ist die neue Grenze von
+-- der anderen Seite, einen Rang unter dem Recht. Ohne diese Zeile wäre 9.1
+-- auch von einem Gate erfüllt, das bei Rang 5 noch offen steht.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000008', $q$
+    select coalesce(array_to_string(competencies, ','), '(leer)')
+      from public.search_directory() where name = 'Anna'
+  $q$),
+  '(leer)',
+  'Rang 5 bekommt Annas Zeile gar nicht — und damit auch ihre competencies '
+  'nicht');
 
 -- 9.2 HAT IHRE AUFGABE ERFÜLLT UND IST DESHALB FORT.
 --
@@ -440,15 +472,16 @@ select is(
 -- Schwelle als ihre erweiterten Spalten. Diese Zweistufigkeit entfällt. Ihre
 -- Nachfolge tritt 10.1 an — dieselbe Abfrage, und wieder „nur sich selbst".
 
--- ── 10. Liste und erweiterte Spalten tragen DIESELBE Schwelle (AGE-903) ─────
--- Das ist die Aufhebung der Zweistufigkeit aus AGE-598. Vorher gab es einen
--- Mittelzustand: in der Liste, aber mit maskierten Spalten. Den gibt es nicht
--- mehr — unterhalb Rang 4 bekommt ein Aufrufer die EIGENE Zeile und sonst
--- nichts.
+-- ── 10. Liste und erweiterte Spalten tragen DIESELBE Schwelle ───────────────
+-- Das ist die Aufhebung der Zweistufigkeit aus AGE-598 (AGE-903). Vorher gab es
+-- einen Mittelzustand: in der Liste, aber mit maskierten Spalten. Den gibt es
+-- nicht mehr — ohne das Suchrecht bekommt ein Aufrufer die EIGENE Zeile und
+-- sonst nichts.
 --
--- Gero ist hier der wichtigste Betrachter der ganzen Datei: Rang 3 ist der
--- HÖCHSTE Rang ausserhalb des Clubs. Hielte die Schwelle bei ihm nicht, wäre
--- sie nirgends gehalten.
+-- **Die Schwelle selbst ist mit AGE-1000 von Rang 4 auf Rang 6 gewandert**, die
+-- Einheitlichkeit nicht. Hilde ist deshalb jetzt der wichtigste Betrachter der
+-- ganzen Datei: Rang 5 ist der HÖCHSTE Rang ohne Suchrecht. Hielte die Schwelle
+-- bei ihr nicht, wäre sie nirgends gehalten.
 
 -- 10.1 Gero (Rang 3) bekommt GENAU die eigene Zeile. Cem fehlt ohnehin
 -- (`is_public = false`) — das ist keine Stufenfrage und war es nie.
@@ -461,17 +494,39 @@ select is(
   'Rang 3 bekommt genau die eigene Zeile — der höchste Rang ausserhalb des '
   'Clubs sieht kein fremdes Profil');
 
--- 10.2 Die Positivkontrolle unmittelbar darüber: EIN Rang höher steht die
--- ganze Liste offen. Ohne sie wäre 10.1 auch von einem Gate erfüllt, das das
--- Verzeichnis für ALLE zumacht — und das wäre derselbe grüne Befund bei
--- entgegengesetztem Schaden.
+-- 10.1b Frida (Rang 4) bekommt ebenfalls genau die eigene Zeile. Sie steht IM
+-- Club — bis AGE-1000 stand hier die ganze Liste. Diese Zeile ist der Beleg
+-- für die Verschiebung und nicht eine Wiederholung von 10.1.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
     select string_agg(name, ',' order by name) from public.search_directory()
      where name = any(pg_temp.fixtures())
   $q$),
-  'Anna,Bea,Dora,Egon,Frida,Gero',
-  '… und Rang 4 bekommt die ganze Liste — die Grenze liegt zwischen 3 und 4 '
+  'Frida',
+  'Rang 4 bekommt genau die eigene Zeile — das Verzeichnis ist nicht mehr die '
+  'Clubleistung');
+
+-- 10.1c Hilde (Rang 5) auch. Der höchste Rang ohne das Recht.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000008', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Hilde',
+  'Rang 5 bekommt genau die eigene Zeile — der höchste Rang ohne Suchrecht '
+  'sieht kein fremdes Profil');
+
+-- 10.2 Die Positivkontrolle unmittelbar darüber: EIN Rang höher steht die
+-- ganze Liste offen. Ohne sie wären 10.1 bis 10.1c auch von einem Gate
+-- erfüllt, das das Verzeichnis für ALLE zumacht — und das wäre derselbe grüne
+-- Befund bei entgegengesetztem Schaden.
+select is(
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
+    select string_agg(name, ',' order by name) from public.search_directory()
+     where name = any(pg_temp.fixtures())
+  $q$),
+  'Anna,Bea,Dora,Egon,Frida,Gero,Hilde',
+  '… und Rang 6 bekommt die ganze Liste — die Grenze liegt zwischen 5 und 6 '
   'und nicht irgendwo darunter');
 
 -- 10.3 Die eigene Zeile behält ihre erweiterten Felder. Das ist der Selbst-Zweig
@@ -557,17 +612,17 @@ select is(
   '… und auch nicht über den Firmennamen — die Suche ist kein zweiter Weg an '
   'die Liste');
 
--- 11.3 Ab Rang 4 bleibt der reiche Volltext. Die Positivkontrolle nach oben,
+-- 11.3 Mit dem Suchrecht bleibt der reiche Volltext. Die Positivkontrolle nach oben,
 -- und nach AGE-903 die Hauptzusage dieser Gruppe: ohne sie wären 11.1 und 11.2
 -- auch von einer Suche erfüllt, die für NIEMANDEN mehr etwas findet.
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
       from public.search_directory(p_query => 'Bilanzanalyse')
      where name = any(pg_temp.fixtures())
   $q$),
   'Anna',
-  'Rang 4 findet den Kompetenz-Begriff weiterhin — die Bindung verengt die '
+  'Rang 6 findet den Kompetenz-Begriff weiterhin — die Bindung verengt die '
   'Suche für Berechtigte nicht');
 
 -- ── 12. `branche` ist ein Basisfeld ─────────────────────────────────────────
@@ -579,14 +634,16 @@ select is(
 -- Konto UNTERHALB der Schwelle zu messen: nur dort trennte sich Basisfeld von
 -- erweitertem Feld. Diese Trennung ist durch die Ausgabe von
 -- `search_directory` nicht mehr beobachtbar (siehe 10.3) — gemessen wird
--- deshalb an Rang 4, und was die Zusage jetzt hält, ist die Herkunft der Spalte
--- aus `profiles_public`, nicht mehr ihre Sichtbarkeit unterhalb einer Schwelle.
+-- deshalb oberhalb der Schwelle, und was die Zusage hält, ist die Herkunft der
+-- Spalte aus `profiles_public`, nicht mehr ihre Sichtbarkeit unterhalb einer
+-- Schwelle. Mit AGE-1000 ist der Messpunkt von Rang 4 auf Rang 6 gewandert,
+-- weil Rang 4 jetzt gar keine fremde Zeile mehr bekommt.
 --
 -- Dass `profiles_public` bewusst KEINE Stufenschwelle trägt, steht als eigene
 -- Anforderung in der Spec und wird in `rls_test.sql` belegt, nicht hier.
 
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
     select coalesce(branche, '(null)') from public.search_directory()
      where name = 'Anna'
   $q$),
@@ -594,7 +651,7 @@ select is(
   'branche kommt GEFÜLLT an — sie ist ein Basisfeld aus profiles_public');
 
 select is(
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
       from public.search_directory(p_branche => 'Beratung')
      where name = any(pg_temp.fixtures())
@@ -610,7 +667,10 @@ select is(
 -- ein Konto ab Rang 4 nicht. Die niedrigere Stufe bekäme eine Fähigkeit, die
 -- der höheren fehlt, und das widerspräche 11.3.
 --
--- Anna trägt `region = 'Hamburg'`. Beide Stufen müssen daran scheitern — nicht
+-- Anna trägt `region = 'Hamburg'`. Beide Betrachter müssen daran scheitern —
+-- der eine ohne Suchrecht, der andere MIT. Der zweite ist der eigentliche
+-- Beleg: ohne ihn wäre die Zusage auch von einem Gate erfüllt, das beiden
+-- alles verwehrt. Nicht
 -- weil Suche nach Region falsch wäre, sondern weil sie es für BEIDE zugleich
 -- werden muss. Wird diese Zusage rot, weil jemand `region` durchsuchbar macht:
 -- dann gehört es in BEIDE Vektoren, und dann ist Rot hier das richtige Signal.
@@ -620,7 +680,7 @@ select is(
       from public.search_directory(p_query => 'Hamburg')
      where name = any(pg_temp.fixtures())
   $q$) || ' / ' ||
-  pg_temp.names_as('d1000000-0000-0000-0000-000000000006', $q$
+  pg_temp.names_as('d1000000-0000-0000-0000-000000000002', $q$
     select coalesce(string_agg(name, ',' order by name), '(leer)')
       from public.search_directory(p_query => 'Hamburg')
      where name = any(pg_temp.fixtures())
