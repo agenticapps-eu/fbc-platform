@@ -72,6 +72,15 @@ Die Werte für `navy` und die gerechneten Verhältnisse SHALL festgehalten sein:
 Hover SHALL `rgb(255 255 255 / 0.06)` sein, die aktive Zeile
 `rgb(255 255 255 / 0.12)`, die Trennlinie `rgb(255 255 255 / 0.16)`.
 
+**Der Leerzustand gehört dazu, und er ist der Normalfall.** „Noch kein
+Gespräch … Mitglieder entdecken" sieht jedes neue Mitglied, und sein
+sekundärer Knopf trägt `bg-chrome text-on-chrome`. Im dunklen Modus ist Chrome
+`#081527` und hebt sich von `#002B51` mit **1,3:1** ab — praktisch nicht. Die
+beiden Chrome-Tokens SHALL deshalb **innerhalb der Leiste** umgelegt werden, auf
+einen hellen Knopf (`#D7E4F2`, 11,1:1 gegen die Fläche) mit dunkler Schrift
+(`#0C2043`, 12,5:1 darauf). Diese Umlegung SHALL auf die Leiste beschränkt
+bleiben und SHALL NOT auf `html[data-variant="navy"]` stehen.
+
 **Warum die Werte und nicht nur die Schwelle hier stehen:** die drei Flächen
 unterscheiden sich um wenige Prozent, und die naheliegende Wahl fällt durch. Eine
 gefüllte Aktivfläche in der Akzentfarbe der Navigation (`#1F53B0`) trägt den
@@ -96,6 +105,13 @@ Farben wieder offen.
 - **WHEN** ein Thread ungelesene Nachrichten hat
 - **THEN** hebt sich das Abzeichen mit mindestens 3:1 von der Fläche ab, und
   seine Ziffer erfüllt auf dem Abzeichen mindestens 4,5:1
+
+#### Scenario: Der Leerzustand ist bedienbar
+
+- **WHEN** ein Mitglied ohne Gespräche die Leiste im Modus `navy` ausklappt
+- **THEN** ist der Hinweistext lesbar, und der Knopf „Mitglieder entdecken"
+  hebt sich mit mindestens 3:1 von der Fläche ab, mit mindestens 4,5:1 für
+  seine Schrift
 
 #### Scenario: Auf `/chat` gilt weiter die helle Fassung
 

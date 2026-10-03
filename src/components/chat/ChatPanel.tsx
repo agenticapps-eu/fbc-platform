@@ -45,20 +45,27 @@ export function ChatPanel({
 
   if (seite.isError) {
     return (
-      <p className="px-4 py-6 text-sm text-muted">
+      // `--thread-muted` statt `text-muted`: dieses Panel steht auch in der
+      // Nachrichtenleiste, und die traegt im dunklen Modus `#002B51` (AGE-1002).
+      // Der Token faellt auf `/chat` auf `--color-muted` zurueck.
+      <p className="px-4 py-6 text-sm text-[color:var(--thread-muted)]">
         Die Gespräche konnten nicht geladen werden. Lade die Seite neu.
       </p>
     );
   }
 
   if (seite.isLoading) {
-    return <p className="px-4 py-6 text-sm text-muted">Gespräche werden geladen…</p>;
+    return (
+      <p className="px-4 py-6 text-sm text-[color:var(--thread-muted)]">
+        Gespräche werden geladen…
+      </p>
+    );
   }
 
   if (threads.length === 0) {
     return (
       <div className="space-y-3 px-4 py-6">
-        <p className="text-sm text-muted">
+        <p className="text-sm text-[color:var(--thread-muted)]">
           Noch kein Gespräch. Chats entstehen, sobald eine Kontaktanfrage angenommen wurde.
         </p>
         <Link to="/mitglieder">

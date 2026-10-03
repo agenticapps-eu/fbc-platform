@@ -275,6 +275,28 @@ describe("Ein Pill für beide Leisten (AGE-638)", () => {
     expect(screen.getAllByRole("button", { name: "Navigation einklappen" })).toHaveLength(1);
   });
 
+  // ══ EINE FLAECHE, NICHT ZWEI (AGE-1002) ══════════════════════════════════
+  // Bis hierher war die Leiste zweifarbig: eingeklappt `fbc-sidebar-surface`
+  // (im dunklen Modus `#081527`), ausgeklappt `bg-canvas` (weiss). Im hellen
+  // Modus war der Unterschied unsichtbar, weil dort beide weiss sind — genau
+  // deshalb ist das hier eine KLASSEN-Zusage und keine Farbzusage: in jsdom
+  // gibt es kein Theme, und eine berechnete Farbe waere in beiden Faellen
+  // dieselbe. Die Farben selbst stehen in `index.chatleiste-tokens.test.ts`.
+  it("traegt in BEIDEN Zustaenden dieselbe Flaechenklasse", () => {
+    renderApp();
+    const leiste = () => document.getElementById("fbc-nachrichten")!;
+
+    expect(leiste()).toHaveClass("fbc-chat-rail");
+    expect(leiste()).not.toHaveClass("fbc-sidebar-surface");
+    expect(leiste()).not.toHaveClass("bg-canvas");
+
+    fireEvent.click(pill("Nachrichten")!);
+
+    expect(leiste()).toHaveClass("fbc-chat-rail");
+    expect(leiste()).not.toHaveClass("fbc-sidebar-surface");
+    expect(leiste()).not.toHaveClass("bg-canvas");
+  });
+
   it("hat rechts aufgeklappt KEINEN eigenen Knopf im Kopf mehr", () => {
     renderApp();
     fireEvent.click(pill("Nachrichten")!);

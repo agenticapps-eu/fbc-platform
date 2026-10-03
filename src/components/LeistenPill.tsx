@@ -38,10 +38,15 @@ export function LeistenPill({
   onClick,
 }: {
   seite: "links" | "rechts";
-  /** Worauf die Leiste GERADE steht. Die rechte wechselt beim Aufklappen von
-   *  der Chrome- auf die Inhaltsfläche; die Ausbuchtung muss mitwechseln, sonst
-   *  sitzt ein Fleck in der falschen Farbe an ihrer Kante. */
-  flaeche: "leiste" | "inhalt";
+  /** Welche Fläche die Leiste trägt — die Ausbuchtung trägt dieselbe, sonst
+   *  sitzt ein Fleck in der falschen Farbe an ihrer Kante.
+   *
+   *  `"inhalt"` ist mit AGE-1002 entfallen. Es stand für den Zustand „rechte
+   *  Leiste aufgeklappt, also Inhaltsfläche" — den gibt es nicht mehr: die
+   *  rechte Leiste trägt ein- und ausgeklappt `--chat-rail-surface`. Eine
+   *  Variante, die niemand mehr setzt, wäre eine Einladung, sie wieder zu
+   *  setzen. */
+  flaeche: "leiste" | "chat";
   offen: boolean;
   /** `id` der Leiste, die er auf- und zuklappt. */
   steuert: string;
@@ -80,7 +85,7 @@ export function LeistenPill({
         // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
         flaeche === "leiste"
           ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active"
-          : "bg-canvas text-muted hover:text-ink",
+          : "bg-[var(--chat-rail-surface)] text-[color:var(--thread-muted)] hover:text-[color:var(--thread-ink)]",
         // Der Schatten ist GERICHTET — nach aussen, weg von der Leiste. Ein
         // Schatten ringsum sähe aus wie eine schwebende Marke; so sieht es aus,
         // als würfe die Leiste ihre eigene Wölbung.

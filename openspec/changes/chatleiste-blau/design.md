@@ -100,7 +100,32 @@ aktiven Zeile wäre `#8FA5C4` mit **4,0:1** durchgefallen.
 Die vollständige gerechnete Tabelle steht in der Spec, nicht hier: sie ist eine
 Zusage und keine Entwurfsnotiz.
 
-### 4. Die Leiste behält ihre Ränder, aber mit einem Token
+### 4. Chrome wird innerhalb der Leiste umgelegt — für genau einen Knopf
+
+`Button variant="secondary"` steht im Leerzustand der Leiste („Noch kein
+Gespräch … Mitglieder entdecken") und trägt `bg-chrome text-on-chrome`. Auf
+`#002B51` ergibt das **1,3:1** — gerechnet, nicht geschätzt, und damit
+unsichtbar. Für ein neues Mitglied ist das der Normalfall dieser Leiste, nicht
+ein Randfall.
+
+`--color-chrome` und `--color-on-chrome` werden deshalb **innerhalb von
+`.fbc-chat-rail`** umgelegt: `#D7E4F2` auf `#0C2043`, also ein heller Knopf auf
+dunkler Leiste (11,1:1 und 12,5:1).
+
+Das ist eine breite Keule für einen Knopf, und sie ist nur deshalb vertretbar,
+weil nach den übrigen Änderungen dieses Changes **kein anderer Verbraucher** von
+`--color-chrome` in der Leiste übrig ist: die Kopfzeilen und der
+Ungelesen-Punkt lesen `--thread-*`. Das steht als Vorbehalt im CSS-Kommentar,
+und die zwei Verhältnisse stehen als Test.
+
+Verworfen: den Knopf im Leerzustand zu einem Textlink machen. Er steht derselbe
+auf `/chat`, und dort ist der Knopf richtig — eine Komponente mit zwei
+Gestalten wäre teurer als zwei Zeilen CSS.
+
+Verworfen: `variant="ghost"`. Dessen Schrift (`#1F53B0`) trägt auf `#002B51`
+nur 2,2:1.
+
+### 5. Die Leiste behält ihre Ränder, aber mit einem Token
 
 `border-chrome-border` (eingeklappt) und `border-line` (ausgeklappt) werden zu
 `--thread-line`. Im dunklen Modus `rgb(255 255 255 / 0.16)`: eine Trennlinie ist
