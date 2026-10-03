@@ -128,119 +128,126 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
         const istKlappbar = Boolean(section.klappbar && section.title && !collapsed);
         const offen = !istKlappbar || !zugeklappt.has(section.title as string);
         return (
-        <div
-          key={section.title ?? i}
-          className={cn(
-            "flex flex-col gap-1",
-            // AGE-450 #9: Bereichstitel sollen sich klar von den klickbaren Menüitems
-            // abheben. Eine Haarlinie + mehr Luft über jedem Abschnitt (außer dem
-            // ersten) trennt die Gruppen sichtbar als Struktur.
-            // Eingeklappt trägt die Linie die Gruppierung allein — der Titel hat
-            // in einer 4,5-rem-Leiste keinen Platz.
-            i > 0 && "mt-1 border-t border-chrome-border pt-4",
-          )}
-        >
-          {section.title && !collapsed && !istKlappbar && (
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">
-              {section.title}
-            </p>
-          )}
-          {istKlappbar && (
-            <button
-              type="button"
-              onClick={() => umschalten(section.title as string)}
-              aria-expanded={offen}
-              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              {/* Aus dem Icon-Satz, nicht inline gezeichnet: `icons.test.ts`
+          <div
+            key={section.title ?? i}
+            className={cn(
+              "flex flex-col gap-1",
+              // AGE-450 #9: Bereichstitel sollen sich klar von den klickbaren Menüitems
+              // abheben. Eine Haarlinie + mehr Luft über jedem Abschnitt (außer dem
+              // ersten) trennt die Gruppen sichtbar als Struktur.
+              // Eingeklappt trägt die Linie die Gruppierung allein — der Titel hat
+              // in einer 4,5-rem-Leiste keinen Platz.
+              i > 0 && "mt-1 border-t border-chrome-border pt-4",
+            )}
+          >
+            {section.title && !collapsed && !istKlappbar && (
+              <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">
+                {section.title}
+              </p>
+            )}
+            {istKlappbar && (
+              <button
+                type="button"
+                onClick={() => umschalten(section.title as string)}
+                aria-expanded={offen}
+                // Fokusring auf `--leiste-focus` statt `ring-accent` (AGE-1003):
+                // auf der Leistenflaeche `#002B51` traegt der Akzent nur 2,83:1.
+                // Im hellen Modus ist der Token zeichengleich mit dem Akzent.
+                className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]"
+              >
+                {/* Aus dem Icon-Satz, nicht inline gezeichnet: `icons.test.ts`
                   hält fest, dass jeder wiederverwendbare Glyph dort steht — ein
                   eigener Chevron hier wäre der vierte im Baum.
                   `Icon` setzt `aria-hidden` selbst; die Richtung steht ohnehin
                   in `aria-expanded`, und „Dreieck" ergänzt dort nichts. */}
-              <Icon
-                name="chevronDown"
-                className={cn("h-3.5 w-3.5 transition-transform", offen ? "rotate-0" : "-rotate-90")}
-              />
-              {section.title}
-            </button>
-          )}
-          {offen && section.items.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              // `/` (Start) nur bei exaktem Match aktiv, sonst leuchtet es auf jeder Route.
-              // Und ebenso jeder Eintrag, dessen Pfad der ANFANG eines anderen
-              // Eintrags ist: `NavLink` matcht ohne `end` als Präfix, also
-              // leuchteten auf `/admin/mitglieder` „Administration" UND
-              // „Mitglieder" (AGE-566, Diff-Review).
-              //
-              // ABGELEITET statt als Prop am Eintrag: eine Flagge, die der
-              // Aufrufer setzen muss, ist eine Flagge, die er beim nächsten
-              // Unterpfad vergisst — und dann leuchtet wieder alles, ohne dass
-              // ein Test darauf zeigt. Der Abschnitt kennt seine Einträge; er
-              // kann die Frage selbst beantworten.
-              end={item.path === "/" || istPraefixEinesAnderen(item.path, section.items)}
-              onClick={onNavigate}
-              // Eingeklappt ist das Icon die einzige Beschriftung — der Name muss
-              // dann über title (Maus) und aria-label (Screenreader) kommen.
-              //
-              // Das Abzeichen MUSS in diesen Namen hinein: Ein `aria-label`
-              // ERSETZT den Inhalt des Elements, es ergänzt ihn nicht. Stünde
-              // hier nur `item.label`, wäre die Zahl im Abzeichen für einen
-              // Screenreader unsichtbar — sichtbar fürs Auge, stumm für alle
-              // anderen, und ausgerechnet an dem einen Signal, für das dieser
-              // Eintrag existiert.
-              title={collapsed ? zugaenglicherName(item) : undefined}
-              aria-label={collapsed || item.abzeichen ? zugaenglicherName(item) : undefined}
-              className={({ isActive }) =>
-                cn(
-                  "relative flex items-center rounded-md text-sm transition-colors",
-                  navEintragAbstaende(collapsed),
-                  isActive
-                    ? "bg-chrome-active font-semibold text-on-chrome-active"
-                    : "text-on-chrome hover:bg-chrome-elevated hover:text-on-chrome-active",
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {/* Akzent-Linksbalken — gleitet per layoutId zwischen Einträgen.
+                <Icon
+                  name="chevronDown"
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform",
+                    offen ? "rotate-0" : "-rotate-90",
+                  )}
+                />
+                {section.title}
+              </button>
+            )}
+            {offen &&
+              section.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  // `/` (Start) nur bei exaktem Match aktiv, sonst leuchtet es auf jeder Route.
+                  // Und ebenso jeder Eintrag, dessen Pfad der ANFANG eines anderen
+                  // Eintrags ist: `NavLink` matcht ohne `end` als Präfix, also
+                  // leuchteten auf `/admin/mitglieder` „Administration" UND
+                  // „Mitglieder" (AGE-566, Diff-Review).
+                  //
+                  // ABGELEITET statt als Prop am Eintrag: eine Flagge, die der
+                  // Aufrufer setzen muss, ist eine Flagge, die er beim nächsten
+                  // Unterpfad vergisst — und dann leuchtet wieder alles, ohne dass
+                  // ein Test darauf zeigt. Der Abschnitt kennt seine Einträge; er
+                  // kann die Frage selbst beantworten.
+                  end={item.path === "/" || istPraefixEinesAnderen(item.path, section.items)}
+                  onClick={onNavigate}
+                  // Eingeklappt ist das Icon die einzige Beschriftung — der Name muss
+                  // dann über title (Maus) und aria-label (Screenreader) kommen.
+                  //
+                  // Das Abzeichen MUSS in diesen Namen hinein: Ein `aria-label`
+                  // ERSETZT den Inhalt des Elements, es ergänzt ihn nicht. Stünde
+                  // hier nur `item.label`, wäre die Zahl im Abzeichen für einen
+                  // Screenreader unsichtbar — sichtbar fürs Auge, stumm für alle
+                  // anderen, und ausgerechnet an dem einen Signal, für das dieser
+                  // Eintrag existiert.
+                  title={collapsed ? zugaenglicherName(item) : undefined}
+                  aria-label={collapsed || item.abzeichen ? zugaenglicherName(item) : undefined}
+                  className={({ isActive }) =>
+                    cn(
+                      "relative flex items-center rounded-md text-sm transition-colors",
+                      navEintragAbstaende(collapsed),
+                      isActive
+                        ? "bg-chrome-active font-semibold text-on-chrome-active"
+                        : "text-on-chrome hover:bg-chrome-elevated hover:text-on-chrome-active",
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {/* Akzent-Linksbalken — gleitet per layoutId zwischen Einträgen.
                       Eingeklappt entfällt er: neben einem zentrierten Icon in einer
                       schmalen Leiste liest er sich als Rand, nicht als Marke. */}
-                  {isActive && !collapsed && (
-                    <motion.span
-                      layoutId={`sidebar-active-indicator-${indicatorId}`}
-                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-on-chrome-active"
-                      transition={{ duration: preset.duration, ease: preset.ease }}
-                    />
-                  )}
-                  <NavIcon path={item.path} active={isActive} />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                  {item.abzeichen && (
-                    // Ausgeklappt am rechten Rand der Zeile, eingeklappt als
-                    // kleine Marke über der oberen rechten Ecke des Icons. Der
-                    // Link trägt `relative`, die Marke hängt also an ihm und
-                    // nicht am Icon — sie darf es anstoßen, nicht verdecken.
-                    //
-                    // `aria-hidden`, weil der zugängliche Name des Links den
-                    // Inhalt schon trägt (siehe aria-label oben); ohne dies
-                    // stünde die Zahl dort zweimal.
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome",
-                        collapsed ? "absolute -top-0.5 right-0.5" : "ml-auto",
+                      {isActive && !collapsed && (
+                        <motion.span
+                          layoutId={`sidebar-active-indicator-${indicatorId}`}
+                          className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-on-chrome-active"
+                          transition={{ duration: preset.duration, ease: preset.ease }}
+                        />
                       )}
-                    >
-                      {item.abzeichen.text}
-                    </span>
+                      <NavIcon path={item.path} active={isActive} />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {item.abzeichen && (
+                        // Ausgeklappt am rechten Rand der Zeile, eingeklappt als
+                        // kleine Marke über der oberen rechten Ecke des Icons. Der
+                        // Link trägt `relative`, die Marke hängt also an ihm und
+                        // nicht am Icon — sie darf es anstoßen, nicht verdecken.
+                        //
+                        // `aria-hidden`, weil der zugängliche Name des Links den
+                        // Inhalt schon trägt (siehe aria-label oben); ohne dies
+                        // stünde die Zahl dort zweimal.
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome",
+                            collapsed ? "absolute -top-0.5 right-0.5" : "ml-auto",
+                          )}
+                        >
+                          {item.abzeichen.text}
+                        </span>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </NavLink>
-          ))}
-          {offen && section.nachtrag}
-        </div>
+                </NavLink>
+              ))}
+            {offen && section.nachtrag}
+          </div>
         );
       })}
     </nav>

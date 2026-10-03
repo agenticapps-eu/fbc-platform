@@ -72,10 +72,7 @@ const KNOPF_TOKENS = [
  * mussten. `--leiste-focus` ist neu: `ring-accent` trägt auf `#002B51` nur
  * 2,83:1 und fällt damit unter die 3:1 der Norm.
  */
-const LINKE_LEISTE_TOKENS = [
-  "--sidebar-surface",
-  "--leiste-focus",
-] as const;
+const LINKE_LEISTE_TOKENS = ["--sidebar-surface", "--leiste-focus"] as const;
 
 /**
  * Die vier Stellen, die den Fokusring der linken Leiste zeichnen.
@@ -497,7 +494,11 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
   });
 
   it("Schrift auf der Leiste erfuellt 4,5:1", () => {
-    for (const name of ["--color-on-chrome", "--color-on-chrome-muted", "--color-on-chrome-active"] as const) {
+    for (const name of [
+      "--color-on-chrome",
+      "--color-on-chrome-muted",
+      "--color-on-chrome-active",
+    ] as const) {
       const v = kontrast(token(name), flaeche());
       expect(auf2(v), `${name} auf der Leiste: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
     }
@@ -556,9 +557,10 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
       1.5,
     );
     const schrift = kontrast(token("--color-on-chrome-active"), hover);
-    expect(auf2(schrift), `Schrift auf der Hover-Flaeche: ${auf2(schrift)}:1`).toBeGreaterThanOrEqual(
-      4.5,
-    );
+    expect(
+      auf2(schrift),
+      `Schrift auf der Hover-Flaeche: ${auf2(schrift)}:1`,
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it("alle vier Stellen lesen den Fokus-Token wirklich", () => {
