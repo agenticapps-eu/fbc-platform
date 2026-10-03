@@ -58,14 +58,14 @@ ausschliesslich von Elementen der linken Leiste gelesen; eine Definition auf
 **Was gemessen wurde und sich als unbedenklich erwiesen hat.** Drei Dinge, die
 nach dem Farbwechsel verdächtig aussehen und es nicht sind:
 
-| Element | Farbe | auf `#081527` | auf `#002B51` |
-|---|---|---|---|
-| inaktiver Eintrag | `#9FB4D2` | 8,66:1 | 6,78:1 ✓ |
-| Abschnittsmarke | `#8FA5C4` | 7,28:1 | 5,70:1 ✓ |
-| aktiv, Wortmarke, Hover | `#FFFFFF` | 18,31:1 | 14,34:1 ✓ |
-| Punkte der Wortmarke | `#5B90E0` | 5,68:1 | 4,45:1 ✓ |
-| Hover-Fläche | `#0E1F38` | 1,11:1 | 1,15:1 |
-| Aktivfläche | `#1F53B0` | 2,55:1 | 2,00:1 |
+| Element                 | Farbe     | auf `#081527` | auf `#002B51` |
+| ----------------------- | --------- | ------------- | ------------- |
+| inaktiver Eintrag       | `#9FB4D2` | 8,66:1        | 6,78:1 ✓      |
+| Abschnittsmarke         | `#8FA5C4` | 7,28:1        | 5,70:1 ✓      |
+| aktiv, Wortmarke, Hover | `#FFFFFF` | 18,31:1       | 14,34:1 ✓     |
+| Punkte der Wortmarke    | `#5B90E0` | 5,68:1        | 4,45:1 ✓      |
+| Hover-Fläche            | `#0E1F38` | 1,11:1        | 1,15:1        |
+| Aktivfläche             | `#1F53B0` | 2,55:1        | 2,00:1        |
 
 Die **Hover-Fläche** hebt sich schon heute mit 1,11:1 praktisch nicht ab; der
 sichtbare Hinweis ist die Schrift, die auf Weiss wechselt (16,51:1 auf der

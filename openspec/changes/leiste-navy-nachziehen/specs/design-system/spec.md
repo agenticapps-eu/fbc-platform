@@ -133,13 +133,13 @@ Jedes Element auf der Leistenfläche SHALL die Kontrastschwellen halten: **4,5:1
 für Text, **3:1** für Bedienelemente und bedeutungstragende Grafik. Die Werte
 SHALL festgehalten sein:
 
-| Element | Farbe | auf `#081527` (vorher) | auf `#002B51` |
-|---|---|---|---|
-| inaktiver Menüeintrag | `#9FB4D2` | 8,66:1 | **6,78:1** |
-| Abschnittsmarke | `#8FA5C4` | 7,28:1 | **5,70:1** |
-| aktiver Eintrag, Wortmarke, Hover-Schrift | `#FFFFFF` | 18,31:1 | **14,34:1** |
-| Punkte der Wortmarke | `#5B90E0` | 5,68:1 | **4,45:1** |
-| Fokusring (neuer Token) | `#B9CCE6` | — | **8,77:1** |
+| Element                                   | Farbe     | auf `#081527` (vorher) | auf `#002B51` |
+| ----------------------------------------- | --------- | ---------------------- | ------------- |
+| inaktiver Menüeintrag                     | `#9FB4D2` | 8,66:1                 | **6,78:1**    |
+| Abschnittsmarke                           | `#8FA5C4` | 7,28:1                 | **5,70:1**    |
+| aktiver Eintrag, Wortmarke, Hover-Schrift | `#FFFFFF` | 18,31:1                | **14,34:1**   |
+| Punkte der Wortmarke                      | `#5B90E0` | 5,68:1                 | **4,45:1**    |
+| Fokusring (neuer Token)                   | `#B9CCE6` | —                      | **8,77:1**    |
 
 **Zwei Flächen halten die 3:1 nicht, und das SHALL hier stehen statt beim
 nächsten Griff an die Farben neu verhandelt zu werden.**
