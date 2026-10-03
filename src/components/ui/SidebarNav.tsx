@@ -231,7 +231,13 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-semibold text-chrome",
+                        // `--leiste-badge` statt `bg-accent`/`text-chrome`
+                        // (AGE-1003, Befund des Code-Reviews): die Fuellung
+                        // #2F6BD1 traegt gegen die neue Leistenflaeche nur
+                        // 2,83:1 — dieselbe Zahl, mit der dieser Change seinen
+                        // Fokus-Token begruendet. Im Hellen fallen beide Tokens
+                        // auf genau die alten Werte zurueck.
+                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--leiste-badge)] px-1.5 text-xs font-semibold text-[color:var(--leiste-badge-ink)]",
                         collapsed ? "absolute -top-0.5 right-0.5" : "ml-auto",
                       )}
                     >

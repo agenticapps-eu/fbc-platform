@@ -26,11 +26,16 @@
  * seine eigene Fläche gehört. Ein App-Symbol hat keine Fläche hinter sich; iOS
  * verbietet Durchsichtigkeit sogar. Genommen wird deshalb die zweite
  * dokumentierte Markenpaarung: weiss auf Navy (`docs/design-system.html`,
- * „Invers · Weiß auf Navy #081527"), dieselbe Fläche, auf der die Sidebar in
- * der navy-Variante steht.
+ * „Invers · Weiß auf Navy #081527").
+ *
+ * Hier stand bis AGE-1003 „dieselbe Fläche, auf der die Sidebar in der
+ * navy-Variante steht". Das stimmt nicht mehr: die Sidebar trägt seitdem
+ * `#002B51`. Der Wert unten bleibt trotzdem richtig — er ist die dokumentierte
+ * Markenpaarung und war nie von der Leistenfarbe abgeleitet, auch wenn die
+ * Begründung das nahelegte.
  */
 
-/** Navy — `--color-chrome` / `--sidebar-surface` der navy-Variante. */
+/** Navy — die dokumentierte Markenpaarung, NICHT die Leistenfläche. */
 export const HINTERGRUND = "#081527";
 /** Die Marke auf dem Navy. */
 export const VORDERGRUND = "#FFFFFF";

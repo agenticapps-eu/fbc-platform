@@ -72,7 +72,35 @@ const KNOPF_TOKENS = [
  * mussten. `--leiste-focus` ist neu: `ring-accent` trägt auf `#002B51` nur
  * 2,83:1 und fällt damit unter die 3:1 der Norm.
  */
-const LINKE_LEISTE_TOKENS = ["--sidebar-surface", "--leiste-focus"] as const;
+const LINKE_LEISTE_TOKENS = [
+  "--sidebar-surface",
+  "--leiste-focus",
+  "--leiste-badge",
+  "--leiste-badge-ink",
+] as const;
+
+/**
+ * Jede Farbe, die auf der linken Leiste gegen ihre Flaeche steht — die
+ * VOLLSTAENDIGE Liste, nicht die der umgelegten Tokens.
+ *
+ * Der Unterschied ist genau der Befund, an dem die erste Fassung dieses
+ * Changes gescheitert ist: sie mass die fuenf Tokens, die sie angefasst hatte,
+ * und sah deshalb nicht, dass das Abzeichen `bg-accent` liest und von 3,61:1
+ * auf 2,83:1 gefallen war — dieselbe Zahl, mit der derselbe Change den
+ * Fokus-Token begruendet. Derselbe Fehler wie bei AGE-1002, eine Leiste weiter
+ * links, und der Test hat ihn aus demselben Grund nicht gesehen.
+ *
+ * Die Schwelle steht je Eintrag dabei, weil sie nicht fuer alle gleich ist:
+ * 4,5:1 fuer Text, 3:1 fuer bedeutungstragende Grafik.
+ */
+const AUF_DER_LEISTE: { token: string; schwelle: number; was: string }[] = [
+  { token: "--color-on-chrome", schwelle: 4.5, was: "inaktiver Menueintrag" },
+  { token: "--color-on-chrome-muted", schwelle: 4.5, was: "Abschnittsmarke" },
+  { token: "--color-on-chrome-active", schwelle: 4.5, was: "aktiver Eintrag, Wortmarke" },
+  { token: "--color-accent-on-chrome", schwelle: 3, was: "Punkte der Wortmarke" },
+  { token: "--leiste-focus", schwelle: 3, was: "Fokusring" },
+  { token: "--leiste-badge", schwelle: 3, was: "Flaeche des Zaehlers" },
+];
 
 /**
  * Die vier Stellen, die den Fokusring der linken Leiste zeichnen.
@@ -493,21 +521,50 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     expect(wert(navy(), "--color-chrome")?.toLowerCase()).toBe("#081527");
   });
 
-  it("Schrift auf der Leiste erfuellt 4,5:1", () => {
-    for (const name of [
-      "--color-on-chrome",
-      "--color-on-chrome-muted",
-      "--color-on-chrome-active",
-    ] as const) {
+  it("JEDE Farbe auf der Leiste haelt ihre Schwelle", () => {
+    // Ein Fall ueber die vollstaendige Liste statt drei Faelle ueber die
+    // bequeme Auswahl. Wer hier ein Element vergisst, vergisst es sichtbar.
+    for (const { token: name, schwelle, was } of AUF_DER_LEISTE) {
       const v = kontrast(token(name), flaeche());
-      expect(auf2(v), `${name} auf der Leiste: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+      expect(
+        auf2(v),
+        `${was} (${name}): ${auf2(v)}:1, gefordert ${schwelle}`,
+      ).toBeGreaterThanOrEqual(schwelle);
     }
   });
 
-  it("die Punkte der Wortmarke halten 3:1", () => {
-    // Bedeutungstragende Grafik, nicht Text — deshalb 3:1 und nicht 4,5:1.
-    const v = kontrast(token("--color-accent-on-chrome"), flaeche());
-    expect(auf2(v), `Punkte der Wortmarke: ${auf2(v)}:1`).toBeGreaterThanOrEqual(3);
+  it("die Ziffer auf dem Zaehler erfuellt 4,5:1", () => {
+    // Sie steht auf dem Zaehler, nicht auf der Leiste — die Flaeche darunter
+    // ist also `--leiste-badge` und nicht `--sidebar-surface`.
+    const v = kontrast(token("--leiste-badge-ink"), token("--leiste-badge"));
+    expect(auf2(v), `Ziffer auf dem Zaehler: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("der Zaehler liest die Tokens wirklich und nicht mehr die Inhaltsfarben", () => {
+    const nav = readFileSync("src/components/ui/SidebarNav.tsx", "utf8");
+    expect(nav, "der Zaehler liest --leiste-badge nicht").toContain("var(--leiste-badge)");
+    expect(nav, "die Ziffer liest --leiste-badge-ink nicht").toContain("var(--leiste-badge-ink)");
+    const ohneKommentare = nav.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    expect(ohneKommentare, "SidebarNav traegt noch bg-accent").not.toContain("bg-accent");
+    expect(ohneKommentare, "SidebarNav traegt noch text-chrome").not.toContain("text-chrome");
+  });
+
+  it("die Trennlinien sind sichtbar — und sie sind ausdruecklich KEIN Bedienelement", () => {
+    // `--color-chrome-border` ist weiss zu 8 % und traegt damit 1,26:1 gegen
+    // die Leiste (vorher 1,23:1 — also minimal BESSER, keine Verschlechterung).
+    // Die 3:1 der Norm gelten hier nicht: 1.4.11 fordert sie fuer
+    // Bedienelemente und bedeutungstragende Grafik, und eine Haarlinie
+    // zwischen zwei Abschnitten ist weder das eine noch das andere. Eine
+    // untere Grenze steht trotzdem, damit sie nicht unsichtbar wird — als
+    // benannte Entscheidung, nicht als Schwelle der Norm.
+    //
+    // Befund des Code-Reviews: ohne diesen Fall waere die Linie in der
+    // Aufzaehlung gar nicht vorgekommen, und die Anforderung „jedes Element
+    // haelt die Schwellen" waere am Tag ihrer Niederschrift falsch gewesen.
+    const grund = flaeche();
+    const v = kontrast(ueber(token("--color-chrome-border"), grund), grund);
+    expect(auf2(v), `Trennlinie: ${auf2(v)}:1`).toBeGreaterThanOrEqual(1.2);
+    expect(auf2(v), "die Linie ist bewusst KEIN Bedienelement").toBeLessThan(3);
   });
 
   it("der Fokusring haelt 3:1 — in BEIDEN Modi", () => {
@@ -537,15 +594,11 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
       4.5,
     );
 
-    // Und die zweiten Merkmale sind im Quelltext: der weisse Linksbalken im
-    // aufgeklappten Zustand, die halbfette Schrift.
-    const nav = readFileSync("src/components/ui/SidebarNav.tsx", "utf8");
-    expect(nav, "der weisse Linksbalken des aktiven Eintrags fehlt").toContain(
-      "bg-on-chrome-active",
-    );
-    expect(nav, "die halbfette Schrift des aktiven Eintrags fehlt").toContain(
-      "font-semibold text-on-chrome-active",
-    );
+    // Worauf die Erkennbarkeit beruht, steht als RENDER-Zusage in
+    // `SidebarNav.active.test.tsx` — aufgeklappt und eingeklappt getrennt.
+    // Hier stand erst eine Textsuche ueber die Datei; die konnte die
+    // Bedingung `isActive && !collapsed` nicht sehen und haette den
+    // eingeklappten Zustand nie gemessen. Befund des Code-Reviews.
   });
 
   it("die Hover-Flaeche traegt das Signal NICHT, und der Beleg dafuer steht hier", () => {
@@ -592,18 +645,41 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     // Der Ring IM Overlay bleibt: er steht nicht auf der Leiste.
     expect(feedback, "der Ring im Overlay ist verschwunden").toContain("ring-accent-strong");
 
+    // Am ELEMENT verankert, nicht an der Reihenfolge der Klassen: dieses Repo
+    // sortiert Tailwind-Klassen von Hand (kein `prettier-plugin-tailwindcss`),
+    // und eine Zusage, die bei jeder eingeschobenen Klasse rot wird, erzieht
+    // dazu, sie zu entschaerfen. Befund des Code-Reviews.
     const shell = readFileSync("src/components/AppShell.tsx", "utf8");
     expect(
-      /text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-\[color:var\(--leiste-focus\)\]/.test(
-        shell,
-      ),
+      /to="\/"[\s\S]{0,300}?var\(--leiste-focus\)/.test(shell),
       "die Wortmarke in der Leiste liest den Token nicht",
     ).toBe(true);
 
+    // Der Pill traegt BEIDE Tokens, je einen pro Seite. Zwei Textsuchen ueber
+    // die Datei koennen deshalb nicht unterscheiden, ob sie am richtigen Zweig
+    // haengen: wer den linken Ring in den gemeinsamen Teil hochzieht, gibt ihn
+    // der RECHTEN Leiste mit — und beide Suchen blieben gruen. Deshalb hier
+    // die Bindung an den Zweig, ueber die Flaechenklasse, die ihn ausweist.
+    // Befund des Code-Reviews.
     const pill = readFileSync("src/components/LeistenPill.tsx", "utf8");
-    expect(pill, "der chat-Zweig des Pills muss --thread-focus behalten").toContain(
-      "var(--thread-focus)",
-    );
+    const zweige = [
+      ...pill.matchAll(/"([^"]*focus-visible:ring-\[color:var\(--[a-z-]+\)\][^"]*)"/g),
+    ].map((m) => m[1]);
+    const links = zweige.find((z) => z.includes("fbc-sidebar-surface"));
+    const rechts = zweige.find((z) => z.includes("var(--chat-rail-surface)"));
+    expect(links, "kein Zweig traegt die Flaeche der linken Leiste MIT einem Ring").toBeTruthy();
+    expect(rechts, "kein Zweig traegt die Flaeche der rechten Leiste MIT einem Ring").toBeTruthy();
+    expect(links, "der linke Zweig liest nicht --leiste-focus").toContain("var(--leiste-focus)");
+    expect(rechts, "der rechte Zweig liest nicht --thread-focus").toContain("var(--thread-focus)");
+    // Und keiner der beiden Tokens darf ein zweites Mal vorkommen — sonst
+    // stuende einer zusaetzlich im gemeinsamen Teil und gaelte fuer beide.
+    const ohneKommentare = pill.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    for (const name of ["--leiste-focus", "--thread-focus"]) {
+      expect(
+        ohneKommentare.split(`var(${name})`).length - 1,
+        `var(${name}) kommt nicht genau einmal vor`,
+      ).toBe(1);
+    }
   });
 
   it("die gerechneten Werte stehen in der Spec — Gegenprobe gegen die Tabelle", () => {
@@ -615,6 +691,7 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
       ["--color-on-chrome-active", 14.34],
       ["--color-accent-on-chrome", 4.45],
       ["--leiste-focus", 8.77],
+      ["--leiste-badge", 4.45],
     ];
     for (const [name, soll] of erwartet) {
       const ist = kontrast(token(name), flaeche());

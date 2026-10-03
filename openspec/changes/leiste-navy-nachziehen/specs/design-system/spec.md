@@ -133,13 +133,31 @@ Jedes Element auf der Leistenfläche SHALL die Kontrastschwellen halten: **4,5:1
 für Text, **3:1** für Bedienelemente und bedeutungstragende Grafik. Die Werte
 SHALL festgehalten sein:
 
-| Element                                   | Farbe     | auf `#081527` (vorher) | auf `#002B51` |
-| ----------------------------------------- | --------- | ---------------------- | ------------- |
-| inaktiver Menüeintrag                     | `#9FB4D2` | 8,66:1                 | **6,78:1**    |
-| Abschnittsmarke                           | `#8FA5C4` | 7,28:1                 | **5,70:1**    |
-| aktiver Eintrag, Wortmarke, Hover-Schrift | `#FFFFFF` | 18,31:1                | **14,34:1**   |
-| Punkte der Wortmarke                      | `#5B90E0` | 5,68:1                 | **4,45:1**    |
-| Fokusring (neuer Token)                   | `#B9CCE6` | —                      | **8,77:1**    |
+| Element                                   | Farbe     | auf `#081527` (vorher) | auf `#002B51`             |
+| ----------------------------------------- | --------- | ---------------------- | ------------------------- |
+| inaktiver Menüeintrag                     | `#9FB4D2` | 8,66:1                 | **6,78:1**                |
+| Abschnittsmarke                           | `#8FA5C4` | 7,28:1                 | **5,70:1**                |
+| aktiver Eintrag, Wortmarke, Hover-Schrift | `#FFFFFF` | 18,31:1                | **14,34:1**               |
+| Punkte der Wortmarke                      | `#5B90E0` | 5,68:1                 | **4,45:1**                |
+| Fokusring (neuer Token)                   | `#B9CCE6` | —                      | **8,77:1**                |
+| Zähler offener Anfragen, Fläche           | `#5B90E0` | —                      | **4,45:1**                |
+| Ziffer auf dem Zähler                     | `#00172B` | —                      | **5,62:1** auf dem Zähler |
+
+**Der Zähler offener Anfragen SHALL eigene Tokens führen.** Er las
+`bg-accent` mit `text-chrome`, und `--color-accent` (`#2F6BD1`) trägt gegen die
+neue Fläche nur **2,83:1** — dieselbe Zahl, die den eigenen Fokus-Token
+begründet, am selben Ort. Die Werte SHALL die der Nachrichtenleiste sein
+(`#5B90E0` / `#00172B`), denn AGE-1002 hat sie für **dasselbe Element auf
+derselben Fläche** gerechnet. Im Modus `hell` SHALL beide Tokens genau die
+heutigen Werte tragen (`#2F6BD1` und `#FFFFFF`).
+
+**Die Trennlinien SHALL sichtbar bleiben, sind aber ausdrücklich KEIN
+Bedienelement.** `--color-chrome-border` ist Weiss zu 8 % und trägt **1,26:1**
+gegen die Fläche, vorher 1,23:1 — also minimal besser. Die 3:1 aus 1.4.11
+gelten für sie nicht: eine Haarlinie zwischen zwei Abschnitten ist weder
+Bedienelement noch bedeutungstragende Grafik. Eine untere Grenze SHALL
+trotzdem gelten, damit sie nicht unsichtbar wird — als benannte Entscheidung,
+nicht als Schwelle der Norm.
 
 **Zwei Flächen halten die 3:1 nicht, und das SHALL hier stehen statt beim
 nächsten Griff an die Farben neu verhandelt zu werden.**
@@ -151,11 +169,26 @@ Weiss wechselt und auf der Hover-Fläche 16,51:1 trägt. Die Fläche SHALL NOT a
 Zustandsmerkmal gelten.
 
 Die **Aktivfläche** (`#1F53B0`) trägt **2,00:1** gegen die Leiste, vorher
-2,55:1 — die Schwelle hielt sie noch nie. Der aktive Eintrag SHALL durch
-mindestens zwei Merkmale **über** der Schwelle erkennbar bleiben: weisse
-halbfette Schrift (7,19:1 auf der Füllung), der weisse Linksbalken im
-aufgeklappten Zustand und das weisse Symbol im eingeklappten. Die Füllung SHALL
-als Dekoration gelten, nicht als Signal.
+2,55:1 — die Schwelle hielt sie noch nie. Der aktive Eintrag SHALL deshalb an
+anderem erkennbar sein als an ihr, und die Merkmale SHALL **je Zustand** benannt
+sein, weil sie sich unterscheiden:
+
+|                                                              | aufgeklappt | eingeklappt |
+| ------------------------------------------------------------ | ----------- | ----------- |
+| halbfette weisse Beschriftung (7,19:1 auf der Füllung)       | ja          | **nein**    |
+| weisser Linksbalken                                          | ja          | **nein**    |
+| Symbolfarbe `#FFFFFF` statt `#9FB4D2` (14,34:1 statt 6,78:1) | ja          | ja          |
+| Symbolform `solid` statt `line`                              | ja          | ja          |
+
+Eingeklappt bleiben also **zwei** Merkmale, und sie SHALL Farbe **und** Form
+zusammen sein — die bestehende Anforderung „Farbe trägt nie allein eine
+Bedeutung" verlangt genau das. Die Füllung SHALL in beiden Fällen als Dekoration
+gelten, nicht als Signal.
+
+Diese Zusage SHALL **gerendert** geprüft werden, in beiden Zuständen getrennt.
+Eine Textsuche über die Quelldatei genügt nicht: der Balken hängt an
+`isActive && !collapsed`, und eine Suche nach seiner Klasse sieht keine
+Bedingung.
 
 #### Scenario: Die linke Navigation im dunklen Modus
 
@@ -189,9 +222,21 @@ als Dekoration gelten, nicht als Signal.
 
 #### Scenario: Der aktive Eintrag ist nicht an seiner Füllung erkennbar
 
-- **WHEN** ein Mitglied im Modus `navy` den aktiven Eintrag sieht
-- **THEN** ist er an weisser halbfetter Schrift und am weissen Balken bzw. am
-  weissen Symbol erkennbar, nicht an der Füllung allein
+- **WHEN** ein Mitglied im Modus `navy` den aufgeklappten aktiven Eintrag sieht
+- **THEN** ist er an weisser halbfetter Schrift und am weissen Linksbalken
+  erkennbar, nicht an der Füllung allein
+
+#### Scenario: Eingeklappt trägt das Symbol den Zustand allein
+
+- **WHEN** dasselbe Mitglied die Navigation einklappt
+- **THEN** gibt es weder Balken noch Beschriftung, und der aktive Eintrag ist
+  an der Farbe **und** der Form seines Symbols erkennbar
+
+#### Scenario: Der Zähler offener Anfragen hebt sich ab und ist lesbar
+
+- **WHEN** ein Mitglied im Modus `navy` einen Eintrag mit offenen Anfragen sieht
+- **THEN** hebt sich der Zähler mit mindestens 3:1 von der Leiste ab, und seine
+  Ziffer erfüllt auf dem Zähler mindestens 4,5:1
 
 #### Scenario: Die unbeteiligten Flächen bleiben, wie sie waren
 

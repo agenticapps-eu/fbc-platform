@@ -27,8 +27,8 @@ Token-Tausch.
 - Das gilt aufgeklappt wie eingeklappt und auch für die Navigationsschublade auf
   dem Telefon.
 - Alles darin bleibt lesbar: Menüeinträge, Abschnittsmarken, der aktive
-  Eintrag, die Wortmarke und die Zähler. Die Kontraste sind ausgerechnet und
-  liegen über dem, was die Barrierefreiheits-Norm verlangt.
+  Eintrag, die Wortmarke und der Zähler offener Anfragen. Die Kontraste sind
+  ausgerechnet und liegen über dem, was die Barrierefreiheits-Norm verlangt.
 - Die Tastaturbedienung bleibt sichtbar: der Rahmen, der ein Bedienelement als
   „jetzt am Zug" markiert, wird auf der neuen Fläche angepasst, statt in ihr zu
   verschwinden.
@@ -55,6 +55,17 @@ den heutigen Wert `#2F6BD1`, im navy-Block `#B9CCE6` (8,77:1). Der Token wird
 ausschliesslich von Elementen der linken Leiste gelesen; eine Definition auf
 `html[data-variant="navy"]` kann damit nirgends durchschlagen.
 
+**Und derselbe Befund ein zweites Mal, gefunden erst vom Code-Review.** Der
+Zähler offener Anfragen las `bg-accent` — dieselbe Farbe, dieselbe Fläche,
+dieselbe Zahl: von 3,61:1 auf **2,83:1**. Die erste Fassung dieses Changes hat
+ihn übersehen, obwohl `design.md` die Stelle namentlich nennt, um damit eine
+Alternative zu verwerfen. Benannt, benutzt, nicht gemessen.
+
+Er bekommt deshalb ebenfalls eigene Tokens, und die Werte sind nicht neu
+erfunden: es sind die, die AGE-1002 für **dasselbe Element auf derselben
+Fläche** gerechnet hat (`#5B90E0` mit `#00172B`, 4,45:1 und 5,62:1). Beide
+Leisten tragen jetzt dieselbe Fläche, also auch dasselbe Abzeichen.
+
 **Was gemessen wurde und sich als unbedenklich erwiesen hat.** Drei Dinge, die
 nach dem Farbwechsel verdächtig aussehen und es nicht sind:
 
@@ -72,12 +83,24 @@ sichtbare Hinweis ist die Schrift, die auf Weiss wechselt (16,51:1 auf der
 Hover-Fläche). Auf `#002B51` wird daraus 1,15:1 — marginal besser, keine
 Verschlechterung.
 
-Die **Aktivfläche** hielt die 3:1 noch nie. Der Zustand ist durch drei weitere
-Merkmale erkennbar, jedes deutlich über der Schwelle: weisse halbfette Schrift
-(7,19:1 auf der Füllung), der weisse Linksbalken und das weisse Symbol. Die
-Füllung ist Dekoration, nicht das Signal — und das gehört in die Spec, sonst
-wird beim nächsten Griff an die Farben eine Zahl verteidigt, die nie gegolten
-hat.
+Die **Aktivfläche** hielt die 3:1 noch nie. Der Zustand ist durch weitere
+Merkmale erkennbar — aber **nicht durch dieselben in beiden Zuständen**, und
+die erste Fassung dieses Absatzes hat das verschwiegen:
+
+- **Aufgeklappt:** weisse halbfette Schrift (7,19:1 auf der Füllung) und der
+  weisse Linksbalken.
+- **Eingeklappt gibt es beide nicht.** Der Balken hängt an
+  `isActive && !collapsed`, die Beschriftung an `!collapsed`. Übrig bleiben die
+  **Farbe** des Symbols (`#FFFFFF` statt `#9FB4D2`, 14,34:1 statt 6,78:1 gegen
+  die Leiste) und seine **Form** — `NavIcon` schaltet von `line` auf `solid`.
+  Form und Farbe zusammen, nicht Farbe allein: genau das verlangt die bestehende
+  Anforderung „Farbe trägt nie allein eine Bedeutung".
+
+Die Füllung ist in beiden Fällen Dekoration, nicht das Signal — und das gehört
+in die Spec, sonst wird beim nächsten Griff an die Farben eine Zahl verteidigt,
+die nie gegolten hat. Beide Zustände sind jetzt als **Render**-Zusage geprüft;
+die erste Fassung hat es mit einer Textsuche über die Quelldatei „belegt", und
+die konnte die Bedingung `!collapsed` gar nicht sehen.
 
 **`--color-chrome` bleibt `#081527`, und das ist eine Entscheidung.** Der Token
 färbt nicht die Leiste. Er färbt die Vollflächen von `/onboarding` und
@@ -108,7 +131,14 @@ Keine.
 - `src/components/AppShell.tsx`, `src/components/ui/SidebarNav.tsx`,
   `src/components/feedback/FeedbackButton.tsx`,
   `src/components/LeistenPill.tsx` — je eine Klasse: der Fokusring liest den
-  Token statt `ring-accent`.
+  Token statt `ring-accent`. Dazu in `SidebarNav.tsx` der Zähler, der statt
+  `bg-accent text-chrome` die beiden Abzeichen-Tokens liest.
+- `src/components/ui/SidebarNav.active.test.tsx` — die Render-Zusage, woran der
+  aktive Eintrag erkennbar ist, aufgeklappt und eingeklappt getrennt.
+- `scripts/app-icons.logic.ts` und `src/pages/StyleguidePage.tsx` — zwei
+  Kommentare bzw. Beschriftungen, die `--color-chrome` „Sidebar-Fläche" nennen.
+  Die Styleguide-Seite wird ausgeliefert, der Satz steht also nicht nur im
+  Quelltext.
 - `src/index.chatleiste-tokens.test.ts` — die Zusage, dass `--sidebar-surface`
   `#081527` ist, dreht sich um und kommt um die Kontraste der linken Leiste
   erweitert zurück.
@@ -124,9 +154,11 @@ Keine.
 - `--color-chrome` und damit `/onboarding`, `/willkommen` und
   `Button variant="secondary"` — begründet oben.
 - Die Topbar. Sie ist eine Inhaltsfläche und in beiden Modi hell.
-- Die Ziffer auf dem Zähler (`text-chrome` auf `bg-accent`, 3,61:1). Das ist ein
-  Bestand, der von dieser Änderung unberührt bleibt — die Ziffer steht auf dem
-  Zähler, nicht auf der Leiste. Als eigener Befund notiert, nicht hier behoben.
+- Die Trennlinien (`--color-chrome-border`, Weiss zu 8 %). Sie tragen 1,26:1
+  gegen die neue Fläche, vorher 1,23:1 — also minimal **besser**. Eine Haarlinie
+  zwischen zwei Abschnitten ist weder Bedienelement noch bedeutungstragende
+  Grafik; die 3:1 gelten für sie nicht. Als benannte Entscheidung geprüft, mit
+  einer unteren Grenze, damit sie nicht unsichtbar wird.
 - Ein sichtbarer Fokusring für die Menüeinträge selbst. Sie tragen heute keinen
   und verlassen sich auf den Standardumriss des Browsers; das ist unverändert
   und gehört in einen eigenen Vorgang.
