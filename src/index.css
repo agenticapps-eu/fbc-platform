@@ -189,6 +189,51 @@
   /* Theme-Layer-Tokens: Werte, die kein Tailwind-Utility tragen kann (Verläufe).
      Die Sidebar sitzt am Rand, nicht schwebend — Entscheidung aus dem Meeting. */
   --sidebar-surface: #ffffff;
+
+  /* ── Die Nachrichtenleiste rechts (AGE-1002) ─────────────────────────────
+     EIN Token fuer die Flaeche, ein- und ausgeklappt. Bis AGE-1002 war die
+     Leiste zweifarbig (Chrome eingeklappt, canvas ausgeklappt); Detlev hat im
+     Meeting am 03.10. eine durchgehende Flaeche verlangt.
+
+     Bewusst NICHT `--color-chrome`: daran haengt die linke Navigation, und die
+     soll hier gerade nicht mitwandern (offene Frage E7 an Detlev). Faellt sie
+     mit Ja aus, ist es dort ein Einzeiler.
+
+     Die `--thread-*`-Tokens sind die Farben, die `ThreadList` und die
+     Kopfzeilen der Leiste lesen. Hier auf :root stehen sie auf den
+     INHALTS-Farben — damit sieht alles aus wie heute, und `ThreadList`
+     braucht weder ein Variantenargument noch eine zweite Fassung. Ueberschrieben
+     werden sie ausschliesslich innerhalb von `.fbc-chat-rail` (weiter unten im
+     navy-Block). Der ORT entscheidet, nicht ein Argument: dieselbe Komponente
+     steht auf `/chat` auf heller Flaeche und in der Leiste auf dunkler. */
+  --chat-rail-surface: #ffffff;
+  --thread-ink: #1e2a3a;
+  --thread-muted: #626f85;
+  --thread-hover: #f6f8fb;
+  /* Der heutige Wert ausgerechnet: `bg-accent-soft/40` ist #EFF5FD zu 40 % auf
+     Weiss. Als fester Wert statt als Transparenz, damit die Rechnung im Test
+     eindeutig ist.
+     BERICHTIGT nach dem Code-Review: 0,4·239 + 0,6·255 = 248,6 → F9, nicht F6.
+     Gruen und Blau stimmten, Rot war um 3 daneben — in einem Kommentar, der
+     behauptet, die Zahl sei ausgerechnet. */
+  --thread-active: #f9fbfe;
+  --thread-line: #e2e8f0;
+  --thread-badge: #2f6bd1;
+  --thread-badge-ink: #ffffff;
+  /* Der Fokusring der Leiste. Eigener Token, weil `ring-accent` im dunklen
+     Modus auf `#002B51` nur 2,8:1 traegt — unter den 3:1, die diese Aenderung
+     selbst zusagt, und eine VERSCHLECHTERUNG gegenueber vorher (3,6:1 auf dem
+     Chrome-Rail, 5,1:1 auf Weiss). Befund des Code-Reviews. */
+  --thread-focus: #2f6bd1;
+  /* Die chrome-artigen Elemente der Leiste: das Symbol im eingeklappten Rail
+     und der Einklapp-Pill. Sie standen vor AGE-1002 auf `--color-on-chrome`,
+     und im HELLEN Modus muss das so bleiben — die Zusage lautet „kein Pixel".
+     Deshalb eigene Tokens mit genau den alten Werten statt `--thread-muted`
+     (das ist #626f85 und waere im Hellen sichtbar anders). Befund des
+     Code-Reviews. */
+  --thread-chrome-ink: #475569;
+  --thread-chrome-ink-hover: #1f53b0;
+
   --hero-bg: transparent;
   --hero-ink: #1e2a3a;
   --hero-muted: #64748b;
@@ -219,6 +264,94 @@ html[data-variant="navy"] {
   --color-accent-on-chrome: #5b90e0;
 
   --sidebar-surface: #081527;
+}
+
+/* Die Nachrichtenleiste im dunklen Modus (AGE-1002).
+ *
+ * `#002B51` ist gemessen, nicht gewaehlt: Detlev hat im Meeting am 03.10. das
+ * Blau der DK-Real-Invest-Website benannt, und dort steht es im
+ * Elementor-`post-12.css` (Fussbereich und Flaechen). Es ist ABSICHTLICH nicht
+ * das `#081527` der linken Navigation — dass die beiden Leisten sich
+ * unterscheiden, ist die Vorgabe, solange Frage E7 offen ist.
+ *
+ * Der Selektor ist die halbe Zusage: die `--thread-*`-Tokens stehen auf
+ * `.fbc-chat-rail` und NICHT auf `html[data-variant="navy"]`. Stuenden sie
+ * dort, faerbte sich `ThreadList` auch auf `/chat` — und die Seite soll hell
+ * bleiben. `index.chatleiste-tokens.test.ts` prueft genau diesen Selektor.
+ *
+ * ══ DIE KONTRASTE SIND GERECHNET, UND DIE NAHELIEGENDE WAHL FAELLT DURCH ═══
+ * Drei Flaechen kommen in der Leiste vor, und sie unterscheiden sich um wenige
+ * Prozent: Grundflaeche, Zeile unter dem Mauszeiger, aktive Zeile.
+ *
+ *   Text                      Grundflaeche   Hover    aktive Zeile
+ *   #FFFFFF (Name, Kopf)         14,3:1     12,1:1      10,1:1
+ *   #B9CCE6 (Vorschau, Zeit)      8,8:1      7,4:1       6,2:1
+ *
+ * Verworfen: eine gefuellte Aktivflaeche in `#1F53B0`, dem Akzent der linken
+ * Navigation. Sie traegt den Vorschautext nur mit 2,9:1. Und `#8FA5C4`, das
+ * Muted der linken Navigation, haelt auf der Grundflaeche (5,7:1), faellt aber
+ * auf der aktiven Zeile mit 4,0:1 durch — deshalb das hellere `#B9CCE6`.
+ *
+ * Nachgerechnet wird das in `index.chatleiste-tokens.test.ts`, gegen genau
+ * diese Werte. Eine Farbaenderung, die eine Schwelle reisst, wird dort rot. */
+html[data-variant="navy"] .fbc-chat-rail {
+  --chat-rail-surface: #002b51;
+  --thread-ink: #ffffff;
+  --thread-muted: #b9cce6;
+  --thread-hover: rgb(255 255 255 / 0.06);
+  --thread-active: rgb(255 255 255 / 0.12);
+  /* Eine Trennlinie zwischen Listenzeilen ist Dekoration im Sinne der Norm —
+     1.4.11 gilt fuer Bedienelemente und bedeutungstragende Grafik. Sichtbar
+     muss sie trotzdem sein: 1,6:1 gegen die Flaeche. */
+  --thread-line: rgb(255 255 255 / 0.16);
+  --thread-badge: #5b90e0;
+  --thread-badge-ink: #00172b;
+  --thread-focus: #b9cce6;
+  --thread-chrome-ink: #b9cce6;
+  --thread-chrome-ink-hover: #ffffff;
+
+  /* ── Der sekundaere Knopf im Leerzustand ─────────────────────────────────
+     „Noch kein Gespraech. Chats entstehen, sobald eine Kontaktanfrage
+     angenommen wurde." plus „Mitglieder entdecken" — fuer ein neues Mitglied
+     der NORMALFALL dieser Leiste, nicht ein Randfall.
+
+     `Button variant="secondary"` traegt `bg-chrome text-on-chrome`. Im dunklen
+     Modus ist Chrome `#081527`, und das hebt sich von `#002B51` mit **1,3:1**
+     ab — praktisch unsichtbar. Gerechnet, nicht im Bild geschaetzt.
+
+     Deshalb wird der Knopf HIER, und nur hier, umgelegt: ein heller Knopf auf
+     dunkler Leiste.
+
+     ══ ES SIND FUENF TOKENS, NICHT ZWEI ══════════════════════════════════
+     Die erste Fassung legte nur `--color-chrome` und `--color-on-chrome` um und
+     hat den Defekt damit einen Zustand weiter geschoben statt ihn zu beheben —
+     Befund des Code-Reviews, und der schwerste des Durchgangs:
+
+       * `hover:bg-chrome-elevated` blieb auf dem navy-Wert `#0E1F38`. Beim
+         Ueberfahren waere die Schrift `#0C2043` darauf gestanden: **1,0:1**,
+         also schlicht weg. Genau der Fehler, gegen den diese Umlegung
+         existiert.
+       * `--color-chrome-border` blieb `rgb(255 255 255 / .08)` und ist auf der
+         hellen Knopfflaeche unsichtbar — der Rand, den `Button.tsx` ausdruecklich
+         fuer die Abhebung fuehrt, war weg.
+       * `focus-visible:ring-offset-soft` liest `--color-soft` (#F6F8FB) und
+         malte beim Fokussieren einen fast weissen Hof auf die dunkle Leiste.
+         Der Versatz eines Rings gehoert auf die Flaeche DAHINTER, hier also auf
+         die Leiste selbst.
+
+     ══ UND ES SIND ZWEI KNOEPFE, NICHT EINER ═════════════════════════════
+     Neben „Mitglieder entdecken" im Leerzustand steht „Weitere Gespraeche"
+     (`ChatPanel.tsx`), sobald die Liste blaettert. Die frueher hier stehende
+     Behauptung „der EINZIGE Verbraucher" war falsch.
+
+     Alle fuenf Werte stehen als Zusage in `index.chatleiste-tokens.test.ts`,
+     auch der Hover-Zustand — die erste Fassung des Tests pruefte genau die zwei
+     Tokens, die umgelegt WAREN, und konnte den Befund deshalb nicht sehen. */
+  --color-chrome: #d7e4f2;
+  --color-on-chrome: #0c2043;
+  --color-chrome-elevated: #c3d6ec;
+  --color-chrome-border: rgb(12 32 67 / 0.2);
+  --color-soft: #002b51;
 }
 
 @layer base {
@@ -269,6 +402,10 @@ html[data-variant="navy"] {
 .fbc-chat-rail {
   width: var(--fbc-chat-w, 0rem);
   transition: width 180ms ease;
+  /* Als Klasse und nicht als Tailwind-Utility: der Wert kommt aus einer
+     Variable, die der navy-Block auf DIESEM Element ueberschreibt. Siehe den
+     Kommentar dort. */
+  background: var(--chat-rail-surface);
 }
 /* ── Sichere Raender (AGE-642 C1) ──────────────────────────────────────────
    Erst mit `viewport-fit=cover` in index.html liefern diese `env()` ueberhaupt

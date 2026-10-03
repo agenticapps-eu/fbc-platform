@@ -2,7 +2,20 @@ import { cn } from "../../lib/cn";
 import type { ChatThread } from "../../lib/chat";
 import { Avatar } from "../ui/Avatar";
 
-/** Thread-Liste („Meine Konversationen", §9) — wählbar, aktiver Thread hervorgehoben. */
+/** Thread-Liste („Meine Konversationen", §9) — wählbar, aktiver Thread hervorgehoben.
+ *
+ * ══ DIE FARBEN KOMMEN AUS TOKENS, NICHT AUS KLASSEN (AGE-1002) ════════════
+ * Diese Liste steht an ZWEI Orten: auf `/chat` (helle Fläche) und in der
+ * angedockten Nachrichtenleiste, die im dunklen Modus `#002B51` trägt. Sie
+ * bekommt dafür **kein** Variantenargument und existiert nicht in zwei
+ * Fassungen: die `--thread-*`-Tokens fallen auf die Inhaltsfarben zurück und
+ * werden ausschliesslich innerhalb von `.fbc-chat-rail` überschrieben
+ * (`index.css`). Der ORT entscheidet, nicht ein Argument — und jede neue Fläche,
+ * die diese Liste auf dunklen Grund stellt, setzt die Tokens dort.
+ *
+ * Die Kontraste für den dunklen Fall sind gerechnet und stehen in
+ * `index.chatleiste-tokens.test.ts`; eine Farbänderung, die eine Schwelle
+ * reisst, wird dort rot. */
 export function ThreadList({
   threads,
   activeId,
@@ -17,7 +30,7 @@ export function ThreadList({
   ungelesenJeThread: Map<string, number>;
 }) {
   return (
-    <ul className="divide-y divide-line">
+    <ul className="divide-y divide-[color:var(--thread-line)]">
       {threads.map((thread) => {
         const active = thread.id === activeId;
         const ungelesen = ungelesenJeThread.get(thread.id) ?? 0;
@@ -37,7 +50,14 @@ export function ThreadList({
               }
               className={cn(
                 "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
-                active ? "bg-accent-soft/40" : "hover:bg-soft",
+                // Vor AGE-1002 trug diese Zeile GAR KEINEN sichtbaren Fokus —
+                // sie verliess sich auf den Standardumriss des Browsers. Auf
+                // heller Flaeche ging das durch; auf der dunkelblauen Leiste
+                // ist es eine Zumutung. Der Ring liest denselben Token wie der
+                // Pill. Befund des Code-Reviews (als Altlast gemeldet, hier
+                // behoben, weil diese Aenderung sie verschaerft).
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--thread-focus)]",
+                active ? "bg-[var(--thread-active)]" : "hover:bg-[var(--thread-hover)]",
               )}
             >
               <Avatar name={thread.partner.name} src={thread.partner.avatarUrl} size="md" />
@@ -45,7 +65,7 @@ export function ThreadList({
                 <span className="flex items-baseline justify-between gap-2">
                   <span
                     className={cn(
-                      "truncate text-ink",
+                      "truncate text-[color:var(--thread-ink)]",
                       ungelesen > 0 ? "font-semibold" : "font-medium",
                     )}
                   >
@@ -56,13 +76,13 @@ export function ThreadList({
                     // sonst liest ein Screenreader sie zweimal.
                     <span
                       aria-hidden="true"
-                      className="shrink-0 rounded-full bg-accent px-1.5 text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
+                      className="shrink-0 rounded-full bg-[var(--thread-badge)] px-1.5 text-[0.6875rem] font-semibold leading-[1.125rem] text-[color:var(--thread-badge-ink)]"
                     >
                       {ungelesen}
                     </span>
                   )}
                 </span>
-                <span className="block truncate text-sm text-muted">
+                <span className="block truncate text-sm text-[color:var(--thread-muted)]">
                   {thread.lastMessage
                     ? `${thread.lastMessage.fromMe ? "Du: " : ""}${thread.lastMessage.body}`
                     : "Noch keine Nachrichten"}

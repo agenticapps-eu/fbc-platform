@@ -38,10 +38,15 @@ export function LeistenPill({
   onClick,
 }: {
   seite: "links" | "rechts";
-  /** Worauf die Leiste GERADE steht. Die rechte wechselt beim Aufklappen von
-   *  der Chrome- auf die Inhaltsfläche; die Ausbuchtung muss mitwechseln, sonst
-   *  sitzt ein Fleck in der falschen Farbe an ihrer Kante. */
-  flaeche: "leiste" | "inhalt";
+  /** Welche Fläche die Leiste trägt — die Ausbuchtung trägt dieselbe, sonst
+   *  sitzt ein Fleck in der falschen Farbe an ihrer Kante.
+   *
+   *  `"inhalt"` ist mit AGE-1002 entfallen. Es stand für den Zustand „rechte
+   *  Leiste aufgeklappt, also Inhaltsfläche" — den gibt es nicht mehr: die
+   *  rechte Leiste trägt ein- und ausgeklappt `--chat-rail-surface`. Eine
+   *  Variante, die niemand mehr setzt, wäre eine Einladung, sie wieder zu
+   *  setzen. */
+  flaeche: "leiste" | "chat";
   offen: boolean;
   /** `id` der Leiste, die er auf- und zuklappt. */
   steuert: string;
@@ -76,11 +81,22 @@ export function LeistenPill({
         // `w-6` sind 24 px, und das ist kein gerundeter Zufall: WCAG 2.2
         // verlangt für ein Ziel mindestens 24 × 24 px.
         "absolute top-8 z-10 flex h-10 w-6 -translate-y-1/2 items-center justify-center",
-        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        // Der Ring liest ab AGE-1002 einen Token statt `ring-accent`. Grund:
+        // auf der dunkelblauen Nachrichtenleiste traegt `--color-accent`
+        // (#2F6BD1) nur 2,8:1 — unter den 3:1 fuer Bedienelemente, und
+        // schlechter als vorher (3,6:1 auf dem Chrome-Rail, 5,1:1 auf Weiss).
+        // Links faellt der Token auf genau `--color-accent` zurueck, dort
+        // aendert sich also nichts. Befund des Code-Reviews.
+        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--thread-focus)]",
         // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
         flaeche === "leiste"
           ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active"
-          : "bg-canvas text-muted hover:text-ink",
+          : // `--thread-chrome-ink` und nicht `--thread-muted`: im HELLEN Modus
+            // muss der eingeklappte Pill aussehen wie vorher, und das war
+            // `text-on-chrome` (#475569) mit Hover `#1F53B0`. `--thread-muted`
+            // ist #626f85 und waere sichtbar anders — die Zusage lautet „kein
+            // Pixel". Befund des Code-Reviews.
+            "bg-[var(--chat-rail-surface)] text-[color:var(--thread-chrome-ink)] hover:text-[color:var(--thread-chrome-ink-hover)]",
         // Der Schatten ist GERICHTET — nach aussen, weg von der Leiste. Ein
         // Schatten ringsum sähe aus wie eine schwebende Marke; so sieht es aus,
         // als würfe die Leiste ihre eigene Wölbung.

@@ -942,21 +942,22 @@ export default function AppShell() {
           der rechten Viewport-Kante, `border-l` statt `border-r`, dieselbe
           Fläche. Sie ist KEINE Kopie: sie steht nur angemeldet und nur
           ausserhalb der Chatrouten, und ihr Startzustand ist eingeklappt. */}
-      {/* Zwei Flächen, nicht eine — und das ist im navy-Theme gemessen, nicht
-          gewählt. EINGEKLAPPT ist die Leiste ein Rail wie links: Chrome, navy
-          im navy-Theme. AUFGEKLAPPT trägt sie eine LISTE, und die ist Inhalt:
-          `ThreadList` schreibt in `text-ink` auf `hover:bg-soft`. Auf
-          Chrome-Fläche wäre sie unlesbar, und ein zweiter, chrome-fähiger
-          Aufguss der Liste widerspräche der Vorgabe, sie wiederzuverwenden.
-          Ohne diese Fallunterscheidung stand im navy-Theme ein navyer Kopf über
-          einer weissen Liste — im Bild gesehen, im hellen Theme unsichtbar,
-          weil dort beide Flächen weiss sind. */}
+      {/* EINE Fläche, ein- und ausgeklappt (AGE-1002, Detlev im Meeting am
+          03.10.): `--chat-rail-surface`, im dunklen Modus `#002B51`.
+
+          Hier stand bis AGE-1002 eine Fallunterscheidung, und ihre Begründung
+          war richtig: aufgeklappt trägt die Leiste `ThreadList`, und die
+          schrieb `text-ink` auf `hover:bg-soft` — auf dunkler Fläche unlesbar.
+          Gelöst ist das nicht durch zwei Flächen, sondern durch sieben
+          Leisten-Tokens, die `ThreadList` liest und die nur innerhalb von
+          `.fbc-chat-rail` überschrieben werden (`index.css`). Die Liste bleibt
+          EINE Komponente ohne Variantenargument, und `/chat` bleibt hell. */}
       {chatLeisteSteht && (
         <aside
           id="fbc-nachrichten"
           className={cn(
             "fbc-chat-rail fixed inset-y-0 right-0 z-40 hidden flex-col border-l xl:flex",
-            chatCollapsed ? cn("border-chrome-border", SIDEBAR_SURFACE) : "border-line bg-canvas",
+            "border-[color:var(--thread-line)]",
           )}
         >
           {chatCollapsed ? (
@@ -966,14 +967,18 @@ export default function AppShell() {
             // Rails: zwei Schalter, keine 40 px auseinander, mit derselben
             // Wirkung. Kein Thread wird hier geladen — die Zahl führt
             // `useUngelesen` ohnehin getrennt.
-            <div className="flex h-16 shrink-0 items-center justify-center border-b border-chrome-border px-2">
-              <span className="relative p-2 text-on-chrome">
+            <div className="flex h-16 shrink-0 items-center justify-center border-b border-[color:var(--thread-line)] px-2">
+              {/* `--thread-chrome-ink`: im hellen Modus genau das alte
+                  `text-on-chrome` (#475569). `--thread-muted` waere dort
+                  #626f85 und damit sichtbar heller — die Zusage lautet „kein
+                  Pixel". Befund des Code-Reviews. */}
+              <span className="relative p-2 text-[color:var(--thread-chrome-ink)]">
                 <Icon name="messages" className="h-5 w-5" />
                 {(ungelesenFehlt || ungelesen.gesamt > 0) && (
                   // `aria-hidden`: die Zahl steht schon im Satz darunter.
                   <span
                     aria-hidden="true"
-                    className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-accent px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-canvas"
+                    className="absolute -right-0.5 -top-0.5 min-w-[1.125rem] rounded-full bg-[var(--thread-badge)] px-1 text-center text-[0.6875rem] font-semibold leading-[1.125rem] text-[color:var(--thread-badge-ink)]"
                   >
                     {ungelesenFehlt ? "!" : ungelesen.gesamt}
                   </span>
@@ -1004,18 +1009,20 @@ export default function AppShell() {
               </span>
             </div>
           ) : (
-            <div className="flex h-16 shrink-0 items-center border-b border-line px-4">
-              <span className="font-display text-sm font-semibold text-ink">Nachrichten</span>
+            <div className="flex h-16 shrink-0 items-center border-b border-[color:var(--thread-line)] px-4">
+              <span className="font-display text-sm font-semibold text-[color:var(--thread-ink)]">
+                Nachrichten
+              </span>
             </div>
           )}
 
-          {/* `flaeche` folgt dem Zustand der Leiste: eingeklappt ist sie ein
-              Chrome-Rail wie links, aufgeklappt trägt sie die Threadliste auf
-              Inhaltsfläche. Eine feste Angabe hinterliesse beim Umschalten
-              einen Fleck in der falschen Farbe an ihrer Kante. */}
+          {/* `flaeche` ist jetzt FEST (AGE-1002): die Leiste trägt ein- und
+              ausgeklappt dieselbe Fläche, also auch ihre Ausbuchtung. Die
+              frühere Abhängigkeit von `chatCollapsed` war der Grund, warum der
+              Pill beim Umschalten die Farbe wechselte. */}
           <LeistenPill
             seite="rechts"
-            flaeche={chatCollapsed ? "leiste" : "inhalt"}
+            flaeche="chat"
             offen={!chatCollapsed}
             steuert="fbc-nachrichten"
             onClick={() => setChatCollapsed((c) => !c)}
