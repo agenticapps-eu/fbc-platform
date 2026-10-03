@@ -26,12 +26,18 @@ berichtigen können; sie unerreichbar zu machen wäre eine Datensperre, keine
 Rechtegrenze. Die abgelöste Fassung sagte „maintaining one's own … is available
 from the lowest tier" — davon bleibt das Pflegen, das Neuanlegen fällt.
 
-#### Scenario: Ein Konto mit dem Recht sieht fremde Angebote
+#### Scenario: Discover-and-above member sees others' offers for matching
+
+<!-- Titel zeichengleich. „Discover-and-above" ist ab AGE-1000 ueberholt —
+     es ist „mit dem Recht `suche_biete`", also ab Rang 5. -->
 
 - **WHEN** a member holding `suche_biete` selects `offers`/`needs`
 - **THEN** the `offers_select`/`needs_select` policy returns rows of other members
 
-#### Scenario: Ein Konto ohne das Recht sieht nur die eigenen
+#### Scenario: Below-Discover member sees only their own
+
+<!-- Titel zeichengleich. Der Fall gilt ab AGE-1000 auch fuer Rang 4, also
+     INNERHALB des Clubs. -->
 
 - **WHEN** ein aktiviertes Mitglied auf Rang 4 `offers`/`needs` liest
 - **THEN** kommen nur Zeilen zurück, deren `profile_id` die eigene ist
@@ -42,7 +48,10 @@ from the lowest tier" — davon bleibt das Pflegen, das Neuanlegen fällt.
   anlegen will
 - **THEN** wird der INSERT von der Policy abgelehnt
 
-#### Scenario: Ohne das Recht bleibt die eigene Zeile pflegbar
+#### Scenario: A member below the rank can still maintain their own
+
+<!-- Titel zeichengleich, und der Rumpf ist ENGER geworden: pflegen ja,
+     neu anlegen nein. „maintain" meinte vorher beides. -->
 
 - **GIVEN** ein aktiviertes Mitglied auf Rang 4 mit einer bestehenden eigenen
   Zeile in `offers`
@@ -75,7 +84,9 @@ Vorschläge gar nicht und kann sich deshalb auch nicht sinnvoll auf einen
 berufen. Die Anfrage selbst gelingt unverändert — Entscheidung E4 hält
 Kontaktanfragen ab Rang 4 offen. Gefunden im Diff-Review.
 
-#### Scenario: Participant with the right reads their match
+#### Scenario: Participant reads their match
+
+<!-- Titel zeichengleich. Beteiligung allein genuegt ab AGE-1000 nicht mehr. -->
 
 - **WHEN** a member holding `vorschlaege` selects `matches` where they are
   `a_profile_id` or `b_profile_id`

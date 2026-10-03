@@ -126,6 +126,16 @@
       `rpc("meine_rechte")` ein ARRAY liefert und keine Zeilenmenge, belegt
       keines von beiden. Ergebnis in der PR-Beschreibung; danach 28 Profile und
       28 Konten wie vorher
-- [ ] 5.5 Code-Review auf dem Diff, Befunde abarbeiten
-- [ ] 5.6 Verifikation: jede Zusage aus den Deltas gegen die laufende Datenbank
-      belegt, Zahlen protokolliert
+- [x] 5.5 Code-Review auf dem Diff, Befunde abarbeiten — **zwei Reader**
+      (codex und ein Reviewer-Subagent), fünf Befunde, alle behoben: siehe
+      Abschnitt 4b. Der schwerste war ein Datenverlustpfad, den dieser Change
+      selbst erzeugt hatte
+- [x] 5.6 Verifikation gegen die laufende Datenbank, durch PostgREST mit echten
+      Konten und echten JWTs. `meine_rechte()`: Rang 4 `[]`, Rang 5 vier
+      Schlüssel, Rang 6 alle zehn. `search_directory()`: 1 / 1 / 31 Zeilen.
+      `POST /events`: 403 / 403 / 201. `POST /event_vorlagen`: 403 / 201.
+      `GET /offers`: 0 / 44 Zeilen, `POST /offers`: 403 / 201.
+      `GET /berechtigungen`: 403 für alle. Der Datenverlustpfad eigens
+      nachgemessen — abgelehnter Insert, Bestand bleibt bei 1; PATCH und DELETE
+      der eigenen Zeile gelingen mit nachgewiesener Wirkung. Danach 28 Profile
+      und 28 Konten wie vorher

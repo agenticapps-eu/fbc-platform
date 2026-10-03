@@ -36,13 +36,20 @@ zu entziehen, ohne Ersatz, schaltet das Verzeichnis für **alle** ab —
 `search_directory` ist `SECURITY INVOKER` und liest sie. Der Entzug und sein
 Ersatz sind deshalb ein Schritt und nicht zwei.
 
-#### Scenario: Ein Konto unterhalb der Verzeichnisschwelle liest Namen im Feed
+#### Scenario: Ein basic-Konto liest Namen im Feed
+
+<!-- Titel zeichengleich zum Bestand — der Name ist eine Kennung. `basic`
+     gibt es seit AGE-903 nicht mehr; gemeint ist jedes Konto unterhalb der
+     Verzeichnisschwelle, und die liegt seit AGE-1000 bei Rang 6. -->
 
 - **WHEN** ein aktiviertes Mitglied unterhalb der Verzeichnisschwelle einen
   Beitrag im Feed sieht
 - **THEN** trägt der Beitrag den aufgelösten Namen seines Verfassers
 
-#### Scenario: Dasselbe Konto erreicht die Suche dennoch nicht
+#### Scenario: Dasselbe Konto erreicht das Verzeichnis dennoch nicht
+
+<!-- Titel zeichengleich. „Das Verzeichnis" heisst ab AGE-1000 genauer: die
+     Liste und die Suche. Ein einzelnes Profil bleibt erreichbar. -->
 
 - **WHEN** dasselbe Mitglied `/mitglieder` aufruft
 - **THEN** greift das Rechte-Gate, und `search_directory` gäbe ihm ohnehin nur
@@ -115,7 +122,11 @@ Ein Filter, der auf einer erweiterten Spalte arbeitet (`p_competency`,
 das Recht ein leeres Ergebnis liefern; die Oberfläche SHALL solche Filter dort
 **gar nicht anbieten**. `p_branche` SHALL NICHT dazugehören.
 
-#### Scenario: Ein Konto ohne das Recht erhält nur die eigene Zeile
+#### Scenario: Ein Konto unterhalb des Clubs erhält nur die eigene Zeile
+
+<!-- Titel zeichengleich. „Unterhalb des Clubs" ist ab AGE-1000 die falsche
+     Beschreibung derselben Zusage: der Fall gilt jetzt auch INNERHALB des
+     Clubs, fuer Rang 4 und 5. Genau das ist die Verschiebung. -->
 
 - **WHEN** ein aktiviertes Mitglied auf Rang 4 oder 5 `search_directory` ohne
   Filter aufruft
@@ -123,7 +134,11 @@ das Recht ein leeres Ergebnis liefern; die Oberfläche SHALL solche Filter dort
   Konto auf Rang 4 die vollständige Liste mit gefüllten erweiterten Spalten
   erhalten
 
-#### Scenario: Ein Konto mit dem Recht erhält Liste und erweiterte Spalten zugleich
+#### Scenario: Ein Konto ab Rang 4 erhält Liste und erweiterte Spalten zugleich
+
+<!-- Titel zeichengleich. Die Rangzahl im Titel ist ab AGE-1000 ueberholt —
+     es ist Rang 6, und sie steht nicht mehr in der Funktion, sondern in
+     `berechtigungen`. -->
 
 - **WHEN** ein aktiviertes Mitglied auf Rang 6 denselben Aufruf macht
 - **THEN** kommen die Basisfelder aller öffentlichen Profile aktivierter
@@ -255,7 +270,12 @@ nachgebaut werden; der **Nachweis** SHALL an der Datenbank geführt werden.
 - **THEN** erscheint ein Fehlerzustand
 - **AND** weder eine „nichts gefunden"-Meldung noch ein Stufen-Hinweis
 
-#### Scenario: Ohne das Recht und leer erscheint der Stufen-Hinweis
+#### Scenario: Unterhalb discover und leer erscheint der Aufstiegs-Hinweis
+
+<!-- Titel zeichengleich. Zwei Worte darin sind ab AGE-1000 ueberholt:
+     „unterhalb discover" (es ist „ohne das Recht", und das trifft auch
+     Rang 4 und 5) und „Aufstiegs-Hinweis" (er fuehrt zum Support, nicht in
+     einen Kaufweg). -->
 
 <!-- Titel geändert: die abgelöste Fassung hiess „Unterhalb discover und leer
      erscheint der Aufstiegs-Hinweis" und band den Fall an einen Rang. Er hängt
@@ -269,7 +289,9 @@ nachgebaut werden; der **Nachweis** SHALL an der Datenbank geführt werden.
 - **AND** es erscheint keine Meldung, es sei nichts gefunden worden
 - **AND** es erscheint kein Kaufknopf
 
-#### Scenario: Ohne das Recht wird die eigene Zeile trotzdem gezeigt
+#### Scenario: Unterhalb discover wird die eigene Zeile trotzdem gezeigt
+
+<!-- Titel zeichengleich, siehe das Szenario darueber. -->
 
 - **WHEN** ein aktiviertes Mitglied ohne `verzeichnis.suchen` nach seinem eigenen
   Namen sucht und die Abfrage seine eigene Zeile liefert
