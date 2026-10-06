@@ -76,7 +76,7 @@ function Laden({ uid }: { uid: string }) {
   const navigate = useNavigate();
   const profil = useQuery({
     queryKey: onboardingProfileQueryKey(uid),
-    queryFn: () => fetchOnboardingProfile(uid),
+    queryFn: fetchOnboardingProfile,
     staleTime: Infinity,
   });
   const auswahl = useQuery({
@@ -207,7 +207,7 @@ function Strecke({
   async function schrittSchreiben(id: SchrittId) {
     if (id === "beruf") {
       const wert = headline.trim();
-      if (wert !== profil.headline) await saveOnboardingHeadline(uid, wert);
+      if (wert !== profil.headline) await saveOnboardingHeadline(wert);
       return;
     }
     if (id === "kategorien") {
@@ -229,10 +229,10 @@ function Strecke({
     }
     if (avatarBlob) {
       const url = await uploadBild("avatars", uid, avatarBlob, profil.avatar_url);
-      if (url) await saveOnboardingAvatarUrl(uid, url);
+      if (url) await saveOnboardingAvatarUrl(url);
     }
     const wert = region.trim();
-    if (wert !== profil.region) await saveOnboardingRegion(uid, wert);
+    if (wert !== profil.region) await saveOnboardingRegion(wert);
   }
 
   /** Setzt den Merker und geht zur Startseite.

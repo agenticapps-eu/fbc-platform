@@ -33,16 +33,7 @@ vi.mock("./supabase", () => ({
           order: async () => ({ data: [], error: null }),
         }),
       }),
-      update: () => ({
-        eq: () => ({
-          select: () => ({
-            single: async () => ({
-              data: { profile_completion: 42, avatar_url: null, cover_url: null },
-              error: null,
-            }),
-          }),
-        }),
-      }),
+
       upsert: async (payload: Record<string, unknown>) => {
         upserts.push({ table, payload });
         return { error: null };
@@ -50,7 +41,16 @@ vi.mock("./supabase", () => ({
       delete: () => ({ eq: async () => ({ error: null }) }),
       insert: async () => ({ error: null }),
     }),
-    rpc: async () => ({ error: null }),
+    // Seit AGE-1001 schreibt `saveProfile` ueber `profil_speichern` statt
+    // ueber UPDATE + `.select()`-Kette. Der Rand liefert, was die
+    // `.select()`-Kette lieferte.
+    rpc: () =>
+      Object.assign(Promise.resolve({ data: null, error: null }), {
+        single: async () => ({
+          data: { profile_completion: 42, avatar_url: null, cover_url: null },
+          error: null,
+        }),
+      }),
   },
 }));
 

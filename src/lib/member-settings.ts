@@ -171,7 +171,7 @@ export function vertagungZuruecksetzen(): void {
 export async function fetchMemberSettings(uid: string): Promise<MemberSettings> {
   const [stored, profile] = await Promise.all([
     supabase.from("member_settings").select(STORED_COLUMNS).eq("profile_id", uid).maybeSingle(),
-    supabase.from("profiles").select("is_public").eq("id", uid).maybeSingle(),
+    supabase.rpc("mein_profil").maybeSingle(),
   ]);
   if (stored.error) throw stored.error;
   if (profile.error) throw profile.error;
@@ -209,9 +209,8 @@ export async function saveMemberSettings(uid: string, values: MemberSettings): P
     .upsert({ profile_id: uid, ...stored }, { onConflict: "profile_id" });
   if (settingsError) throw settingsError;
 
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({ is_public: visible_in_directory })
-    .eq("id", uid);
+  const { error: profileError } = await supabase.rpc("verzeichnis_sichtbarkeit_setzen", {
+    p_sichtbar: visible_in_directory,
+  });
   if (profileError) throw profileError;
 }

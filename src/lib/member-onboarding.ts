@@ -31,12 +31,12 @@ export const onboardingProfileQueryKey = (uid: string) => ["onboarding-profile",
 /** Die drei Felder der Strecke. Bewusst nicht `fetchProfileEditorData`: das lädt
  *  Interessen, Ziele, Videos und die Kontaktzeile mit, von denen hier keins
  *  gebraucht wird. */
-export async function fetchOnboardingProfile(uid: string): Promise<OnboardingProfile> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("headline, avatar_url, region")
-    .eq("id", uid)
-    .maybeSingle();
+export async function fetchOnboardingProfile(): Promise<OnboardingProfile> {
+  // `mein_profil()` statt der Spaltenauswahl (AGE-1001). Die Funktion ist an
+  // die Sitzung gebunden und nimmt keine Kennung entgegen — der Parameter
+  // `uid` ist hier deshalb entfallen. Der Schluessel der Abfrage traegt ihn
+  // weiterhin, denn der Zwischenspeicher gehoert dem Konto.
+  const { data, error } = await supabase.rpc("mein_profil").maybeSingle();
   if (error) throw error;
   return {
     headline: data?.headline ?? "",
@@ -45,27 +45,36 @@ export async function fetchOnboardingProfile(uid: string): Promise<OnboardingPro
   };
 }
 
-/** Feldbezogenes Schreiben: eine Spalte, eigene Zeile. Die RLS erzwingt
- *  `id = auth.uid()`; das `eq` hier ist die Absicht, nicht die Grenze. */
-async function updateEigeneSpalte(
-  uid: string,
-  patch: Partial<Pick<OnboardingProfile, "headline" | "region" | "avatar_url">>,
-): Promise<void> {
-  const { error } = await supabase.from("profiles").update(patch).eq("id", uid);
+/* Feldbezogenes Schreiben: eine Spalte, eigene Zeile. Seit AGE-1001 je eine
+ * eigene SECURITY-DEFINER-Funktion statt eines gemeinsamen UPDATE mit einem
+ * `patch`-Objekt — das Schreibrecht auf `profiles` ist mit dem Leserecht
+ * gefallen, denn ein `update … where id = $1` braucht `select` auf die
+ * Spalten der WHERE-Klausel.
+ *
+ * Drei Funktionen statt einer mit drei Vorgabewerten: der Funktionsname IST
+ * die Positivliste. Bei „null heisst unverändert" liesse sich ein Feld nie
+ * leeren, bei „null heisst leeren" leerte ein vergessener Parameter still.
+ *
+ * Die Kennung ist aus allen dreien entfallen: die Funktionen treffen die
+ * Zeile der Sitzung, einen Weg zu einer fremden gibt es nicht mehr.
+ */
+export async function saveOnboardingHeadline(headline: string): Promise<void> {
+  const { error } = await supabase.rpc("onboarding_kopfzeile_setzen", { p_headline: headline });
   if (error) throw error;
 }
-
-export const saveOnboardingHeadline = (uid: string, headline: string) =>
-  updateEigeneSpalte(uid, { headline });
 
 /** `region` ist der FBC Standort und ein FREITEXTfeld (`ProfileFieldsets.tsx:46`).
  *  Eine verbindliche Liste der Standorte gibt es nicht — hier wird ergänzt, nicht
  *  validiert, deshalb auch ohne die `min(1)`-Pflicht aus `profile.ts:38`. */
-export const saveOnboardingRegion = (uid: string, region: string) =>
-  updateEigeneSpalte(uid, { region });
+export async function saveOnboardingRegion(region: string): Promise<void> {
+  const { error } = await supabase.rpc("onboarding_region_setzen", { p_region: region });
+  if (error) throw error;
+}
 
-export const saveOnboardingAvatarUrl = (uid: string, avatar_url: string) =>
-  updateEigeneSpalte(uid, { avatar_url });
+export async function saveOnboardingAvatarUrl(avatar_url: string): Promise<void> {
+  const { error } = await supabase.rpc("onboarding_bild_setzen", { p_avatar_url: avatar_url });
+  if (error) throw error;
+}
 
 export interface OnboardingFreetext {
   offers: string[];

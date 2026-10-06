@@ -309,14 +309,21 @@ export async function fetchThreads(
     ...new Set(rows.map((t) => (t.a_profile_id === uid ? t.b_profile_id : t.a_profile_id))),
   ];
 
-  // Partner aus der Basistabelle `profiles` (NICHT `profiles_public`): die Chat-Route
-  // ist Prime+, und `profiles_select_self_or_prime` gibt Prime+ jede Profilzeile frei.
-  // So sieht man den Namen eines freigegebenen Kontakts auch dann, wenn dieser sein
-  // Profil NICHT öffentlich gestellt hat (profiles_public filtert `where is_public`).
-  const { data: profiles, error: profilesError } = await supabase
-    .from("profiles")
-    .select("id, name, avatar_url, company, tier")
-    .in("id", partnerIds);
+  // `gespraechspartner_karten` und AUSDRÜCKLICH NICHT `profil_karten`
+  // (AGE-1001). Bis dahin stand hier die Basistabelle `profiles` statt der
+  // Sicht `profiles_public`, und zwar mit Absicht: so trägt ein Kontakt seinen
+  // Namen auch dann, wenn er sein Profil nicht öffentlich gestellt hat — die
+  // Sicht filtert `where is_public`.
+  //
+  // Die neue Funktion führt genau diesen Unterschied weiter: dieselben Felder
+  // ohne `is_public`, dafür nur für Profile, mit denen der Aufrufer einen
+  // Gesprächsfaden teilt. Das gemeinsame Gespräch IST hier die Berechtigung.
+  // Ein Ersatz durch `profil_karten` liesse im Chat Namen verschwinden, und
+  // zwar ausschliesslich bei den Zurückgezogenen.
+  const { data: profiles, error: profilesError } = await supabase.rpc(
+    "gespraechspartner_karten",
+    { p_ids: partnerIds },
+  );
   if (profilesError) throw profilesError;
 
   const partnerById = new Map((profiles ?? []).map((p) => [p.id, p]));

@@ -20,9 +20,19 @@ interface Aufruf {
 }
 
 let aufrufe: Aufruf[] = [];
+/** Seit AGE-1001 laufen die beiden Profil-Haelften ueber Funktionen. */
+let funktionen: string[] = [];
 
 vi.mock("./supabase", () => ({
   supabase: {
+    rpc: (name: string) => {
+      funktionen.push(name);
+      return {
+        maybeSingle: async () => ({ data: null, error: null }),
+        then: (auf: (r: { data: unknown; error: null }) => unknown, ab?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: [], error: null }).then(auf, ab),
+      };
+    },
     from: (table: string) => {
       const eintrag: Aufruf = { table };
       aufrufe.push(eintrag);
@@ -49,6 +59,7 @@ const ID = "33333333-3333-3333-3333-333333333333";
 
 beforeEach(() => {
   aufrufe = [];
+  funktionen = [];
 });
 
 describe("fetchPublicProfile — welche Tabellen gelesen werden (AGE-597)", () => {
@@ -62,9 +73,14 @@ describe("fetchPublicProfile — welche Tabellen gelesen werden (AGE-597)", () =
     const tabellen = aufrufe.map((a) => a.table);
     // Gegenprobe zur Zusage oben: der Test darf nicht dadurch gruen werden,
     // dass gar nichts mehr gelesen wird.
-    for (const t of ["profiles_public", "profiles", "profile_interests", "offers", "needs", "posts"]) {
+    for (const t of ["profile_interests", "offers", "needs", "posts"]) {
       expect(tabellen).toContain(t);
     }
+    // Die beiden Profil-Haelften stehen seit AGE-1001 NICHT mehr in dieser
+    // Liste: `profiles_public` und `profiles` sind entzogen, an ihrer Stelle
+    // stehen zwei Funktionen. Dieselbe Gegenprobe, eine Zeile tiefer.
+    expect(funktionen).toContain("profil_karten");
+    expect(funktionen).toContain("profil_detail");
   });
 
   it("liest `source` bei Angeboten und Gesuchen mit", async () => {

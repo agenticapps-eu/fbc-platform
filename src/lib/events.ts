@@ -341,12 +341,9 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
 
   const [profilesRes, partnersRes] = await Promise.all([
     profileIds.length
-      ? supabase
-          .from("profiles_public")
-          // Drei Spalten mehr als vorher (company, roles, short_bio) — dieselbe
-          // Abfrage, kein zweiter Weg. Sie füllen die Veranstalter-Karte.
-          .select("id, name, avatar_url, tier, company, roles, short_bio")
-          .in("id", profileIds)
+      ? // `profil_karten` liefert alle zehn Felder der abgelösten Sicht; die
+        // Veranstalter-Karte braucht sieben davon.
+        supabase.rpc("profil_karten", { p_ids: profileIds })
       : Promise.resolve({ data: [], error: null }),
     partnerIds.length
       ? supabase.from("partners").select("id, name, logo_url, description").in("id", partnerIds)
@@ -355,7 +352,6 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
 
   const profiles = new Map<string, EventHost>();
   for (const p of profilesRes.data ?? []) {
-    if (!p.id) continue; // profiles_public ist eine View → id ist nullable im Typ.
     profiles.set(p.id, {
       kind: "profile",
       id: p.id,
@@ -517,11 +513,8 @@ export async function fetchEventAttendees(eventId: string): Promise<AttendeeFace
   const rows = data ?? [];
   const ids = [...new Set(rows.map((r) => r.profile_id))];
   if (ids.length === 0) return [];
-  const { data: pdata } = await supabase
-    .from("profiles_public")
-    .select("id, name, avatar_url")
-    .in("id", ids);
-  const profiles = new Map((pdata ?? []).flatMap((p) => (p.id ? [[p.id, p] as const] : [])));
+  const { data: pdata } = await supabase.rpc("profil_karten", { p_ids: ids });
+  const profiles = new Map((pdata ?? []).map((p) => [p.id, p] as const));
   return rows.map((r) => {
     const p = profiles.get(r.profile_id);
     return {
@@ -548,12 +541,8 @@ export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
     { name: string | null; avatar_url: string | null; tier: string | null }
   >();
   if (profileIds.length > 0) {
-    const { data: pdata } = await supabase
-      .from("profiles_public")
-      .select("id, name, avatar_url, tier")
-      .in("id", profileIds);
+    const { data: pdata } = await supabase.rpc("profil_karten", { p_ids: profileIds });
     for (const p of pdata ?? []) {
-      if (!p.id) continue;
       profiles.set(p.id, { name: p.name, avatar_url: p.avatar_url, tier: p.tier });
     }
   }

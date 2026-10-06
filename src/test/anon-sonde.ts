@@ -45,6 +45,13 @@ const PARTNER = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
  * Fixture-Zeilen, aus `anon-anreicherung.test.ts` hierher gezogen (AGE-542),
  * damit beide Prüfstände dieselbe Datenlage sehen. Wer hier eine Spalte
  * entfernt, sollte in beiden rot werden — das ist der Zweck des Umzugs.
+ *
+ * SEIT AGE-1001 stehen hier Relationen UND Funktionen nebeneinander: der
+ * Lesezugriff auf `profiles` und `profiles_public` ist entzogen, die
+ * Anreicherung läuft über `profil_karten`. `from()` und `rpc()` greifen
+ * deshalb in denselben Topf. Eine Kollision zwischen einem Tabellen- und
+ * einem Funktionsnamen gibt es nicht und gäbe in der Datenbank auch keine
+ * — beide liegen in `public`.
  */
 export const ZEILEN: Record<string, Record<string, unknown>[]> = {
   posts: [
@@ -87,15 +94,23 @@ export const ZEILEN: Record<string, Record<string, unknown>[]> = {
       host_partner_id: PARTNER,
     },
   ],
-  profiles_public: [
+  // GENAU die zehn Felder, die `profil_karten` in `returns table (…)`
+  // verspricht — nicht eines mehr. Das ist die Zusage, die bis AGE-1001 die
+  // aufgezeichnete `select()`-Projektion trug: liest der Produktivcode ein
+  // elftes Feld, bekommt er hier `undefined` und die Karte fällt rot aus,
+  // statt still zu verarmen. `anon-anreicherung.test.ts` nagelt die Liste fest.
+  profil_karten: [
     {
       id: AUTOR,
       name: "Jonas Keller",
       avatar_url: "https://x/a.webp",
-      tier: "impact",
+      region: "Wien",
       company: "Keller GmbH",
-      roles: ["Gründer"],
       short_bio: "Baut Dinge.",
+      tier: "impact",
+      roles: ["Gründer"],
+      cover_url: null,
+      branche: "Handwerk",
     },
   ],
   partners: [
@@ -177,7 +192,11 @@ export const sonde = {
 
   rpc(name: string) {
     rekorder.funktionen.push(name);
-    return kette(() => []);
+    // Seit AGE-1001 liefert auch `rpc` aus der Vorrichtung: die Anreicherung
+    // der Autoren und der Veranstalter läuft über `profil_karten`, nicht mehr
+    // über eine Relation. Was keine Zeilen hinterlegt hat, bekommt wie bisher
+    // die leere Menge.
+    return kette(() => ZEILEN[name] ?? []);
   },
 
   auth: {

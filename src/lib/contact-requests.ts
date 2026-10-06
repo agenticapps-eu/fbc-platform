@@ -133,10 +133,7 @@ export async function fetchIncomingRequests(uid: string): Promise<IncomingReques
   if (rows.length === 0) return [];
 
   const fromIds = [...new Set(rows.map((r) => r.from_id))];
-  const profilesRes = await supabase
-    .from("profiles_public")
-    .select("id, name, avatar_url, company, region")
-    .in("id", fromIds);
+  const profilesRes = await supabase.rpc("profil_karten", { p_ids: fromIds });
   if (profilesRes.error) throw profilesRes.error;
 
   const byId = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));

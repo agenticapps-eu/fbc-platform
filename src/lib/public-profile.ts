@@ -93,16 +93,12 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
   // aus dieser Ansicht entfallen, und ein Rundlauf ohne Leser ist kein „Erhalten".
   // Tabelle und `recompute_potential_score` bleiben bestehen.
   const [publicRes, baseRes, interestsRes, offersRes, needsRes, postsRes] = await Promise.all([
-    supabase
-      .from("profiles_public")
-      .select("id, name, avatar_url, cover_url, region, company, short_bio, tier, roles")
-      .eq("id", id)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("headline, branche, member_since, potential_score, competencies, videos")
-      .eq("id", id)
-      .maybeSingle(),
+    supabase.rpc("profil_karten", { p_ids: [id] }).maybeSingle(),
+    // `profil_detail` trägt dieselbe Schwelle, die vorher die Policy
+    // `profiles_select_self_or_discover` trug: Clubschwelle oder eigene Zeile
+    // (AGE-1001). Kommt nichts zurück, war der Vollzugriff nicht erlaubt —
+    // genau wie vorher.
+    supabase.rpc("profil_detail", { p_id: id }).maybeSingle(),
     supabase.from("profile_interests").select("theme, label").eq("profile_id", id).order("label"),
     supabase
       .from("offers")
@@ -135,7 +131,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
 
   const pub = publicRes.data;
   const publicProfile: PublicProfile | null =
-    pub && pub.id
+    pub
       ? {
           id: pub.id,
           name: pub.name ?? "Mitglied",
@@ -149,7 +145,7 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
         }
       : null;
 
-  // Die RLS gab die Basiszeile frei → Vollzugriff (Prime+/eigenes Profil).
+  // Die Funktion gab die erweiterten Felder frei → Vollzugriff (Prime+/eigen).
   const base = baseRes.data;
   const extended: ExtendedProfile | null = base
     ? {

@@ -103,7 +103,8 @@ const ZEILEN: Record<string, Record<string, unknown>[]> = {
   get comments() {
     return kommentarzeilen;
   },
-  profiles_public: [
+  // Seit AGE-1001 holt `fetchAuthors` die Karten ueber `profil_karten`.
+  profil_karten: [
     { id: OEFFENTLICH, name: "Jonas Keller", avatar_url: "https://x/a.webp", tier: "impact" },
   ],
   post_media: [],
@@ -132,6 +133,7 @@ vi.mock("./supabase", () => ({
     },
     rpc: async (name: string, args: unknown) => {
       rpcs.push({ name, args });
+      if (name === "profil_karten") return { data: ZEILEN[name] ?? [], error: null };
       if (name === "former_member_entries") {
         const { p_post_ids = [], p_comment_ids = [] } = (args ?? {}) as {
           p_post_ids?: string[];

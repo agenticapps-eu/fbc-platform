@@ -28,17 +28,21 @@ vi.mock("./supabase", async () => {
 
 import { fetchComments, fetchFeed } from "./feed";
 import { fetchEvent, fetchEvents } from "./events";
-import { AUTOR, PARTNER, rekorder, zuruecksetzen } from "../test/anon-sonde";
+import { AUTOR, PARTNER, ZEILEN, rekorder, zuruecksetzen } from "../test/anon-sonde";
 
 beforeEach(() => {
   zuruecksetzen();
 });
 
 describe("Feed — Autoren", () => {
-  it("fragt ausgeloggt profiles_public gar nicht erst an", async () => {
+  it("ruft ausgeloggt profil_karten gar nicht erst", async () => {
     const seite = await fetchFeed({ uid: null });
 
-    expect(rekorder.relationen).not.toContain("profiles_public");
+    // Bis AGE-1001 stand hier `relationen`/`profiles_public`. Die Zusage ist
+    // dieselbe und sie ist seitdem SCHÄRFER: `profil_karten` trägt sein
+    // `execute` nur für `authenticated`, ein ausgeloggter Aufruf wäre ein 404
+    // statt eines 401 — und ebenso vermeidbar.
+    expect(rekorder.funktionen).not.toContain("profil_karten");
     // Und der Feed liefert trotzdem seine Beiträge — die Sperre nimmt nichts mit.
     expect(seite.posts).toHaveLength(1);
     // „Ein Mitglied", nicht „Mitglied": der Rückfall in `authorOf` heisst seit
@@ -51,10 +55,10 @@ describe("Feed — Autoren", () => {
     expect(seite.posts[0].author.tier).toBeNull();
   });
 
-  it("fragt eingeloggt weiterhin an und löst den Autor auf", async () => {
+  it("ruft eingeloggt weiterhin und löst den Autor auf", async () => {
     const seite = await fetchFeed({ uid: "me" });
 
-    expect(rekorder.relationen).toContain("profiles_public");
+    expect(rekorder.funktionen).toContain("profil_karten");
     expect(seite.posts[0].author.name).toBe("Jonas Keller");
     expect(seite.posts[0].author.avatarUrl).toBe("https://x/a.webp");
     expect(seite.posts[0].author.tier).toBe("impact");
@@ -71,7 +75,7 @@ describe("Kommentare — Autoren", () => {
     const kommentare = await fetchComments(null, "p1");
 
     expect(rekorder.relationen).not.toContain("comments");
-    expect(rekorder.relationen).not.toContain("profiles_public");
+    expect(rekorder.funktionen).not.toContain("profil_karten");
     expect(kommentare).toEqual([]);
   });
 
@@ -82,47 +86,70 @@ describe("Kommentare — Autoren", () => {
     // `comments` trägt sein select nur für `authenticated`.
     const kommentare = await fetchComments("me", "p1");
 
-    expect(rekorder.relationen).toContain("profiles_public");
+    expect(rekorder.funktionen).toContain("profil_karten");
     expect(kommentare[0].author.name).toBe("Jonas Keller");
     expect(kommentare[0].author.avatarUrl).toBe("https://x/a.webp");
   });
 });
 
 describe("Events — Hosts", () => {
-  it("fragt ausgeloggt weder profiles_public noch partners an", async () => {
-    // Beide Relationen sind für anon gesperrt. Eine Regel, die nur die
-    // Profil-Hälfte überspränge, ließe den zweiten 401 stehen.
+  it("ruft ausgeloggt weder profil_karten noch partners", async () => {
+    // Beides ist für anon gesperrt. Eine Regel, die nur die Profil-Hälfte
+    // überspränge, ließe den zweiten Fehlschlag stehen.
     const events = await fetchEvents(null);
 
-    expect(rekorder.relationen).not.toContain("profiles_public");
+    expect(rekorder.funktionen).not.toContain("profil_karten");
     expect(rekorder.relationen).not.toContain("partners");
     expect(events).toHaveLength(2);
     expect(events[0].host).toBeNull();
     expect(events[1].host).toBeNull();
   });
 
-  it("fragt ausgeloggt auch am einzelnen Event keine der beiden an", async () => {
+  it("rührt ausgeloggt auch am einzelnen Event keines von beiden an", async () => {
     await fetchEvent(null, "e1");
 
-    expect(rekorder.relationen).not.toContain("profiles_public");
+    expect(rekorder.funktionen).not.toContain("profil_karten");
     expect(rekorder.relationen).not.toContain("partners");
   });
 
-  it("fragt die Spalten an, die die Veranstalter-Karte braucht", async () => {
+  it("fragt die Partner-Spalten an, die die Veranstalter-Karte braucht", async () => {
     // Ohne diese Zeile wäre die Fixture-Erweiterung eine Behauptung: der Mock
     // liefert seine Felder unabhängig davon, was `select()` verlangt hat. Fällt
     // eine Spalte aus der Projektion, verliert die Karte still ihre Zeile.
+    //
+    // Die Profil-Hälfte dieser Zusage ist mit AGE-1001 ENTFALLEN und durch die
+    // Zusage darunter ERSETZT: es gibt keine Projektion mehr, die Spaltenliste
+    // steht in `returns table (…)` von `profil_karten`.
     await fetchEvents("me");
-    expect(rekorder.spalten.profiles_public).toContain("company");
-    expect(rekorder.spalten.profiles_public).toContain("roles");
-    expect(rekorder.spalten.profiles_public).toContain("short_bio");
     expect(rekorder.spalten.partners).toContain("description");
+  });
+
+  it("hält die Vorrichtung von profil_karten auf genau den zehn Feldern der Funktion", () => {
+    // Der Ersatz für die weggefallene Spalten-Zusage, und er misst dasselbe
+    // von der anderen Seite: verspricht die Vorrichtung MEHR als die Funktion,
+    // ist jede Zusage darüber grün, die in der Datenbank `undefined` bekäme.
+    // Die Liste ist zeichengleich mit dem `returns table (…)` in
+    // 20261003160000_verzeichnis_dicht.sql und mit `database.types.ts`.
+    expect(Object.keys(ZEILEN.profil_karten[0]).sort()).toEqual(
+      [
+        "avatar_url",
+        "branche",
+        "company",
+        "cover_url",
+        "id",
+        "name",
+        "region",
+        "roles",
+        "short_bio",
+        "tier",
+      ].sort(),
+    );
   });
 
   it("löst eingeloggt beide Host-Arten unverändert auf", async () => {
     const events = await fetchEvents("me");
 
-    expect(rekorder.relationen).toContain("profiles_public");
+    expect(rekorder.funktionen).toContain("profil_karten");
     expect(rekorder.relationen).toContain("partners");
     expect(events[0].host).toEqual({
       kind: "profile",

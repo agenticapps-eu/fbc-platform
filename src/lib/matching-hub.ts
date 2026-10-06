@@ -185,10 +185,7 @@ export async function fetchMatchingHub(uid: string): Promise<MatchingHubData> {
   ];
 
   const [profilesRes, offersRes, needsRes, crRes] = await Promise.all([
-    supabase
-      .from("profiles_public")
-      .select("id, name, avatar_url, region, company, tier")
-      .in("id", partnerIds),
+    supabase.rpc("profil_karten", { p_ids: partnerIds }),
     supabase
       .from("offers")
       .select("id, profile_id, category, theme, title")

@@ -267,7 +267,9 @@ export async function saveCompass(
 
   // 3. dev_focus setzen → set_profile_completion-Trigger hebt profile_completion.
   if (focus) {
-    const { error } = await supabase.from("profiles").update({ dev_focus: focus }).eq("id", uid);
+    const { error } = await supabase.rpc("entwicklungsschwerpunkt_setzen", {
+      p_fokus: focus,
+    });
     if (error) throw error;
   }
 
@@ -291,11 +293,7 @@ export async function saveCompass(
 
   // 5. Persistierte Ergebniswerte für die Abschluss-Seite lesen (echte Daten).
   const [profileRes, themeRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("profile_completion, potential_score, dev_focus")
-      .eq("id", uid)
-      .single(),
+    supabase.rpc("mein_profil").single(),
     supabase.from("profile_theme_scores").select("theme, score").eq("profile_id", uid),
   ]);
   if (profileRes.error) throw profileRes.error;

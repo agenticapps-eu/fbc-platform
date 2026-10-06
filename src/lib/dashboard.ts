@@ -216,13 +216,10 @@ export async function fetchDashboard(uid: string): Promise<DashboardData> {
     postsRes,
     hostedRes,
   ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(
-        "id, name, avatar_url, cover_url, region, company, short_bio, tier, roles, headline, member_number, member_since, potential_score, profile_completion, dev_focus, dev_progress, next_steps",
-      )
-      .eq("id", uid)
-      .single(),
+    // `mein_profil()` statt der Spaltenliste (AGE-1001). Die Funktion gibt
+    // `p.*` zurueck; hier werden weiterhin nur die siebzehn Felder unten
+    // gelesen.
+    supabase.rpc("mein_profil").single(),
     supabase.from("profile_theme_scores").select("theme, score").eq("profile_id", uid),
     supabase.from("profile_interests").select("theme, label").eq("profile_id", uid).order("label"),
     supabase.from("goals").select("category, title, progress").eq("profile_id", uid),

@@ -42,8 +42,7 @@ vi.mock("./supabase", () => ({
     from: (table: string) => {
       const eintrag: Aufruf = { table, or: [] };
       aufrufe.push(eintrag);
-      const daten = () =>
-        table === "posts" ? postZeilen : table === "profiles_public" ? PROFILE : [];
+      const daten = () => (table === "posts" ? postZeilen : []);
       const kette: Record<string, unknown> = {
         select: (spalten: string) => {
           eintrag.select = spalten;
@@ -65,7 +64,9 @@ vi.mock("./supabase", () => ({
       };
       return kette;
     },
-    rpc: async () => ({ data: [], error: null }),
+    // `profil_karten` seit AGE-1001 — bis dahin kam PROFILE aus
+    // `from("profiles_public")`.
+    rpc: async (name: string) => ({ data: name === "profil_karten" ? PROFILE : [], error: null }),
   },
 }));
 

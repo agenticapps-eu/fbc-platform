@@ -2390,6 +2390,124 @@ export type Database = {
           need_categories: string[];
         }[];
       };
+      // ── AGE-1001 ────────────────────────────────────────────────────────
+      // Von Hand nachgetragen wie die Nachbarn. Spiegelt
+      // 20261003160000_verzeichnis_dicht.sql. Diese elf Funktionen sind seit
+      // dem Entzug der KOMPLETTE Lesezugriff der Oberflaeche auf `profiles`
+      // und `profiles_public`: `authenticated` haelt auf beiden Relationen
+      // weder `select` noch `update`. Wer hier eine Spalte vermisst, traegt
+      // sie in die MIGRATION ein, nicht hier — eine Spalte, die der Typ
+      // verspricht und die Funktion nicht liefert, ist zur Laufzeit
+      // `undefined` und faellt erst in der Oberflaeche auf.
+      //
+      // Die Nullbarkeit ist an `information_schema.columns` GEMESSEN, nicht
+      // vom Generator uebernommen: `name` ist nullbar, `tier`, `id`,
+      // `videos`, `potential_score` und `profile_completion` sind es nicht.
+      mein_profil: {
+        Args: never;
+        /** Zeichengleich mit der Tabellenzeile — die Funktion liefert `p.*`.
+         *  Der Indexzugriff auf `Database` INNERHALB von `Database` ist
+         *  erlaubt (gegen `tsc --strict` geprueft) und haelt die beiden
+         *  Stellen zusammen; eine abgeschriebene Spaltenliste liefe
+         *  auseinander. */
+        Returns: Database["public"]["Tables"]["profiles"]["Row"][];
+      };
+      meine_stufe: {
+        Args: never;
+        Returns: {
+          tier: string;
+          level_rank: number;
+        }[];
+      };
+      /** Karten zu BEKANNTEN Kennungen, mit dem Praedikat der abgeloesten
+       *  Sicht `profiles_public` — einschliesslich `is_public`. Die Grenze von
+       *  200 Kennungen steht in der Migration und ist ein Betriebsmittel. */
+      profil_karten: {
+        Args: { p_ids: string[] };
+        Returns: {
+          id: string;
+          name: string | null;
+          avatar_url: string | null;
+          region: string | null;
+          company: string | null;
+          short_bio: string | null;
+          tier: string;
+          roles: string[] | null;
+          /** Relativer PFAD im Bucket `covers`, keine fertige URL (AGE-580). */
+          cover_url: string | null;
+          branche: string | null;
+        }[];
+      };
+      /** Dieselben Felder OHNE `is_public`, dafuer nur fuer Profile, mit denen
+       *  der Aufrufer einen Gespraechsfaden teilt. Nur fuer `chat.ts`: ein
+       *  zurueckgezogenes Profil soll im Chat seinen Namen behalten. */
+      gespraechspartner_karten: {
+        Args: { p_ids: string[] };
+        Returns: Database["public"]["Functions"]["profil_karten"]["Returns"];
+      };
+      profil_detail: {
+        Args: { p_id: string };
+        Returns: {
+          headline: string | null;
+          branche: string | null;
+          member_since: string | null;
+          potential_score: number;
+          competencies: string[] | null;
+          /** `text[]` in der Datenbank, NICHT `jsonb` — gemessen. */
+          videos: string[];
+        }[];
+      };
+      /** Der Profil-Editor. KEINE Vorgabewerte: alle vierzehn Parameter sind
+       *  Pflicht, weil „null heisst unveraendert" genau die Zweideutigkeit
+       *  waere, an der `saveProfile` schon einmal Interessen und Ziele
+       *  lautlos geloescht hat. */
+      profil_speichern: {
+        Args: {
+          p_name: string;
+          p_region: string;
+          p_company: string;
+          p_short_bio: string;
+          p_branche: string | null;
+          p_headline: string | null;
+          p_roles: string[];
+          p_competencies: string[];
+          p_website: string | null;
+          p_dev_focus: string | null;
+          p_socials: Json;
+          p_videos: string[];
+          p_avatar_url: string | null;
+          p_cover_url: string | null;
+        };
+        /** Genau das, was der Aufrufer bisher ueber die `.select()`-Kette
+         *  hinter dem UPDATE bekam. */
+        Returns: {
+          profile_completion: number;
+          avatar_url: string | null;
+          cover_url: string | null;
+        }[];
+      };
+      verzeichnis_sichtbarkeit_setzen: {
+        Args: { p_sichtbar: boolean };
+        Returns: undefined;
+      };
+      entwicklungsschwerpunkt_setzen: {
+        Args: { p_fokus: string | null };
+        Returns: undefined;
+      };
+      /** Drei Funktionen statt einer mit drei Vorgabewerten: der Name IST die
+       *  Positivliste, und es gibt keine null-Zweideutigkeit. */
+      onboarding_kopfzeile_setzen: {
+        Args: { p_headline: string };
+        Returns: undefined;
+      };
+      onboarding_region_setzen: {
+        Args: { p_region: string };
+        Returns: undefined;
+      };
+      onboarding_bild_setzen: {
+        Args: { p_avatar_url: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

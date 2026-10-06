@@ -349,7 +349,7 @@ describe("Schritt 1 — Berufsbezeichnung", () => {
     klick("Weiter");
 
     await waitFor(() =>
-      expect(headlineMock).toHaveBeenCalledWith("test-user", "Steuerberaterin"),
+      expect(headlineMock).toHaveBeenCalledWith("Steuerberaterin"),
     );
     expect(saveProfileMock).not.toHaveBeenCalled();
   });
@@ -366,7 +366,7 @@ describe("Schritt 1 — Berufsbezeichnung", () => {
     klick("Später");
     await screen.findByText(STARTSEITE);
 
-    expect(headlineMock).toHaveBeenCalledWith("test-user", "Steuerberaterin");
+    expect(headlineMock).toHaveBeenCalledWith("Steuerberaterin");
     expect(setzeMerkerMock).not.toHaveBeenCalled();
   });
 });
@@ -506,7 +506,7 @@ describe("Schritt 3 — Profilbild und Standort", () => {
     fireEvent.change(feld, { target: { value: "München" } });
     klick("Fertig");
 
-    await waitFor(() => expect(regionMock).toHaveBeenCalledWith("test-user", "München"));
+    await waitFor(() => expect(regionMock).toHaveBeenCalledWith("München"));
     expect(saveProfileMock).not.toHaveBeenCalled();
   });
 });
