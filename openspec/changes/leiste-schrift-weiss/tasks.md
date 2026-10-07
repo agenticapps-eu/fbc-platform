@@ -59,6 +59,19 @@
 - [ ] 4.3 Im navy-Bild nachsehen, was Entscheidung 4 angekündigt hat: trägt der
       eingeklappte aktive Eintrag seinen Zustand noch sichtbar? Die Antwort
       gehört in den PR, nicht in eine Vermutung.
+
+## 3b. Der Fund aus Entscheidung 4 — die Symbolform vervollständigen
+
+- [ ] 3b.1 Gefüllte Fassung für `bulb` und für `dot`. `dot` ist der Rückfall
+      von `NavIcon`, deckt also auch jede künftige Route ohne eigenes Symbol.
+- [ ] 3b.2 Wächter über **beide** Quellen der Leiste: `navItems` UND die
+      Nachschübe aus `AppShell`. Die erste Zählung lief nur über die erste und
+      meldete keine Lücke — alle drei lagen in der zweiten.
+- [ ] 3b.3 Die Form am **DOM** lesen (`fill`/`stroke`), nicht an einer Klasse
+      oder einem Namen: der Unterschied, den ein Auge sieht, hängt an genau
+      diesen Attributen.
+- [ ] 3b.4 Gegenprobe: mit den alten Glyphen muss der Wächter mit genau drei
+      Fehlschlägen ausfallen, benannt nach den drei Pfaden.
 - [ ] 4.4 `StyleguidePage.tsx` und `docs/technisches-handbuch.md` auf
       Behauptungen über die Leisten-Schrift durchsehen — bei AGE-1003 standen
       dort drei falsche.

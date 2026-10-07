@@ -96,7 +96,10 @@ export function LeistenPill({
         "transition-colors focus-visible:outline-none focus-visible:ring-2",
         // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
         flaeche === "leiste"
-          ? "fbc-sidebar-surface text-on-chrome hover:text-on-chrome-active focus-visible:ring-[color:var(--leiste-focus)]"
+          ? // `--leiste-ink` seit AGE-1018, aus demselben Grund, aus dem der
+            // Fokusring hier einen eigenen Token hat: JE SEITE EINER. Im
+            // hellen Modus traegt er zeichengleich #475569, also unveraendert.
+            "fbc-sidebar-surface text-[color:var(--leiste-ink)] hover:text-on-chrome-active focus-visible:ring-[color:var(--leiste-focus)]"
           : // `--thread-chrome-ink` und nicht `--thread-muted`: im HELLEN Modus
             // muss der eingeklappte Pill aussehen wie vorher, und das war
             // `text-on-chrome` (#475569) mit Hover `#1F53B0`. `--thread-muted`

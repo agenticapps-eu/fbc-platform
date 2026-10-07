@@ -62,42 +62,80 @@ Eine eigene `--leiste-ink-hover` einzuführen wäre ein drittes Token für einen
 Wert, der in beiden Modi genau `--color-on-chrome-active` ist. Kein Token für
 keinen Unterschied.
 
-## Entscheidung 4: Eingeklappt bleibt die Symbolform allein — benannt, nicht weggeschrieben
+## Entscheidung 4: Die Symbolform traegt den eingeklappten Zustand — und sie wird dafuer erst vollständig gemacht
 
-Das ist die Folge, die nicht nach Farbe aussieht, und sie gehört vor die
-Umsetzung. `NavIcon` nimmt **keine** Farbe an; es erbt `currentColor` von der
-Textklasse des Links. Die Merkmale des aktiven Eintrags, je Zustand:
+Das ist die Folge, die nicht nach Farbe aussieht, und sie hat die Umsetzung
+verändert. `NavIcon` nimmt **keine** Farbe an; es erbt `currentColor` von der
+Textklasse seines Links. Die Merkmale des aktiven Eintrags, je Zustand:
 
-|                                           | heute aufgeklappt | heute eingeklappt | nachher aufgeklappt | nachher eingeklappt |
-| ----------------------------------------- | ----------------- | ----------------- | ------------------- | ------------------- |
-| halbfette Beschriftung                    | ja                | nein              | ja                  | nein                |
-| weisser Linksbalken                       | ja                | nein              | ja                  | nein                |
-| Symbolfarbe `#FFFFFF` statt `#9FB4D2`     | ja                | **ja**            | **nein**            | **nein**            |
-| Symbolform `solid` statt `line`           | ja                | ja                | ja                  | ja                  |
+|                                       | vorher aufgeklappt | vorher eingeklappt | nachher aufgeklappt | nachher eingeklappt |
+| ------------------------------------- | ------------------ | ------------------ | ------------------- | ------------------- |
+| halbfette Beschriftung                | ja                 | nein               | ja                  | nein                |
+| weisser Linksbalken                   | ja                 | nein               | ja                  | nein                |
+| Symbolfarbe `#FFFFFF` statt `#9FB4D2` | ja                 | **ja**             | **nein**            | **nein**            |
+| Symbolform `solid` statt `line`       | ja                 | ja                 | ja                  | ja                  |
 
-Eingeklappt sinkt die Zahl der zählenden Merkmale damit von **zwei auf eines**.
+Eingeklappt sinkt die Zahl der zählenden Merkmale von zwei auf eines. Die Norm
+hält — 1.4.1 verlangt, dass Farbe nicht das **einzige** Mittel ist, und eine
+Form ist kein Farbmittel. Die Leiste rechts macht denselben Tausch: alle Namen
+stehen dort auf `--thread-ink`, der aktive Faden ist allein an seiner Fläche
+erkennbar.
 
-Die Norm hält: 1.4.1 verlangt, dass Farbe nicht das **einzige** Mittel ist, und
-die Form ist kein Farbmittel. Aber „die Norm hält" ist nicht dasselbe wie „es
-ist gut", und AGE-1003 hat die Zweierschaft ausdrücklich in die Spec geschrieben.
-Sie wird hier also **geändert**, nicht gerissen: die Spec sagt nachher, dass
-eingeklappt die Form allein trägt, und nennt den Grund.
+### Und dann hat die Messung einen bestehenden Mangel aufgedeckt
 
-Drei Auswege wurden gerechnet und verworfen:
+Die Tabelle oben setzt voraus, dass jedes Symbol der Leiste eine gefüllte
+Fassung **hat**. Gemessen hatten es **neun von zwölf**:
 
-1. **Inaktive Einträge auf `#B9CCE6` statt `#FFFFFF`.** Hielte die Zweierschaft
-   und wäre nicht, was gefragt war — „weiss, gleicher Farbcode".
+| Eintrag              | Glyph             | gefüllte Fassung |
+| -------------------- | ----------------- | ---------------- |
+| `/hilfe/tutorials`   | `bulb`            | **nein**         |
+| `/admin/mitglieder`  | `dot` (Rückfall)  | **nein**         |
+| `/admin/feedback`    | `dot` (Rückfall)  | **nein**         |
+
+Für diese drei war der aktive Zustand eingeklappt **schon vorher** allein an der
+Symbolfarbe erkennbar — also allein an Farbe, und genau das verbietet die
+bestehende Anforderung „Farbe trägt nie allein eine Bedeutung". Der Kopf von
+`MASSIV` in `ui/icons.tsx` verspricht ausdrücklich das Gegenteil: „Das trägt die
+Auswahl auch dann, wenn die Leiste eingeklappt ist und kein Label danebensteht."
+
+AGE-1003 hat diesen Mangel nicht gesehen, weil seine Tabelle die Symbolform als
+gegeben annahm. Sichtbar wurde er erst, als diese Änderung das andere Merkmal
+wegnahm: aus „allein an der Farbe" wäre „an nichts" geworden.
+
+**Deshalb gehört die Reparatur in diesen Change und nicht in einen nächsten.**
+Ohne sie wäre die Änderung nicht nur eine Verringerung, sondern für drei
+Einträge ein Ausfall. Zwei Glyphen bekommen eine gefüllte Fassung: `bulb` und
+`dot`. `dot` ist der **Rückfall** von `NavIcon` für jeden Pfad ohne eigenes
+Symbol — damit gilt die Zusage auch für jede Route, die noch niemand gezeichnet
+hat. Robust gebaut statt daran erinnert.
+
+### Warum die Messung zuerst falsch war, und was daran zu lernen ist
+
+Die erste Zählung lief über `navItems` und meldete **keine** Lücke. Alle drei
+Lücken lagen in der zweiten Quelle: „Meine Anfragen", „Support" und
+„Administration" hängt `AppShell` selbst ein, sie stehen nicht in `navItems`.
+Dieselbe Lektion wie bei den zwanzig Aufrufstellen in AGE-1001 — *die Wurzeln
+nennen, nicht nur die Ebenen*. Der Wächter in `SidebarNav.active.test.tsx`
+leitet seine Liste deshalb aus **beiden** Quellen ab, und eine Positivkontrolle
+hält fest, dass die Liste nicht leer ist.
+
+Gegengeprobt wurde der Wächter, statt ihm zu glauben: mit den alten Glyphen
+fällt er mit genau drei Fehlschlägen aus, benannt nach den drei Pfaden.
+
+### Drei andere Auswege, gerechnet und verworfen
+
+1. **Inaktive Einträge auf `#B9CCE6` statt `#FFFFFF`.** Hielte das
+   Farbmerkmal — und wäre nicht, was gefragt war („weiss, gleicher Farbcode").
 2. **Die Aktivfläche über 3:1 heben.** `#1F53B0` trägt 2,00:1 gegen `#002B51`.
-   Ein Ton, der 3:1 hält, ist deutlich heller und ändert das Bild der Leiste
-   stärker als die Schrift, um die es hier geht. Ausserdem erklärt AGE-1003 die
-   Füllung ausdrücklich zur Dekoration — sie zum Signal zu befördern, wäre eine
-   grössere Entscheidung als diese.
-3. **Ein neues Merkmal, etwa ein Ring um das eingeklappte Symbol.** Erfindet
-   Gestaltung, um eine Gestaltungsvorgabe zu reparieren.
-
-Die Leiste rechts macht genau diesen Tausch schon: alle Namen stehen auf
-`--thread-ink`, der aktive Faden ist allein an seiner Fläche erkennbar. Parität
-heisst, denselben Tausch mitzumachen.
+   Das Fenster, in dem eine Füllung gleichzeitig 3:1 gegen die Leiste und
+   4,5:1 für weisse Schrift hält, ist schmal: `#3570D8` schafft 3,05:1 und
+   4,71:1, beides knapp. Eine Schwelle mit 0,05 Reserve ist keine Zusage, und
+   die Leiste sähe sichtbar anders aus als gefragt war. Ausserdem erklärt
+   AGE-1003 die Füllung ausdrücklich zur Dekoration — sie zum Signal zu
+   befördern, wäre eine grössere Entscheidung als diese.
+3. **Den Linksbalken auch eingeklappt zeigen.** Kehrt eine ausdrückliche
+   Entscheidung aus AGE-1003 um („neben einem zentrierten Icon in einer
+   schmalen Leiste liest er sich als Rand, nicht als Marke").
 
 ## Was ausserhalb bleibt
 

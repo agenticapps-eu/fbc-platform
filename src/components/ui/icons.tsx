@@ -307,6 +307,32 @@ const MASSIV: Partial<Record<GlyphName, ReactElement>> = {
   heart: (
     <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z" />
   ),
+
+  /** AGE-1018, und das ist eine REPARATUR, kein Beiwerk.
+   *
+   *  Der Kopf dieses Blocks verspricht: „Das traegt die Auswahl auch dann, wenn
+   *  die Leiste eingeklappt ist und kein Label danebensteht." Gemessen hielt das
+   *  Versprechen fuer NEUN von zwoelf Leisten-Eintraegen. Drei fehlten:
+   *  `/hilfe/tutorials` traegt `bulb`, `/admin/mitglieder` und
+   *  `/admin/feedback` fallen auf `dot` zurueck — und keiner der beiden Glyphen
+   *  hatte eine gefuellte Fassung. Eingeklappt war ihr aktiver Zustand allein an
+   *  der SYMBOLFARBE erkennbar, also allein an Farbe, und genau das verbietet
+   *  die Anforderung „Farbe traegt nie allein eine Bedeutung".
+   *
+   *  Aufgefallen ist es, weil AGE-1018 inaktive Eintraege auf denselben
+   *  Weisston setzt: aus „allein an der Farbe" waere „an nichts" geworden.
+   *
+   *  `dot` ist der RUECKFALL von `NavIcon` fuer jeden Pfad ohne eigenes Symbol.
+   *  Damit gilt die Zusage ab hier auch fuer jede Route, die noch niemand
+   *  gezeichnet hat — robust gebaut statt daran erinnert. */
+  dot: <circle cx="12" cy="12" r="4.2" />,
+  bulb: (
+    <>
+      <path d="M12 2.6a6.4 6.4 0 0 0-4.3 11.1c.7.7.9 1.2.9 2.1 0 .4.3.7.7.7h5.4c.4 0 .7-.3.7-.7 0-.9.2-1.4.9-2.1A6.4 6.4 0 0 0 12 2.6Z" />
+      <rect x="9.3" y="17.3" width="5.4" height="1.4" rx=".7" />
+      <rect x="10.3" y="20.3" width="3.4" height="1.4" rx=".7" />
+    </>
+  ),
 };
 
 /** Glyphen ohne Linienfassung — sie sind als Fläche gedacht und würden als

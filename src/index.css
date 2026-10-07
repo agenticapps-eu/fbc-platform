@@ -229,6 +229,49 @@
   --leiste-badge: #2f6bd1;
   --leiste-badge-ink: #ffffff;
 
+  /* Die SCHRIFT der linken Leiste (AGE-1018).
+     Donald, 07.10.: sie ist im dunklen Modus zu dunkel und soll denselben
+     Weisston tragen wie die Namen in der Nachrichtenleiste rechts.
+
+     HIER WIRD KEIN DEFEKT REPARIERT, und das gehoert in den Kommentar, damit
+     der naechste Leser keinen sucht: die abgeloesten Werte hielten die Norm —
+     #9FB4D2 trug 6,78:1 und #8FA5C4 trug 5,70:1 gegen #002B51, beide ueber den
+     4,5:1, und beide als Test festgehalten. Geaendert wird eine VORGABE.
+
+     WARUM EIGENE TOKENS UND NICHT `--color-on-chrome` UMGELEGT: weil die
+     beiden alten Tokens weit mehr faerben als die Leiste. Gemessen:
+       src/pages/WillkommenPage.tsx        22 Stellen
+       src/pages/OnboardingPage.tsx        17 Stellen
+       src/components/ui/Button.tsx         1 Stelle — variant="secondary"
+     Zwei Vollseiten und ein Knopf, ueber dessen Gestaltung eine OFFENE Frage
+     steht (Donald, 06.10.), wuerden mitgefaerbt. Dasselbe Vorgehen also wie
+     bei `--leiste-focus` und `--leiste-badge` darueber.
+
+     Die Werte hier sind zeichengleich mit `--color-on-chrome` und
+     `--color-on-chrome-muted`. Damit ist „im hellen Modus aendert sich nichts"
+     am Wert pruefbar und nicht als Absicht notiert.
+
+       hell: #475569 auf Weiss 7,46:1, #64748B auf Weiss 5,28:1 — die heutigen
+             Werte, Zeichen fuer Zeichen.
+       navy: #FFFFFF gegen #002B51 14,34:1 (Hover 16,51:1, Aktivflaeche
+             7,19:1), #B9CCE6 8,77:1 (Hover 10,10:1).
+
+     ZWEI TOKENS UND NICHT EINES: die Leiste hat eine Rangfolge —
+     Abschnittsmarke ueber Menueintrag —, und die Leiste rechts fuehrt fuer
+     genau diese Rangfolge ebenfalls zwei Toene. Ein einziger weisser Ton
+     loeschte sie, und die Marken schrien dann lauter als die Eintraege, die
+     sie ordnen.
+
+     DIE FOLGE, DIE NICHT NACH FARBE AUSSIEHT: `NavIcon` nimmt KEINE Farbe an,
+     es erbt `currentColor` von der Textklasse seines Links. Werden inaktive
+     Eintraege weiss, faellt eingeklappt die Symbolfarbe als Merkmal des
+     aktiven Eintrags weg — es bleibt die Form (`solid` gegen `line`) ALLEIN.
+     Die Norm haelt (1.4.1 verlangt, dass Farbe nicht das EINZIGE Mittel ist),
+     aber es sind zwei Merkmale weniger eines. Steht so in der Spec, samt den
+     drei gerechneten und verworfenen Auswegen in design.md. */
+  --leiste-ink: #475569;
+  --leiste-ink-muted: #64748b;
+
   /* ── Die Nachrichtenleiste rechts (AGE-1002) ─────────────────────────────
      EIN Token fuer die Flaeche, ein- und ausgeklappt. Bis AGE-1002 war die
      Leiste zweifarbig (Chrome eingeklappt, canvas ausgeklappt); Detlev hat im
@@ -343,6 +386,18 @@ html[data-variant="navy"] {
   --leiste-focus: #b9cce6;
   --leiste-badge: #5b90e0;
   --leiste-badge-ink: #00172b;
+
+  /* AGE-1018: dieselbe Schrift wie die Nachrichtenleiste rechts. Die Werte
+     sind zeichengleich mit `--thread-ink` und `--thread-muted`.
+
+     ABER NICHT ABGELEITET: `var(--thread-ink)` stuende hier falsch. Die
+     `--thread-*`-Tokens sitzen auf `.fbc-chat-rail`, nicht auf `html`; ein
+     Element der linken Leiste liegt nicht in diesem Teilbaum und bekaeme den
+     Rueckfallwert aus `@theme` — also den hellen. Die Gleichheit ist eine
+     Absicht, und ein Waechter in `index.chatleiste-tokens.test.ts` vergleicht
+     die beiden Seiten, damit sie nicht auseinanderlaeuft. */
+  --leiste-ink: #ffffff;
+  --leiste-ink-muted: #b9cce6;
 }
 
 /* Die Nachrichtenleiste im dunklen Modus (AGE-1002).

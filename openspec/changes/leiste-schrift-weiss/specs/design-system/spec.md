@@ -155,6 +155,25 @@ sein statt beim nächsten Griff an die Leiste als Versehen zu erscheinen. Die
 Nachrichtenleiste macht denselben Tausch: alle Namen stehen dort auf
 `--thread-ink`, und der aktive Faden ist allein an seiner Fläche erkennbar.
 
+**Weil die Form das einzige Merkmal ist, SHALL JEDER Eintrag der Leiste sie
+tragen.** Das ist nicht gegeben und war es nicht: gemessen hatten neun von
+zwölf Einträgen eine gefüllte Fassung. `/hilfe/tutorials` (`bulb`) sowie
+`/admin/mitglieder` und `/admin/feedback` (Rückfall `dot`) hatten keine — für
+sie war der aktive Zustand eingeklappt **schon vorher** allein an der
+Symbolfarbe erkennbar, also allein an Farbe, im Widerspruch zur Anforderung
+„Farbe trägt nie allein eine Bedeutung".
+
+Jedes Symbol, das die Leiste zeigt, SHALL deshalb eine gefüllte Fassung
+besitzen, **einschliesslich des Rückfall-Symbols** für Pfade ohne eigenes
+Glyph. Damit gilt die Zusage auch für Routen, die noch niemand gezeichnet hat —
+sie ist gebaut und nicht erinnert.
+
+Diese Zusage SHALL über eine Pfadliste geprüft werden, die aus **beiden**
+Quellen der Leiste abgeleitet ist: der Routenliste und den Abschnitten, die die
+Hülle selbst einhängt („Meine Anfragen", „Support", „Administration"). Eine
+Liste aus nur einer Quelle hat genau diese drei Lücken übersehen, weil alle drei
+in der zweiten lagen.
+
 Die Füllung SHALL in beiden Zuständen als Dekoration gelten, nicht als Signal.
 
 Diese Zusage SHALL **gerendert** geprüft werden, in beiden Zuständen getrennt.
@@ -219,6 +238,13 @@ Bedingung.
 - **THEN** gibt es weder Balken noch Beschriftung, und der aktive Eintrag ist
   an der **Form** seines Symbols erkennbar — `solid` gegen `line` —, nicht an
   dessen Farbe, denn alle Symbole der Leiste tragen dort denselben Weisston
+
+#### Scenario: Auch die Einträge ohne eigenes Symbol wechseln die Form
+
+- **WHEN** ein Mitglied die eingeklappte Leiste auf „Tutorials" oder ein
+  Administrations-Unterthema öffnet
+- **THEN** ist der aktive Eintrag an der Form seines Symbols erkennbar, obwohl
+  diese Einträge kein eigens gezeichnetes Symbol haben
 
 #### Scenario: Der Zähler offener Anfragen hebt sich ab und ist lesbar
 

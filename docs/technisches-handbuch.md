@@ -519,6 +519,8 @@ Mitglieds.
 | Fläche der Nachrichtenleiste | `--chat-rail-surface: #002b51` | nur navy, nur die rechte Leiste |
 | Fläche der linken Navigation | `--sidebar-surface: #002b51` | nur navy; derselbe Wert |
 | Fokusring der linken Leiste | `--leiste-focus: #b9cce6` | nur navy; hell = `--color-accent` |
+| Schrift der linken Leiste | `--leiste-ink: #ffffff` | nur navy; hell = `--color-on-chrome` |
+| Abschnittsmarken der Leiste | `--leiste-ink-muted: #b9cce6` | nur navy; hell = `--color-on-chrome-muted` |
 
 > **Beide angedockten Leisten tragen im dunklen Modus `#002B51`.** Die Farbe
 > ist auf dkrealinvest.com gemessen und von Detlev im Meeting am 03.10.2026
