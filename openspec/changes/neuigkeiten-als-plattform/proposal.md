@@ -23,17 +23,24 @@ die niemand als Wortmeldung gemeint hat.
 
 Die Wirkung, vorher und nachher gegen PROD gerechnet:
 
-| Konto | heute  | nachher | Folge                    |
-| ----- | ------ | ------- | ------------------------ |
-| A     | **23** | **0**   | fällt aus der Liste      |
-| B     | 18     | 11      | verliert 7 Ankündigungen |
-| C     | 2      | 2       | unverändert              |
-| D     | 1      | 1       | unverändert              |
+| Konto | heute  | nachher | Folge                |
+| ----- | ------ | ------- | -------------------- |
+| A     | **23** | **0**   | fällt aus der Liste  |
+| B     | 18     | 18      | unverändert          |
+| C     | 2      | 2       | unverändert          |
+| D     | 1      | 1       | unverändert          |
 
-Konto A schreibt ausschliesslich Neuigkeiten. Konto B hat neben elf eigenen
-Beiträgen sieben erzeugte Veranstaltungs-Ankündigungen — auch das sind keine
-Wortmeldungen. Nach der Änderung steht in der Liste, was Mitglieder wirklich
-geschrieben haben: 11, 2, 1.
+Konto A stellt ausschliesslich Neuigkeiten zu und verschwindet damit aus der
+Liste. Alle anderen bleiben, wie sie sind.
+
+**Veranstaltungs-Ankündigungen zählen weiter mit, und das ist eine Entscheidung
+und kein Versehen.** Der erste Entwurf dieses Changes hätte sie
+mit ausgeschlossen. Der Kopf der ursprünglichen Migration hält aber fest:
+„ENTSCHIEDEN am 25.08. (Donald): gezählt werden ALLE sichtbaren Beiträge, also
+auch die `kind = 'event'`-Beiträge … ein Verein, der Veranstaltungen ausrichtet,
+hält das Ausrichten für Aktivität." Diese Entscheidung bleibt stehen — sie
+stillschweigend umzudrehen wäre an einer Beschwerde über Neuigkeiten vorbei
+(Befund der Plan-Review, codex; bestätigt von Donald am 07.10.).
 
 ## Der Umfang ist viel kleiner, als er aussah — zweimal gemessen
 
@@ -66,10 +73,8 @@ Neuigkeiten-Versand von Anfang an gilt.
 
 ## What Changes
 
-- „Die aktivsten Mitglieder" zählt nur noch, was Mitglieder selbst geschrieben
-  haben. Neuigkeiten und erzeugte Veranstaltungs-Ankündigungen zählen nicht
-  mehr mit.
-- Wer bisher nur wegen der Neuigkeiten in dieser Liste stand, steht nicht mehr
-  darin — und wer dort steht, steht für eigene Beiträge.
+- „Die aktivsten Mitglieder" zählt Neuigkeiten der Plattform nicht mehr mit.
+  Wer bisher nur wegen ihnen in dieser Liste stand, steht nicht mehr darin.
+- Veranstaltungen zählen unverändert weiter: wer eine ausrichtet, ist aktiv.
 - An den Neuigkeiten selbst ändert sich nichts: sie erscheinen wie bisher unter
   eff.bee.zee, und Likes und Kommentare bleiben, wie sie sind.
