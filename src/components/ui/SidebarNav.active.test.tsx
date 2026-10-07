@@ -144,8 +144,9 @@ describe("SidebarNav: woran der aktive Eintrag erkennbar ist", () => {
  *
  * Es lautet dort: „Das traegt die Auswahl auch dann, wenn die Leiste
  * eingeklappt ist und kein Label danebensteht." Gemessen hielt es fuer neun von
- * zwoelf Eintraegen — `/hilfe/tutorials` (`bulb`) sowie `/admin/mitglieder` und
- * `/admin/feedback` (Rueckfall `dot`) hatten keine gefuellte Fassung. Seit
+ * DREIZEHN Eintraegen — `/hilfe/tutorials` (`bulb`) sowie `/admin/mitglieder`,
+ * `/admin/feedback` und `/admin/neuigkeiten` (Rueckfall `dot`) hatten keine
+ * gefuellte Fassung. Seit
  * AGE-1018 ist das die EINZIGE Unterscheidung im eingeklappten Zustand, also
  * muss sie fuer alle gelten.
  *
@@ -167,6 +168,13 @@ const AUS_APPSHELL = [
   "/admin",
   "/admin/mitglieder",
   "/admin/feedback",
+  // AGE-631, und er hat beim ersten Durchgang GEFEHLT — gefunden vom
+  // Code-Review. Genau der Fehler, gegen den der Kommentar darueber
+  // argumentiert, eine Ebene tiefer wiederholt: diese Haelfte der Liste ist
+  // abgeschrieben, nicht abgeleitet, weil `AppShell` die Abschnitte im Rumpf
+  // einer Komponente baut und sie sich nicht importieren lassen. Wer dort
+  // einen Eintrag nachschiebt, muss ihn HIER nachtragen.
+  "/admin/neuigkeiten",
 ];
 
 describe("Jedes Symbol der Leiste wechselt aktiv seine FORM", () => {

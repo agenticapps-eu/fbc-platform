@@ -91,9 +91,22 @@
   --color-accent-soft: #eff5fd;
   --color-accent-ink: #ffffff;
 
-  /* Chrome — Sidebar-/Topbar-Fläche. Hieß bis AGE-492 `night`; im hellen Theme
+  /* Chrome — die Rahmenfamilie. Hieß bis AGE-492 `night`; im hellen Theme
      ist das Weiß, und ein Name, der das Gegenteil seines Wertes behauptet, ist
-     eine Falle für die Folge-Changes. */
+     eine Falle für die Folge-Changes.
+
+     WAS DIE LINKE LEISTE DAVON LIEST, und was nicht — gemessen, nicht nach dem
+     Namen vermutet (AGE-1003 und AGE-1018):
+       liest sie:        `-elevated` (Hover), `-border` (Trennlinien),
+                         `-active` (Aktivfläche), `-on-chrome-active` (aktiver
+                         Eintrag, Wortmarke, Hover-Schrift)
+       liest sie NICHT:  den Grundton `--color-chrome` (ihre Fläche kommt aus
+                         `--sidebar-surface`) und seit AGE-1018 auch nicht mehr
+                         `--color-on-chrome` / `--color-on-chrome-muted` — die
+                         färben die Vollflächen von `/onboarding` und
+                         `/willkommen` und `Button variant="secondary"`.
+     Die Topbar steht trotz des alten Namens ebenfalls nicht hier: sie ist
+     `bg-canvas/85`, eine Inhaltsfarbe. */
   --color-chrome: #ffffff;
   --color-chrome-elevated: #f6f8fb;
   --color-chrome-border: #e2e8f0;
@@ -251,8 +264,13 @@
      `--color-on-chrome-muted`. Damit ist „im hellen Modus aendert sich nichts"
      am Wert pruefbar und nicht als Absicht notiert.
 
-       hell: #475569 auf Weiss 7,46:1, #64748B auf Weiss 5,28:1 — die heutigen
-             Werte, Zeichen fuer Zeichen.
+       hell: #475569 auf Weiss 7,58:1, #64748B auf Weiss 4,76:1 — die heutigen
+             Werte, Zeichen fuer Zeichen. Die zweite Zahl hat nur 0,26 Reserve
+             ueber den 4,5:1; sie wird deshalb im HELLEN Modus eigens
+             nachgerechnet und nicht nur im dunklen. (Erste Fassung dieses
+             Kommentars schrieb 7,46 und 5,28 — beide falsch, beide im hellen
+             Modus, also genau dort, wo damals kein Test rechnete. Befund des
+             Code-Reviews.)
        navy: #FFFFFF gegen #002B51 14,34:1 (Hover 16,51:1, Aktivflaeche
              7,19:1), #B9CCE6 8,77:1 (Hover 10,10:1).
 
@@ -271,6 +289,24 @@
      drei gerechneten und verworfenen Auswegen in design.md. */
   --leiste-ink: #475569;
   --leiste-ink-muted: #64748b;
+
+  /* Das chrome-artige Bedienelement der Leiste: der Einklapp-Pill (AGE-1018,
+     BEFUND DES CODE-REVIEWS).
+     Er bekam zuerst `--leiste-ink` wie ein Menueintrag. Das war aus zwei
+     Gruenden falsch, und beide haengen zusammen:
+       1. Er hat KEINE Hover-Flaeche. Die Begruendung „im Dunkeln uebernimmt die
+          Flaeche den Hover" gilt fuer die Menueintraege und den Feedback-Knopf
+          (beide `hover:bg-chrome-elevated`), fuer ihn nicht. Mit `#FFFFFF` im
+          Ruhezustand waere sein Hover auf `--color-on-chrome-active` zeichen-
+          gleich, also TOT — der Pill haette im navy-Modus gar keinen
+          Hover-Zustand mehr gehabt.
+       2. Er ist das ausdruecklich GESPIEGELTE Bauteil („Beide Leisten tragen
+          denselben Schalter an derselben Stelle"). Sein Zwilling rechts liest
+          `--thread-chrome-ink` — in hell #475569, in navy #B9CCE6. Mit
+          #FFFFFF links waeren die beiden erstmals verschieden gewesen.
+     Die Werte sind deshalb zeichengleich mit `--thread-chrome-ink`. Hover
+     bleibt `--color-on-chrome-active` und lebt damit in beiden Modi. */
+  --leiste-chrome-ink: #475569;
 
   /* ── Die Nachrichtenleiste rechts (AGE-1002) ─────────────────────────────
      EIN Token fuer die Flaeche, ein- und ausgeklappt. Bis AGE-1002 war die
@@ -338,7 +374,10 @@
  *
  * Bis AGE-492 kippte `navy` die ganze Oberfläche: Karten, Fließtext, Linien,
  * Signalfarben. Entscheidung Donald 2026-08-04: der Schalter färbt nur noch
- * Sidebar und Topbar dunkelblau, der Inhalt bleibt in beiden Themes hell —
+ * den Rahmen dunkelblau, der Inhalt bleibt in beiden Themes hell —
+ * (bis AGE-1018 stand hier „Sidebar und Topbar". Die Topbar ist gemessen
+ * `bg-canvas/85` und war nie betroffen; die Leiste holt ihre Fläche aus
+ * `--sidebar-surface`.) —
  * so wie die Referenz es zeigt. Damit gibt es bewusst KEINEN Dark-Reading-Mode
  * mehr; `navy` ist eine Marken-Variante des Rahmens, kein Nachtmodus.
  *
@@ -398,6 +437,9 @@ html[data-variant="navy"] {
      die beiden Seiten, damit sie nicht auseinanderlaeuft. */
   --leiste-ink: #ffffff;
   --leiste-ink-muted: #b9cce6;
+  /* Zeichengleich mit `--thread-chrome-ink` im selben Modus — die beiden
+     Einklapp-Pills sind ein gespiegeltes Bauteil, kein aehnliches. */
+  --leiste-chrome-ink: #b9cce6;
 }
 
 /* Die Nachrichtenleiste im dunklen Modus (AGE-1002).

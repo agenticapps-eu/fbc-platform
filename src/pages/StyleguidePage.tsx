@@ -295,7 +295,7 @@ export default function StyleguidePage() {
               <div className="mt-5 flex flex-col gap-1">
                 <span className="relative rounded-md bg-chrome-elevated px-3 py-2 text-sm font-medium text-accent">
                   <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-accent" />
-                  Aktive Route (Akzent-Label + Akzent-Linksbalken)
+                  Hervorgehobene Zeile auf Chrome (Akzent-Label + Linksbalken)
                 </span>
                 <span className="rounded-md px-3 py-2 text-sm text-on-chrome-muted">
                   Gedämpfter Text auf Chrome (Onboarding, Willkommen)

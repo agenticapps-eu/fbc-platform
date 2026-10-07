@@ -84,13 +84,14 @@ erkennbar.
 ### Und dann hat die Messung einen bestehenden Mangel aufgedeckt
 
 Die Tabelle oben setzt voraus, dass jedes Symbol der Leiste eine gefüllte
-Fassung **hat**. Gemessen hatten es **neun von zwölf**:
+Fassung **hat**. Gemessen hatten es **neun von dreizehn**:
 
-| Eintrag              | Glyph             | gefüllte Fassung |
-| -------------------- | ----------------- | ---------------- |
-| `/hilfe/tutorials`   | `bulb`            | **nein**         |
-| `/admin/mitglieder`  | `dot` (Rückfall)  | **nein**         |
-| `/admin/feedback`    | `dot` (Rückfall)  | **nein**         |
+| Eintrag               | Glyph            | gefüllte Fassung |
+| --------------------- | ---------------- | ---------------- |
+| `/hilfe/tutorials`    | `bulb`           | **nein**         |
+| `/admin/mitglieder`   | `dot` (Rückfall) | **nein**         |
+| `/admin/feedback`     | `dot` (Rückfall) | **nein**         |
+| `/admin/neuigkeiten`  | `dot` (Rückfall) | **nein**         |
 
 Für diese drei war der aktive Zustand eingeklappt **schon vorher** allein an der
 Symbolfarbe erkennbar — also allein an Farbe, und genau das verbietet die
@@ -111,9 +112,16 @@ hat. Robust gebaut statt daran erinnert.
 
 ### Warum die Messung zuerst falsch war, und was daran zu lernen ist
 
-Die erste Zählung lief über `navItems` und meldete **keine** Lücke. Alle drei
+Die erste Zählung lief über `navItems` und meldete **keine** Lücke. Alle vier
 Lücken lagen in der zweiten Quelle: „Meine Anfragen", „Support" und
 „Administration" hängt `AppShell` selbst ein, sie stehen nicht in `navItems`.
+
+Und dann hat sich die Lektion **noch einmal** wiederholt: die zweite Zählung
+fand drei Lücken, der Code-Review eine vierte — `/admin/neuigkeiten`, aus
+derselben zweiten Quelle. Die Hälfte der Pfadliste im Wächter ist abgeschrieben
+und nicht abgeleitet, weil `AppShell` ihre Abschnitte im Rumpf einer Komponente
+baut. Das steht jetzt als Warnung an der Liste, statt dass der nächste Leser es
+für abgeleitet hält.
 Dieselbe Lektion wie bei den zwanzig Aufrufstellen in AGE-1001 — *die Wurzeln
 nennen, nicht nur die Ebenen*. Der Wächter in `SidebarNav.active.test.tsx`
 leitet seine Liste deshalb aus **beiden** Quellen ab, und eine Positivkontrolle

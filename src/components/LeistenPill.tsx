@@ -96,10 +96,14 @@ export function LeistenPill({
         "transition-colors focus-visible:outline-none focus-visible:ring-2",
         // Die Fläche der Leiste, nicht eine eigene. Kein Rahmen.
         flaeche === "leiste"
-          ? // `--leiste-ink` seit AGE-1018, aus demselben Grund, aus dem der
-            // Fokusring hier einen eigenen Token hat: JE SEITE EINER. Im
-            // hellen Modus traegt er zeichengleich #475569, also unveraendert.
-            "fbc-sidebar-surface text-[color:var(--leiste-ink)] hover:text-on-chrome-active focus-visible:ring-[color:var(--leiste-focus)]"
+          ? // `--leiste-chrome-ink` und NICHT `--leiste-ink` (AGE-1018, Befund
+            // des Code-Reviews): der Pill hat keine Hover-Flaeche. Mit dem
+            // Weiss der Menueintraege waere sein Hover im navy-Modus
+            // zeichengleich mit dem Ruhezustand — also tot. Und sein
+            // gespiegelter Zwilling rechts liest `--thread-chrome-ink`; die
+            // Werte sind deshalb genau dessen Werte. JE SEITE EINER, wie beim
+            // Fokusring. Im hellen Modus #475569, also unveraendert.
+            "fbc-sidebar-surface text-[color:var(--leiste-chrome-ink)] hover:text-on-chrome-active focus-visible:ring-[color:var(--leiste-focus)]"
           : // `--thread-chrome-ink` und nicht `--thread-muted`: im HELLEN Modus
             // muss der eingeklappte Pill aussehen wie vorher, und das war
             // `text-on-chrome` (#475569) mit Hover `#1F53B0`. `--thread-muted`

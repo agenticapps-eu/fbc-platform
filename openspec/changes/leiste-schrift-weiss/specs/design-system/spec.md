@@ -10,16 +10,25 @@
           `--color-on-chrome-muted`, sondern an zwei eigenen Token. Die beiden
           alten Token behalten ihre Werte und färben ab jetzt die beiden
           Vollseiten und den sekundären Knopf — nicht mehr die Leiste.
-       2. Die Kontrasttabelle trägt die neuen Werte. Die alten bleiben als
-          Zeile stehen, weil sie weiterhin gelten — nur eben woanders.
+       2. Die Kontrasttabelle trägt die neuen Werte. Die alten stehen NICHT
+          mehr darin (Befund des Code-Reviews an einer früheren Fassung dieses
+          Kommentars, die das Gegenteil behauptete) — sie gelten weiterhin,
+          aber für die beiden Vollseiten und den sekundären Knopf, und das
+          steht als eigener Absatz und eigenes Szenario da.
        3. Die Merkmalstabelle des aktiven Eintrags: eingeklappt fällt die
           Symbolfarbe als Merkmal weg, weil inaktive Symbole denselben Weisston
           erben. `NavIcon` nimmt keine Farbe an, es erbt `currentColor` —
           gemessen, nicht angenommen. Es bleibt die Form.
        4. Das Szenario „Eingeklappt trägt das Symbol den Zustand allein" sagte
           im THEN „Farbe UND Form". Name zeichengleich, Rumpf neu.
+       5. Der Einklapp-Pill bekommt einen DRITTEN Token. Er hat keine
+          Hover-Fläche, und mit dem Weiss der Menüeinträge wäre sein
+          Hover-Zustand im dunklen Modus zeichengleich mit dem Ruhezustand
+          gewesen — also tot. Dazu ist er das ausdrücklich gespiegelte
+          Bauteil; sein Zwilling rechts trägt den gedämpften Ton. Beides
+          Befunde des Code-Reviews.
      Alle neun bestehenden Szenarien stehen unten, auch die unveränderten — ein
-     MODIFIED-Block bekräftigt den GANZEN Satz. Zwei kommen hinzu. -->
+     MODIFIED-Block bekräftigt den GANZEN Satz. VIER kommen hinzu. -->
 
 ### Requirement: Die linke Navigation trägt im dunklen Modus dieselbe Fläche wie die Nachrichtenleiste
 
@@ -38,19 +47,29 @@ rahmen die Seite und tragen seit dieser Anforderung dieselbe Fläche; eine
 dunklere Schrift links liest sich dann als Versehen. Die Leiste SHALL deshalb
 zwei **eigene** Token führen:
 
-| Token                | auf `@theme` | im Modus `navy` | entspricht        |
-| -------------------- | ------------ | --------------- | ----------------- |
-| `--leiste-ink`       | `#475569`    | `#FFFFFF`       | `--thread-ink`    |
-| `--leiste-ink-muted` | `#64748B`    | `#B9CCE6`       | `--thread-muted`  |
+| Token                 | auf `@theme` | im Modus `navy` | entspricht             |
+| --------------------- | ------------ | --------------- | ---------------------- |
+| `--leiste-ink`        | `#475569`    | `#FFFFFF`       | `--thread-ink`         |
+| `--leiste-ink-muted`  | `#64748B`    | `#B9CCE6`       | `--thread-muted`       |
+| `--leiste-chrome-ink` | `#475569`    | `#B9CCE6`       | `--thread-chrome-ink`  |
 
 Die Werte auf `@theme` SHALL **zeichengleich** die heutigen Werte von
 `--color-on-chrome` und `--color-on-chrome-muted` sein. Damit ist „im hellen
 Modus ändert sich nichts" eine Zusage am Wert und nicht ein Satz über eine
 Absicht.
 
-Es SHALL **zwei** Token sein und nicht eines. Die Leiste hat eine Rangfolge —
+Es SHALL **drei** Token sein und nicht eines. Die Leiste hat eine Rangfolge —
 Abschnittsmarke über Menüeintrag —, und die Nachrichtenleiste führt für genau
 diese Rangfolge ebenfalls zwei Töne. Ein einziger weisser Ton löschte sie.
+
+**Der Einklapp-Pill SHALL den dritten tragen, und NICHT den der Menüeinträge.**
+Dafür gibt es zwei Gründe, und beide hängen zusammen. Er hat als einziges
+Element der Leiste **keine Hover-Fläche**: mit dem Weiss der Menüeinträge wäre
+sein Hover-Ton im Modus `navy` zeichengleich mit seinem Ruhe-Ton, er hätte dort
+also gar keinen Hover-Zustand mehr. Und er ist das ausdrücklich **gespiegelte**
+Bauteil — die bestehende Anforderung verlangt denselben Schalter an derselben
+Stelle, und sein Zwilling rechts trägt `--thread-chrome-ink`. Die Werte SHALL
+deshalb in **beiden** Modi zeichengleich mit diesem Token sein.
 
 Die beiden Token SHALL **ausschliesslich** von Elementen der Leistenfläche
 gelesen werden. Der Grund ist gemessen: `text-on-chrome` und
@@ -94,6 +113,7 @@ SHALL festgehalten sein:
 | Abschnittsmarke                           | `#B9CCE6` | **8,77:1**                |
 | aktiver Eintrag, Wortmarke                | `#FFFFFF` | **14,34:1**               |
 | Punkte der Wortmarke                      | `#5B90E0` | **4,45:1**                |
+| Einklapp-Pill                             | `#B9CCE6` | **8,77:1**                |
 | Fokusring                                 | `#B9CCE6` | **8,77:1**                |
 | Zähler offener Anfragen, Fläche           | `#5B90E0` | **4,45:1**                |
 | Ziffer auf dem Zähler                     | `#00172B` | **5,62:1** auf dem Zähler |
@@ -131,6 +151,12 @@ kann nicht heller werden; im Modus `hell` SHALL weiterhin die Schrift wechseln
 deren Hover-Fläche Weiss zu 6 % ist. Die Fläche SHALL NOT als Merkmal des
 **aktiven** Zustands gelten.
 
+**Diese Aufteilung gilt NICHT für den Einklapp-Pill**, und das ist der Grund
+für seinen eigenen Ton: er trägt keine Hover-Fläche, bei ihm muss also die
+Schrift wechseln — in beiden Modi. Eine Regel, die „im Dunkeln übernimmt die
+Fläche" pauschal für die ganze Leiste ausspräche, nähme ihm seinen einzigen
+Hover-Zustand.
+
 Die **Aktivfläche** (`#1F53B0`) trägt **2,00:1** gegen die Leiste, vorher
 2,55:1 — die Schwelle hielt sie noch nie. Der aktive Eintrag SHALL deshalb an
 anderem erkennbar sein als an ihr, und die Merkmale SHALL **je Zustand** benannt
@@ -157,11 +183,11 @@ Nachrichtenleiste macht denselben Tausch: alle Namen stehen dort auf
 
 **Weil die Form das einzige Merkmal ist, SHALL JEDER Eintrag der Leiste sie
 tragen.** Das ist nicht gegeben und war es nicht: gemessen hatten neun von
-zwölf Einträgen eine gefüllte Fassung. `/hilfe/tutorials` (`bulb`) sowie
-`/admin/mitglieder` und `/admin/feedback` (Rückfall `dot`) hatten keine — für
-sie war der aktive Zustand eingeklappt **schon vorher** allein an der
-Symbolfarbe erkennbar, also allein an Farbe, im Widerspruch zur Anforderung
-„Farbe trägt nie allein eine Bedeutung".
+**dreizehn** Einträgen eine gefüllte Fassung. `/hilfe/tutorials` (`bulb`) sowie
+`/admin/mitglieder`, `/admin/feedback` und `/admin/neuigkeiten` (Rückfall
+`dot`) hatten keine — für sie war der aktive Zustand eingeklappt **schon
+vorher** allein an der Symbolfarbe erkennbar, also allein an Farbe, im
+Widerspruch zur Anforderung „Farbe trägt nie allein eine Bedeutung".
 
 Jedes Symbol, das die Leiste zeigt, SHALL deshalb eine gefüllte Fassung
 besitzen, **einschliesslich des Rückfall-Symbols** für Pfade ohne eigenes
@@ -171,8 +197,11 @@ sie ist gebaut und nicht erinnert.
 Diese Zusage SHALL über eine Pfadliste geprüft werden, die aus **beiden**
 Quellen der Leiste abgeleitet ist: der Routenliste und den Abschnitten, die die
 Hülle selbst einhängt („Meine Anfragen", „Support", „Administration"). Eine
-Liste aus nur einer Quelle hat genau diese drei Lücken übersehen, weil alle drei
-in der zweiten lagen.
+Liste aus nur einer Quelle hat genau diese vier Lücken übersehen, weil alle vier
+in der zweiten lagen — und die erste Fassung der Liste selbst hat den vierten
+Eintrag noch einmal übersehen, weil ihre zweite Hälfte abgeschrieben statt
+abgeleitet ist. Wer dort einen Eintrag nachschiebt, SHALL ihn in dieser Liste
+nachtragen; der Grund SHALL an der Liste stehen.
 
 Die Füllung SHALL in beiden Zuständen als Dekoration gelten, nicht als Signal.
 
@@ -200,6 +229,13 @@ Bedingung.
 - **THEN** tragen Menüeinträge links und Gesprächsnamen rechts denselben
   Weisston, und Abschnittsmarken links denselben hellen Ton wie Vorschautext
   und Uhrzeit rechts
+
+#### Scenario: Der Einklapp-Pill behält seinen Hover-Zustand
+
+- **WHEN** ein Mitglied im Modus `navy` mit dem Zeiger über den Einklapp-Pill
+  der linken Leiste fährt
+- **THEN** wechselt seine Schrift sichtbar, und er trägt im Ruhezustand
+  denselben Ton wie der Einklapp-Pill der Nachrichtenleiste
 
 #### Scenario: Im hellen Modus ändert sich an der Navigation nichts
 
