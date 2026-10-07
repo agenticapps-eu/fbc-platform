@@ -9,6 +9,12 @@
      Die beiden bestehenden Szenarien stehen unten unverändert — ein
      MODIFIED-Block bekräftigt den ganzen Satz. VIER kommen hinzu.
 
+     Das Szenario „Die Zahl folgt der Sichtbarkeit des Betrachters" ist
+     korrigiert: sein THEN war seit AGE-601 falsch (zwischen aktivierten
+     Betrachtern gibt es keinen Unterschied mehr), und ein MODIFIED-Block ist
+     der Moment, an dem man das nicht einfach weiterreicht. Befund des
+     Code-Reviews.
+
      Die Fünferzahl ist von „SHALL fünf" auf „bis zu fünf" präzisiert — sie
      widersprach sonst dem eigenen Ergebnis dieses Changes, nach dem drei
      Konten übrig bleiben (Befund der Plan-Review, codex).
@@ -72,10 +78,12 @@ Die Reihenfolge SHALL bei gleicher Zahl eindeutig entschieden sein.
 
 #### Scenario: Die Zahl folgt der Sichtbarkeit des Betrachters
 
-- **WHEN** dasselbe Mitglied von zwei Betrachtern unterschiedlicher Stufe
-  betrachtet wird
-- **THEN** nennt die Liste für den Betrachter mit der geringeren Stufe eine
-  Zahl, die die für ihn unsichtbaren Beiträge nicht enthält
+- **WHEN** dasselbe Mitglied von zwei **aktivierten** Betrachtern
+  unterschiedlicher Stufe betrachtet wird
+- **THEN** nennt die Liste beiden dieselbe Zahl — seit AGE-601 gibt es zwischen
+  aktivierten Betrachtern keine Sichtbarkeitsstufe mehr zu messen; die
+  verbliebene Achse ist die Sitzung, und ausgeloggt ist diese Liste gar nicht
+  zu zeigen
 
 #### Scenario: Neuigkeiten zählen nicht mit
 
@@ -94,7 +102,7 @@ Die Reihenfolge SHALL bei gleicher Zahl eindeutig entschieden sein.
 
 - **WHEN** ein bereits gelistetes Mitglied einen veröffentlichten, für den
   Betrachter sichtbaren Beitrag schreibt
-- **THEN** erhöht sich seine Zahl in der Liste um eins
+- **THEN** erhöht sich seine Zahl in der Liste um genau eins
 
 #### Scenario: Ein terminierter Beitrag zählt noch nicht
 

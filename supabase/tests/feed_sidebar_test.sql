@@ -34,7 +34,7 @@
 --   * In pgTAP heisst es `alike()`, nicht `like()`.
 
 begin;
-select plan(30);
+select plan(31);
 
 -- ── Fixtures: Betrachter ────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -58,15 +58,15 @@ update public.profiles set tier = 'impact', name = 'Sb Autor Eins', activated_at
 update public.profiles set tier = 'impact', name = 'Sb Autor Zwei', activated_at = now(), is_public = true
  where id = 'a1000000-0000-0000-0000-000000000002';
 
--- ── Fixtures: der Zusteller und die beiden erzeugten Beitragsarten ─────────
--- AGE-1004. `Sb Zusteller` stellt AUSSCHLIESSLICH Neuigkeiten zu und darf nach
--- diesem Change in „Aktivste Mitglieder" nicht mehr auftauchen. `Sb Autor Eins`
--- bekommt zusaetzlich eine Veranstaltung — die zaehlt weiterhin MIT, und das
--- ist eine Entscheidung vom 25.08., keine Auslassung.
--- Zwei EIGENE Konten mit je GENAU EINEM Beitrag, und zwar je einem der beiden
--- erzeugten Arten. So misst dieser Abschnitt nur sich selbst: die Zahlen der
--- bestehenden Autoren bleiben unberuehrt, und die Namen beginnen mit `Zz`,
--- damit sie auch die Reihenfolge-Zusage weiter oben nicht verschieben.
+-- ── Fixtures: der Zusteller und der Gastgeber ──────────────────────────────
+-- AGE-1004. Zwei eigene Konten, damit die Zahlen der bestehenden Autoren
+-- unberuehrt bleiben:
+--   `Zz Zusteller`  drei Neuigkeiten, sonst nichts — darf nach diesem Change
+--                   nicht mehr in „Aktivste Mitglieder" stehen.
+--   `Zz Gastgeber`  zwei Veranstaltungen, sonst nichts — steht weiterhin drin.
+--                   Das ist die Entscheidung vom 25.08. und keine Auslassung.
+-- Die Namen beginnen mit `Zz`, damit sie die Reihenfolge-Zusage weiter unten
+-- nicht verschieben.
 insert into auth.users (id, aud, role, email) values
   ('a3000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'sb-zusteller@test.fbc'),
   ('a3000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'sb-gastgeber@test.fbc');
@@ -91,10 +91,13 @@ insert into public.release_notes (id, title, body) values
   ('a4000000-0000-0000-0000-000000000001', 'Sb Neuerung 1', 'Rumpf'),
   ('a4000000-0000-0000-0000-000000000002', 'Sb Neuerung 2', 'Rumpf'),
   ('a4000000-0000-0000-0000-000000000003', 'Sb Neuerung 3', 'Rumpf');
+-- `members` und nicht `public`: genau das setzt `release_feed_post_sync()` auf
+-- PROD. Eine Vorrichtung, die sichtbarer ist als der Bestand, waere die
+-- schaerfere Vorlage — aber sie waere nicht der Bestand.
 insert into public.posts (author_id, body, visibility, kind, release_note_id) values
-  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000001'),
-  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000002'),
-  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000003');
+  ('a3000000-0000-0000-0000-000000000001', '', 'members', 'release', 'a4000000-0000-0000-0000-000000000001'),
+  ('a3000000-0000-0000-0000-000000000001', '', 'members', 'release', 'a4000000-0000-0000-0000-000000000002'),
+  ('a3000000-0000-0000-0000-000000000001', '', 'members', 'release', 'a4000000-0000-0000-0000-000000000003');
 
 -- Der Gastgeber: zwei Veranstaltungen, sonst nichts. Die Beitraege legt der
 -- TRIGGER an, nicht diese Datei — ein Einschub von Hand scheitert am
@@ -528,31 +531,69 @@ select is(
 -- nicht der Beleg.
 -- ════════════════════════════════════════════════════════════════════════════
 
+-- Nachgeschlagen wird ueber `profile_id`, nicht ueber `name` — so haelt es der
+-- Rest dieser Datei, und aus gutem Grund: der Name kommt aus
+-- `resolve_display_name` und haengt am Aufrufer. Ein gruenes „(leer)" koennte
+-- sonst auch aus einem nicht passenden Namen stammen. Befund des Code-Reviews.
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
-    $$select coalesce(string_agg(name, ',' order by name), '(leer)')
-        from public.feed_top_authors(50) where name = 'Zz Zusteller'$$),
+    $$select coalesce(string_agg(post_count::text, ','), '(leer)')
+        from public.feed_top_authors(50)
+       where profile_id = 'a3000000-0000-0000-0000-000000000001'$$),
   '(leer)',
   'AGE-1004: ein Konto, das nur Neuigkeiten zustellt, steht NICHT in der Liste');
 
 select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
-    $$select coalesce(post_count::text, '(fehlt)') from public.feed_top_authors(50)
-       where name = 'Zz Gastgeber'$$),
+    $$select coalesce(string_agg(post_count::text, ','), '(leer)')
+        from public.feed_top_authors(50)
+       where profile_id = 'a3000000-0000-0000-0000-000000000002'$$),
   '2',
   'AGE-1004: ein Konto mit NUR Veranstaltungen steht sehr wohl in der '
   'Liste. Entschieden am 25.08. (Donald): ein Verein, der Veranstaltungen '
   'ausrichtet, haelt das Ausrichten fuer Aktivitaet. Wer hier auf '
   '`kind = ''member''` verengt, dreht diese Entscheidung um und wird an dieser '
-  'Zeile rot.');
+  'Zeile rot. Sie ist zugleich die Lebenszeichen-Probe: solange hier eine Zahl '
+  'steht, ist das 20er-Fenster der Funktion nachweislich weit genug, und das '
+  '„(leer)" darueber sagt etwas.');
 
--- Gegenprobe: ohne sie waere die erste Zusage auch dann gruen, wenn die
--- Funktion gar nichts mehr liefert.
-select cmp_ok(
+-- ── Zwei DIFFERENZmessungen am selben Konto ─────────────────────────────────
+-- Beide Szenarien des Deltas behaupten eine Veraenderung, und eine Veraenderung
+-- belegt man nur mit zwei Messungen. Befund des Code-Reviews: bis hierher stand
+-- die eine als Zusage da, ohne je gemessen zu sein, und die andere war von der
+-- Zusage darueber vollstaendig ueberdeckt.
+
+-- (a) Ein TERMINIERTER eigener Beitrag erhoeht die Zahl NICHT. Das ist die
+--     Zusage, die `security invoker` traegt: das Praedikat
+--     `veroeffentlicht_ab <= now()` steht in den Policies und wird NICHT in die
+--     Funktion kopiert.
+insert into public.posts (author_id, body, visibility, kind, veroeffentlicht_ab)
+values ('a3000000-0000-0000-0000-000000000002', 'Zz geplant', 'members', 'member',
+        now() + interval '1 day');
+
+select is(
   pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
-    $$select count(*)::text from public.feed_top_authors(50)$$)::int,
-  '>', 0,
-  'Gegenprobe: die Funktion liefert ueberhaupt Zeilen');
+    $$select coalesce(string_agg(post_count::text, ','), '(leer)')
+        from public.feed_top_authors(50)
+       where profile_id = 'a3000000-0000-0000-0000-000000000002'$$),
+  '2',
+  'AGE-1004: ein terminierter eigener Beitrag erhoeht die Zahl NICHT — die '
+  'Funktion zaehlt unter den Rechten des Aufrufers, und beide SELECT-Policies '
+  'auf `posts` tragen `veroeffentlicht_ab <= now()`');
+
+-- (b) Ein VEROEFFENTLICHTER eigener Beitrag erhoeht sie um genau eins.
+insert into public.posts (author_id, body, visibility, kind)
+values ('a3000000-0000-0000-0000-000000000002', 'Zz sichtbar', 'members', 'member');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
+    $$select coalesce(string_agg(post_count::text, ','), '(leer)')
+        from public.feed_top_authors(50)
+       where profile_id = 'a3000000-0000-0000-0000-000000000002'$$),
+  '3',
+  'AGE-1004 Gegenprobe: ein veroeffentlichter eigener Beitrag erhoeht die Zahl '
+  'um genau eins — die Funktion zaehlt also noch, sie zaehlt nur anderes nicht '
+  'mehr mit');
 
 select * from finish();
 rollback;

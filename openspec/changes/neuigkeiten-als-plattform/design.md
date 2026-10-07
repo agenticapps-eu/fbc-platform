@@ -86,8 +86,10 @@ Filter lautlos**. Nichts schlüge fehl; die Liste zählte wieder Neuigkeiten mit
 und niemand sähe es, bis es jemandem wieder auffällt.
 
 Eine Notiz im Vorgang würde das nicht verhindern — Notizen werden gelesen, wenn
-man sie sucht. Stattdessen bekommt dieser Change eine **pgTAP-Zusage**, dass
-`feed_top_authors` Neuigkeiten und Veranstaltungs-Ankündigungen nicht mitzählt.
+man sie sucht. Stattdessen bekommt dieser Change **pgTAP-Zusagen**: dass `feed_top_authors`
+Neuigkeiten nicht mitzählt, und dass es Veranstaltungs-Ankündigungen sehr wohl
+tut. Die zweite nagelt die Entscheidung vom 25.08. fest — wer auf
+`kind = 'member'` verengt, wird an ihr rot.
 Sie wandert mit in die Suite, und auf dem Branch von AGE-1001 wird sie in dem
 Moment rot, in dem dessen Migration den Filter wegnimmt. Der Konflikt kann sich
 damit nicht mehr verstecken.

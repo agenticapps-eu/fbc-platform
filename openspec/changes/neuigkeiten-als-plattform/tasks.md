@@ -64,9 +64,9 @@
 
 - [x] 5.1 Fremdreviewer auf dem Plan — es ist eine Migration an einer Funktion,
       Donalds Regel vom 26.08. greift. Zwei Anbieter, keiner davon der eigene.
-- [ ] 5.2 Code-Review auf dem Diff.
-- [ ] 5.3 Befunde abarbeiten.
-- [ ] 5.4 ADR in `docs/decisions/` — Nummer eins über der höchsten, erst `ls`.
+- [x] 5.2 Code-Review auf dem Diff.
+- [x] 5.3 Befunde abarbeiten.
+- [x] 5.4 ADR in `docs/decisions/` — Nummer eins über der höchsten, erst `ls`.
       Die locked decision ist Entscheidung 1: die Urheberschaft bleibt in den
       Daten, ein Plattform-Konto wird abgelehnt.
 - [ ] 5.5 `openspec validate --all` grün.
@@ -85,5 +85,5 @@
         nachgereicht). Erst wenn die Funktion in beiden Fällen den Filter
         trägt, ist es erledigt. Der Test aus 1.1 ist der Wächter, nicht der
         Beleg — er läuft nur im Neuaufbau.
-- [ ] 5.9 Folgevorgang für den Potential Score anlegen (Befund der Plan-Review,
+- [x] 5.9 Folgevorgang für den Potential Score anlegen (Befund der Plan-Review,
       von Donald am 07.10. ausdrücklich NICHT in diesen Change gezogen).

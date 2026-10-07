@@ -64,13 +64,16 @@
 -- mehr gezaehlt.
 --
 -- KEIN INDEX, und das ist gemessen statt vermutet. Die Plan-Review hat einen
--- auf `posts.kind` gefordert. `EXPLAIN (ANALYZE, BUFFERS)` auf PROD, derselbe
--- Rumpf mit und ohne Filter:
+-- auf `posts.kind` gefordert. `EXPLAIN (ANALYZE, BUFFERS)` auf PROD am
+-- 07.10.2026, derselbe Rumpf mit und ohne Filter, bei 44 Beitraegen:
 --
 --   Kosten      32,10  ->  18,07
 --   Puffer         74  ->     71
---   Laufzeit  1,261ms  ->  0,842ms
 --   Plan      Hash Join + 2x Seq Scan  ->  Nested Loop + Index Scan profiles_pkey
+--
+-- Die gemessene Laufzeit fiel von 1,261 auf 0,842 ms — ein EINZELLAUF auf 44
+-- Zeilen, also Rauschen, und deshalb steht sie hier NICHT als Ergebnis.
+-- Tragend sind Kosten, Puffer und der Planwechsel. Befund des Code-Reviews.
 --
 -- Der Filter macht die Abfrage BILLIGER: weniger Zeilen gehen in den Verbund,
 -- und der Planer wechselt deshalb auf einen Indexzugriff. Bei 44 Zeilen waehlt

@@ -2,7 +2,7 @@
 reviewers: [gemini, codex]
 models: [gemini-3-pro, gpt-5.2-codex]
 verdicts: [APPROVE, REQUEST-CHANGES]
-reviewed_artifacts_sha: prompt-1004.txt, 376 Zeilen, 18892 Bytes
+reviewed_artifacts_sha: 438ea6dc580ff6a032845f10cdd7301b6853a54cd979ce48a800647ae60bbd54
 ---
 
 # Change review — neuigkeiten-als-plattform
