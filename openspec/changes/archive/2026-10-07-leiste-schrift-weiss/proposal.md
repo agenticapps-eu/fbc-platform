@@ -32,10 +32,16 @@ allein. Das ist die eine Entscheidung, die dieser Change zu treffen hat.
 ## What Changes
 
 - Die Schrift der linken Navigation ist im dunklen Modus weiss — derselbe Ton
-  wie die Namen in der Nachrichtenleiste rechts.
-- Die Abschnittsmarken darüber („Mein Bereich", „Club") sind hell blaugrau,
-  derselbe Ton wie Vorschautext und Uhrzeit in der Leiste rechts. Die
-  Rangfolge zwischen Marke und Eintrag bleibt damit sichtbar.
-- Im hellen Modus ändert sich nichts — kein Pixel, kein Wert.
+  wie die Gesprächsnamen in der Nachrichtenleiste rechts. Beide Leisten rahmen
+  die Seite und lesen sich jetzt gleich.
+- Die Abschnittsüberschriften darüber („Mein Bereich", „Support") sind hell
+  blaugrau, derselbe Ton wie Vorschautext und Uhrzeit rechts. Überschrift und
+  Eintrag bleiben damit unterscheidbar.
+- Der Einklapp-Schalter der Leiste behält beim Überfahren seinen sichtbaren
+  Wechsel und sieht aus wie sein Gegenstück an der rechten Leiste.
+- Bei eingeklappter Leiste zeigen jetzt **alle** Menüpunkte den aktiven
+  Zustand durch ein ausgefülltes Symbol — auch „Tutorials" und die
+  Unterpunkte der Administration, bei denen das bisher fehlte.
+- Im hellen Modus ändert sich nichts.
 - Ausserhalb der Leiste ändert sich nichts: die Willkommensstrecke, der
-  Kompass-Einstieg und die sekundären Knöpfe bleiben, wie sie sind.
+  Kompass-Einstieg und die Knöpfe bleiben, wie sie sind.
