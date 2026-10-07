@@ -34,7 +34,7 @@
 --   * In pgTAP heisst es `alike()`, nicht `like()`.
 
 begin;
-select plan(27);
+select plan(30);
 
 -- ── Fixtures: Betrachter ────────────────────────────────────────────────────
 insert into auth.users (id, aud, role, email) values
@@ -57,6 +57,54 @@ update public.profiles set tier = 'impact', name = 'Sb Autor Eins', activated_at
  where id = 'a1000000-0000-0000-0000-000000000001';
 update public.profiles set tier = 'impact', name = 'Sb Autor Zwei', activated_at = now(), is_public = true
  where id = 'a1000000-0000-0000-0000-000000000002';
+
+-- ── Fixtures: der Zusteller und die beiden erzeugten Beitragsarten ─────────
+-- AGE-1004. `Sb Zusteller` stellt AUSSCHLIESSLICH Neuigkeiten zu und darf nach
+-- diesem Change in „Aktivste Mitglieder" nicht mehr auftauchen. `Sb Autor Eins`
+-- bekommt zusaetzlich eine Veranstaltung — die zaehlt weiterhin MIT, und das
+-- ist eine Entscheidung vom 25.08., keine Auslassung.
+-- Zwei EIGENE Konten mit je GENAU EINEM Beitrag, und zwar je einem der beiden
+-- erzeugten Arten. So misst dieser Abschnitt nur sich selbst: die Zahlen der
+-- bestehenden Autoren bleiben unberuehrt, und die Namen beginnen mit `Zz`,
+-- damit sie auch die Reihenfolge-Zusage weiter oben nicht verschieben.
+insert into auth.users (id, aud, role, email) values
+  ('a3000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated', 'sb-zusteller@test.fbc'),
+  ('a3000000-0000-0000-0000-000000000002', 'authenticated', 'authenticated', 'sb-gastgeber@test.fbc');
+update public.profiles set tier = 'impact', name = 'Zz Zusteller', activated_at = now(), is_public = true
+ where id = 'a3000000-0000-0000-0000-000000000001';
+update public.profiles set tier = 'impact', name = 'Zz Gastgeber', activated_at = now(), is_public = true
+ where id = 'a3000000-0000-0000-0000-000000000002';
+
+-- WARUM MEHR ALS EIN BEITRAG JE KONTO: die Funktion klemmt auf 20 Zeilen, und
+-- oben stehen 25 Fuell-Autoren mit je einem Beitrag. Mit nur einem Beitrag
+-- fielen beide Probekonten aus dem Fenster — die Zusage „steht nicht in der
+-- Liste" waere dann gruen, ohne den Filter je beruehrt zu haben. Gemessen, nicht
+-- vermutet: in einem ersten Lauf war sie genau deshalb gruen.
+--
+-- Der Gastgeber unten ist die Gegenprobe DAZU: solange er erscheint, ist das
+-- Fenster nachweislich weit genug, und das Verschwinden des Zusteller sagt
+-- etwas.
+
+-- Der Zusteller: drei Neuigkeiten, sonst nichts. Drei Zeilen, weil ein
+-- eindeutiger Index je `release_note_id` nur einen Beitrag zulaesst.
+insert into public.release_notes (id, title, body) values
+  ('a4000000-0000-0000-0000-000000000001', 'Sb Neuerung 1', 'Rumpf'),
+  ('a4000000-0000-0000-0000-000000000002', 'Sb Neuerung 2', 'Rumpf'),
+  ('a4000000-0000-0000-0000-000000000003', 'Sb Neuerung 3', 'Rumpf');
+insert into public.posts (author_id, body, visibility, kind, release_note_id) values
+  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000001'),
+  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000002'),
+  ('a3000000-0000-0000-0000-000000000001', '', 'public', 'release', 'a4000000-0000-0000-0000-000000000003');
+
+-- Der Gastgeber: zwei Veranstaltungen, sonst nichts. Die Beitraege legt der
+-- TRIGGER an, nicht diese Datei — ein Einschub von Hand scheitert am
+-- eindeutigen Index `posts_event_ref_id_key`, und genau diese erzeugten
+-- Beitraege sind die gemeinten.
+insert into public.events (id, title, starts_at, host_id) values
+  ('a5000000-0000-0000-0000-000000000001', 'Sb Veranstaltung 1', now() + interval '7 days',
+   'a3000000-0000-0000-0000-000000000002'),
+  ('a5000000-0000-0000-0000-000000000002', 'Sb Veranstaltung 2', now() + interval '8 days',
+   'a3000000-0000-0000-0000-000000000002');
 
 -- 25 Füll-Autoren mit je einem öffentlichen Beitrag. Sie sind nur dafür da,
 -- dass die Obergrenze von 20 überhaupt greifen KANN — mit sieben Autoren
@@ -463,6 +511,48 @@ select is(
        where t.active and t.key like 'sb%' and x.c > 0$$),
   'discover: dieselbe Gleichheit auf der anderen Stufe — eine Abschrift ohne '
   'den Rang bestünde die eine oder die andere, nicht beide');
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- AGE-1004 · Was „aktivste Mitglieder" zaehlt und was nicht
+--
+-- Diese drei Zusagen sind zugleich der WAECHTER gegen einen Konflikt, der
+-- ausserhalb dieser Datei liegt: AGE-1001 traegt in seiner Migration einen
+-- vollstaendigen `create or replace` von `feed_top_authors`, geschrieben gegen
+-- den Stand VOR diesem Change. Wird sein Rumpf eingespielt, ohne den Filter
+-- mitzufuehren, faellt die erste Zusage hier aus.
+--
+-- Sie reichen allein NICHT (Befund der Plan-Review, codex): CI baut frisch auf
+-- und spielt nach Zeitstempel ein, PROD in der Reihenfolge der Merges — ein
+-- Test im Neuaufbau sieht den PROD-Fall gar nicht. Die eigentliche Massnahme
+-- ist das Umhaengen des Zeitstempels von AGE-1001. Dies hier ist der Waechter,
+-- nicht der Beleg.
+-- ════════════════════════════════════════════════════════════════════════════
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
+    $$select coalesce(string_agg(name, ',' order by name), '(leer)')
+        from public.feed_top_authors(50) where name = 'Zz Zusteller'$$),
+  '(leer)',
+  'AGE-1004: ein Konto, das nur Neuigkeiten zustellt, steht NICHT in der Liste');
+
+select is(
+  pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
+    $$select coalesce(post_count::text, '(fehlt)') from public.feed_top_authors(50)
+       where name = 'Zz Gastgeber'$$),
+  '2',
+  'AGE-1004: ein Konto mit NUR Veranstaltungen steht sehr wohl in der '
+  'Liste. Entschieden am 25.08. (Donald): ein Verein, der Veranstaltungen '
+  'ausrichtet, haelt das Ausrichten fuer Aktivitaet. Wer hier auf '
+  '`kind = ''member''` verengt, dreht diese Entscheidung um und wird an dieser '
+  'Zeile rot.');
+
+-- Gegenprobe: ohne sie waere die erste Zusage auch dann gruen, wenn die
+-- Funktion gar nichts mehr liefert.
+select cmp_ok(
+  pg_temp.text_as('a0000000-0000-0000-0000-00000000000e',
+    $$select count(*)::text from public.feed_top_authors(50)$$)::int,
+  '>', 0,
+  'Gegenprobe: die Funktion liefert ueberhaupt Zeilen');
 
 select * from finish();
 rollback;
