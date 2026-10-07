@@ -302,7 +302,7 @@ export function FeedbackButton({
         // für Bedienelemente. Der Ring IM Overlay weiter unten bleibt
         // `ring-accent-strong` — er steht nicht auf der Leiste.
         className={cn(
-          "flex w-full items-center rounded-md text-sm text-on-chrome transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]",
+          "flex w-full items-center rounded-md text-sm text-[color:var(--leiste-ink)] transition-colors hover:bg-chrome-elevated hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]",
           navEintragAbstaende(collapsed),
         )}
       >
