@@ -5,6 +5,17 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-10-07-neuigkeiten-als-plattform",
+    "datum": "2026-10-07",
+    "titel": "Neuigkeiten kommen von der Plattform, nicht von einem Mitglied",
+    "linear": "AGE-1004",
+    "aenderungen": [
+      "„Die aktivsten Mitglieder\" zählt Neuigkeiten der Plattform nicht mehr mit. Wer bisher nur wegen ihnen in dieser Liste stand, steht nicht mehr darin.",
+      "Veranstaltungen zählen unverändert weiter: wer eine ausrichtet, ist aktiv.",
+      "An den Neuigkeiten selbst ändert sich nichts: sie erscheinen wie bisher unter eff.bee.zee, und Likes und Kommentare bleiben, wie sie sind."
+    ]
+  },
+  {
     "slug": "2026-10-07-leiste-schrift-weiss",
     "datum": "2026-10-07",
     "titel": "Beide Leisten tragen dieselbe Schrift",
