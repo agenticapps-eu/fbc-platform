@@ -165,11 +165,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // ist der Normalfall (maybeSingle → data null) und kein Fehler.
         const [aktivierung, profileRes, staffRes] = await Promise.all([
           fetchActivationState(),
-          supabase
-            .from("profiles")
-            .select("tier, membership_tiers(level_rank)")
-            .eq("id", uid)
-            .maybeSingle(),
+          // `meine_stufe()` statt der Einbettung `membership_tiers(level_rank)`
+          // auf `profiles` (AGE-1001): das Leserecht auf der Tabelle ist
+          // entzogen. Nebenbei faellt damit die Falle weg, dass eine
+          // Einbettung ohne Grant die GANZE Abfrage mit 401 abweist und nicht
+          // nur den eingebetteten Teil.
+          supabase.rpc("meine_stufe").maybeSingle(),
           supabase.from("staff_roles").select("role").eq("profile_id", uid).maybeSingle(),
         ]);
         if (!active) return;
@@ -180,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile({
           userId: uid,
           tier: profileRes.data?.tier ?? null,
-          levelRank: profileRes.data?.membership_tiers?.level_rank ?? null,
+          levelRank: profileRes.data?.level_rank ?? null,
           staffRole: staffRes.data?.role ?? null,
           isActivated: aktivierung.activated,
           isBlocked: aktivierung.blocked,

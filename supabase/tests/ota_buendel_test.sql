@@ -227,13 +227,18 @@ select is(
 
 -- Gegenprobe zur Zeile darueber: misst die Abfrage ueberhaupt etwas? Ohne sie
 -- waere die Null auch dann gruen, wenn `role_table_grants` hier gar nichts
--- zurueckgibt. `profiles` traegt gemessen SELECT fuer authenticated.
+-- zurueckgibt.
+--
+-- BIS AGE-1001 stand hier `profiles`. Seitdem traegt die Tabelle fuer anon und
+-- authenticated gar kein Recht mehr (Change `verzeichnis-dicht`), und die
+-- Gegenprobe maesse dasselbe wie die Zusage, die sie absichern soll — also
+-- nichts. `events` traegt beides und ist in `grants_test.sql` festgenagelt.
 select cmp_ok(
   (select count(*)::int from information_schema.role_table_grants
-    where table_schema = 'public' and table_name = 'profiles'
+    where table_schema = 'public' and table_name = 'events'
       and grantee in ('anon', 'authenticated')),
   '>', 0,
-  'Gegenprobe: dieselbe Abfrage zaehlt auf profiles sehr wohl Rechte');
+  'Gegenprobe: dieselbe Abfrage zaehlt auf events sehr wohl Rechte');
 
 -- ── 21–26. Der Schreibweg (20260831140000) ──────────────────────────────────
 -- Die Tabelle traegt keinen Grant; geschrieben wird ueber genau eine

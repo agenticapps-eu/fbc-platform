@@ -16,8 +16,25 @@ column set per member (`id`, `name`, `avatar_url`, `cover_url`, `region`, `compa
 `has_needs`, `offer_categories`, `need_categories`) with optional full-text
 (`p_query`, German `search_doc` tsvector) and facet filters (`p_theme`,
 `p_branche`, `p_region`, `p_competency`, `p_offering`, `p_offers`, `p_needs`).
-The function SHALL be `SECURITY INVOKER`, so the caller's own RLS decides which
-profile rows are returned, and SHALL list only `is_public` members.
+Die Funktion SHALL `SECURITY DEFINER` sein, mit festgesetztem `search_path`, und
+SHALL nur `is_public`-Mitglieder listen.
+
+**Das war bis zu diesem Change `SECURITY INVOKER`, und der Wechsel ist keine
+Verbesserung, sondern eine Folge.** Die Funktion liest `profiles_public`, und
+dieser Change entzieht `authenticated` das Leserecht darauf; als INVOKER
+scheiterte sie danach für jeden. Entzug und Umstellung sind deshalb **ein**
+Schritt.
+
+**Was sich dabei verschiebt, SHALL festgehalten sein, weil das Ergebnis gleich
+bleibt und der Grund dafür nicht.** Die Funktion liest die RLS-freie Sicht und
+daneben `left join public.profiles p` für die erweiterten Spalten. Als INVOKER
+maskierte die RLS `p.competencies` für jeden unterhalb von Rang 4. Als DEFINER
+tut sie das nicht mehr — die Maskierung hängt dann **allein am Eintrittstor** der
+Funktion. Dass das Ergebnis dasselbe ist, folgt daraus, dass Rang 6 den Rang 4
+einschliesst und der Selbst-Zweig nur die eigene Zeile liefert. Das ist nach der
+Umstellung keine Eigenschaft der Datenbank mehr, sondern eine Eigenschaft dieser
+einen `where`-Klausel, und SHALL als Zusage geprüft werden statt als Kommentar
+dastehen.
 
 Das Ausführungsrecht SHALL `authenticated` allein halten und SHALL **namentlich**
 entzogen werden — `from public, anon` —, nicht allein über `public`. Ein Entzug
@@ -75,9 +92,11 @@ contact details are never released automatically is untouched.
 
 - **WHEN** a caller invokes `search_directory` with `p_query` set
 - **THEN** only members whose generated `search_doc` matches the query built by
-  `suchbegriff_zu_tsquery(p_query)` are returned, subject to RLS — the
-  prefix-capable helper introduced on 2026-08-17, not `websearch_to_tsquery`,
-  which cannot match a prefix
+  `suchbegriff_zu_tsquery(p_query)` are returned — the prefix-capable helper
+  introduced on 2026-08-17, not `websearch_to_tsquery`, which cannot match a
+  prefix. Die Auswahl begrenzt ab diesem Change das **Eintrittstor der
+  Funktion**, nicht mehr die RLS des Aufrufers: die Funktion ist
+  `SECURITY DEFINER`, und `subject to RLS` wäre dort schlicht falsch
 
 #### Scenario: Facet filters narrow the result
 
@@ -133,9 +152,16 @@ contact details are never released automatically is untouched.
 
 #### Scenario: A below-rank caller learns no other member's categories
 
+<!-- Titel zeichengleich. Die Zusage bleibt; ihr Mechanismus wechselt mit
+     diesem Change von der RLS auf das Eintrittstor der Funktion. Genau
+     deshalb steht sie hier noch einmal. -->
+
 - **WHEN** a caller below the directory's rank gate filters on `p_offers`
-- **THEN** the base-table RLS still yields at most their own row, so neither the
-  returned arrays nor the filtered result set reveals another member's categories
+- **THEN** das Eintrittstor der Funktion liefert ihm höchstens die eigene Zeile,
+  so dass weder die zurückgegebenen Arrays noch die gefilterte Treffermenge die
+  Kategorien eines anderen Mitglieds preisgeben — **die Zusage bleibt, ihr
+  Träger wechselt von der RLS auf die `where`-Klausel**, und genau deshalb wird
+  sie hier eigens geprüft statt mitgedacht
 
 #### Scenario: The previous signature is gone, not shadowed
 
@@ -1145,28 +1171,73 @@ Konto unterhalb der Schwelle nicht das Verzeichnis, sondern nähme ihm die Namen
 in Flächen, die es erreichen darf; es sähe namenlose Beiträge und namenlose
 Gesprächspartner.
 
-**Berichtigt mit V5F-1 — die Zusage bleibt, ihre Begründung war falsch.** Der
-abgelöste Text schloss: „ohne Zugang zum Verzeichnis findet ein Konto unterhalb
-der Schwelle keine fremden Profil-IDs." Das gilt für den Weg über das
-Verzeichnis und sonst nirgends. Die View läuft mit `security_invoker = off`
-**und** trägt das Tabellenrecht `select` für `authenticated`; ein
-`select * from profiles_public` ohne Filter liefert damit die vollständige
-Mitgliederliste an jedes aktivierte Konto. Dasselbe gilt für die Basistabelle:
-`profiles_select_self_or_discover` erlaubt jede fremde Zeile ab Rang 4, auch mit
-`is_public = false`. Gemessen am Katalog von PROD am 03.10.2026.
+**Der Mechanismus wechselt mit diesem Change: von einem Leserecht auf der
+Relation zu kennungsgebundenen Funktionen.** Die Zusage oben bleibt Wort für
+Wort — jedes aktivierte Mitglied bekommt die Basisfelder, ohne Rücksicht auf
+seine Stufe. Was entfällt, ist der **Mengen**zugriff.
 
-Daraus SHALL folgen, was die Verzeichnisschwelle **nicht** leistet: sie bindet
-die Suche, nicht den Rohzugriff. Solange beide Leserechte bestehen, SHALL die
-Aussage „ein Konto ohne `verzeichnis.suchen` kann keine Mitgliederliste
-beschaffen" NICHT geführt werden. Der Verschluss — Entzug beider Leserechte und
-kennungsgebundene Funktionen an ihrer Stelle — SHALL in einem eigenen Change
-erfolgen, weil er zwanzig Abfragestellen, die Einbettung
-`membership_tiers(level_rank)` und die `update().select()`-Ketten berührt.
+`select` auf `public.profiles` und auf `public.profiles_public` SHALL
+`authenticated` entzogen sein. An ihrer Stelle SHALL es `SECURITY DEFINER`-
+Funktionen geben, die **Kennungen entgegennehmen** statt eine Menge zu liefern,
+und die die Namensauflösung über `resolve_display_name` beibehalten:
 
-**Was dabei NICHT geht, und warum es hier steht:** die View einfach `authenticated`
-zu entziehen, ohne Ersatz, schaltet das Verzeichnis für **alle** ab —
-`search_directory` ist `SECURITY INVOKER` und liest sie. Der Entzug und sein
-Ersatz sind deshalb ein Schritt und nicht zwei.
+| Funktion                           | für                                          | Prädikat                                         |
+| ---------------------------------- | -------------------------------------------- | ------------------------------------------------ |
+| `mein_profil()`                    | die eigene Zeile, alle Spalten               | `id = auth.uid()`                                |
+| `meine_stufe()`                    | Stufe und Rang beim Sitzungsstart            | dasselbe, zwei Felder                            |
+| `profil_karten(uuid[])`            | Karten zu bekannten Kennungen                | das Prädikat der Sicht                           |
+| `gespraechspartner_karten(uuid[])` | Karten im Chat                               | gemeinsamer Gesprächsfaden, **ohne** `is_public` |
+| `profil_detail(uuid)`              | die erweiterten Felder eines fremden Profils | `has_level(4)`, wie heute                        |
+
+**`gespraechspartner_karten` SHALL es geben und SHALL NOT in `profil_karten`
+aufgehen.** Der Chat liest heute ausdrücklich die Basistabelle statt der Sicht,
+damit ein Gesprächspartner auch dann seinen Namen trägt, wenn er sein Profil
+nicht öffentlich gestellt hat. Eine Ersatzfunktion mit dem Prädikat der Sicht
+liesse im Chat Namen verschwinden — **ausschliesslich bei den Mitgliedern, die
+sich aus dem Verzeichnis zurückgezogen haben**, und ohne dass ein Test mit
+öffentlichen Konten es bemerkte.
+
+**Der Entzug SHALL beide Funktionen mitnehmen, die die Sicht als
+`SECURITY INVOKER` lesen, nicht nur `search_directory`.** Gemessen über den
+Funktionskatalog von PROD sind es genau zwei: `search_directory` und
+**`feed_top_authors`**, die „Die aktivsten Mitglieder" in der Feed-Seitenleiste
+zeichnet. Die übrigen Funktionen auf `profiles` sind bereits DEFINER und
+unberührt. Ohne diesen Nachzug bricht die Seitenleiste in dem Moment, in dem die
+Migration läuft.
+
+**Die 17 Spalten-Grants für `update` SHALL MITFALLEN.** Das ist nicht die
+Absicht des Changes, sondern seine gemessene Folge, und es SHALL hier stehen,
+weil die naheliegende Reparatur die schlimmere ist:
+
+```
+nur UPDATE(spalte), kein SELECT:  update … where id = $1  →  VERWEIGERT
+dasselbe update OHNE where                               →  gelingt
+zusätzlich SELECT(id):            das update             →  gelingt
+… und dann select count(*)                               →  ALLE ZEILEN
+```
+
+`update … where id = $1` braucht `select` auf die Spalten der WHERE-Klausel —
+das Schreibrecht fällt also mit dem Leserecht. Ein `grant select (id)` als
+Flicken SHALL NOT ausgesprochen werden: er repariert das Schreiben **und stellt
+die Aufzählbarkeit wieder her**, also genau das, was dieser Change schliesst.
+
+Die Schreibwege SHALL stattdessen über eigene Funktionen laufen — je ein
+Schnitt, mit benannten Parametern statt einem `jsonb`-Beutel.
+
+**Die Obergrenze auf der Stapelgrösse SHALL WERFEN und NOT abschneiden.** Eine
+Grenze, die man überschreiten kann, ohne es zu merken, ist keine Grenze, sondern
+ein Datenverlust mit Obergrenze: die überzähligen Kennungen fielen lautlos
+heraus, und der Aufrufer zeigte für sie einen Rückfall ohne Namen und Bild. Wo
+eine Aufrufstelle ungebremst liest, SHALL sie in Stapeln fragen.
+
+**Was NICHT zugesagt wird, und das SHALL hier stehen:** eine Obergrenze auf der
+Stapelgrösse ist ein Betriebsmittel und **kein** Sicherheitsargument — wer 200
+Kennungen auf einmal abfragen darf, darf auch fünfzig Mal 200. Dieser Change
+macht aus einem *Mengen*zugriff einen *Kennungs*zugriff. Ein Mitglied, das sich
+Kennungen aus Feed, Chat und Events zusammensucht, bekommt dazu weiterhin
+Karten. Die Aussage „es gibt keinen Weg zu fremden Profildaten" SHALL NICHT
+geführt werden; die Aussage „die Mitgliederliste ist nicht als Menge abholbar"
+SHALL ab diesem Change geführt werden dürfen.
 
 #### Scenario: Ein basic-Konto liest Namen im Feed
 
@@ -1189,29 +1260,64 @@ Ersatz sind deshalb ein Schritt und nicht zwei.
 
 #### Scenario: Der Rohzugriff auf die Sicht hängt an KEINEM Rang
 
-<!-- Berichtigt nach dem Diff-Review: die erste Fassung nannte „ab Rang 4" für
-     beide Relationen. Das ist für `profiles` richtig und für `profiles_public`
-     zu eng — die Sicht prüft nur die Aktivierung des Aufrufers. Die
-     Anforderung oben sagte es schon („ohne Rücksicht auf seine Stufe"), ihr
-     Szenario nicht. -->
+<!-- Titel zeichengleich, Aussage UMGEDREHT. Bis zu diesem Change hielt dieses
+     Szenario den offenen Zustand fest („es kommen Zeilen zurück"), damit er
+     benannt und nicht behauptet behoben war. Jetzt ist er behoben. -->
 
-- **WHEN** ein aktiviertes Mitglied **auf beliebiger Stufe**, auch ausserhalb
-  des Clubs, `select` auf `profiles_public` ohne Filter versucht
-- **THEN** kommen Zeilen zurück — der Zustand ist benannt, nicht behauptet
-  behoben, und sein Verschluss ist ein eigener Change
+- **WHEN** ein aktiviertes Mitglied **auf beliebiger Stufe** `select` auf
+  `profiles_public` ohne Filter versucht
+- **THEN** kommt keine Zeile zurück — das Leserecht ist entzogen, und der Weg
+  zu Namen und Bildern führt über `profil_karten` mit bekannten Kennungen
 
 #### Scenario: Der Rohzugriff auf die Basistabelle hängt an Rang 4
 
+<!-- Titel zeichengleich, Aussage UMGEDREHT. Der Rang spielt keine Rolle mehr,
+     weil das Leserecht gar nicht mehr besteht. -->
+
 - **WHEN** ein aktiviertes Mitglied ab Rang 4 `select` auf `profiles` ohne
   Filter versucht
-- **THEN** kommen fremde Zeilen zurück, einschliesslich der Profile mit
-  `is_public = false`
+- **THEN** kommt keine Zeile zurück — auch nicht die eigene; die eigene Zeile
+  liefert `mein_profil()`
 
 #### Scenario: Unterhalb des Clubs gibt die Basistabelle nur die eigene Zeile
 
+<!-- Titel zeichengleich, Aussage UMGEDREHT. Vor diesem Change hielt es den
+     Unterschied zwischen den beiden Relationen fest, damit der Verschluss sie
+     getrennt behandelt. Er hat es getan, und danach sind beide gleich zu. -->
+
 - **WHEN** ein aktiviertes Mitglied auf Rang 3 dasselbe versucht
-- **THEN** kommt genau die eigene Zeile zurück — die beiden Relationen sind
-  nicht derselbe Fall, und der Verschluss muss beide getrennt behandeln
+- **THEN** kommt ebenfalls keine Zeile zurück — nach dem Entzug unterscheiden
+  sich die beiden Relationen nicht mehr, und die eigene Zeile kommt für jede
+  Stufe aus `mein_profil()`
+
+#### Scenario: Die eigene Zeile bleibt vollständig erreichbar
+
+- **WHEN** ein aktiviertes Mitglied sein eigenes Profil lädt oder bearbeitet
+- **THEN** bekommt es alle Spalten seiner Zeile über `mein_profil()`, und ein
+  Speichervorgang gelingt weiterhin
+
+#### Scenario: Im Chat bleibt auch ein zurückgezogenes Profil benannt
+
+- **WHEN** ein Mitglied einen Gesprächsfaden mit jemandem öffnet, der sein
+  Profil **nicht** öffentlich gestellt hat
+- **THEN** trägt der Faden dessen Namen und Bild — über
+  `gespraechspartner_karten`, nicht über das Prädikat der Sicht
+
+#### Scenario: Der gemeinsame Faden ersetzt die Clubschwelle
+
+- **WHEN** ein Mitglied **unterhalb** der Clubschwelle einen Gesprächsfaden mit
+  einem zurückgezogenen Profil teilt
+- **THEN** trägt der Faden dessen Namen — die abgelöste Policy verlangte dort
+  noch die Clubschwelle, und an ihre Stelle tritt das gemeinsame Gespräch: wer
+  miteinander schreibt, kennt einander ohnehin
+
+#### Scenario: Die aktivsten Mitglieder erscheinen weiterhin
+
+- **WHEN** ein Mitglied den Feed öffnet
+- **THEN** zeichnet die Seitenleiste „Die aktivsten Mitglieder" wie zuvor —
+  `feed_top_authors` BLEIBT dabei `SECURITY INVOKER` und löst nur die Namen
+  über `profil_karten` auf. Als DEFINER zählte sie terminierte Beiträge mit,
+  weil beide SELECT-Policies auf `posts` `veroeffentlicht_ab <= now()` tragen
 
 ### Requirement: Liste und erweiterte Spalten tragen dieselbe Schwelle
 

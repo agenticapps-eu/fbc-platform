@@ -9,7 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const uploads: { bucket: string; path: string }[] = [];
-let updatePayload: Record<string, unknown> | null = null;
+/** Was `profil_speichern` bekommen hat — seit AGE-1001 der Schreibweg. */
+let gespeichert: Record<string, unknown> | null = null;
 
 vi.mock("./supabase", () => ({
   supabase: {
@@ -25,26 +26,24 @@ vi.mock("./supabase", () => ({
       }),
     },
     from: () => ({
-      update: (payload: Record<string, unknown>) => {
-        updatePayload = payload;
-        return {
-          eq: () => ({
-            select: () => ({
-              single: async () => ({
-                data: { profile_completion: 42, avatar_url: null, cover_url: null },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      },
       delete: () => ({ eq: async () => ({ error: null }) }),
       insert: async () => ({ error: null }),
       // Die Kontaktzeile geht seit AGE-537 im selben Aufruf mit; ohne diesen
       // Rand liefe der Test in „upsert is not a function".
       upsert: async () => ({ error: null }),
     }),
-    rpc: async () => ({ error: null }),
+    rpc: (name: string, args: Record<string, unknown>) => {
+      // NUR der Speicheraufruf: `saveProfile` ruft danach noch
+      // `recompute_potential_score`, und ohne diese Bedingung stuende hier
+      // dessen Argument.
+      if (name === "profil_speichern") gespeichert = args;
+      return Object.assign(Promise.resolve({ data: null, error: null }), {
+        single: async () => ({
+          data: { profile_completion: 42, avatar_url: null, cover_url: null },
+          error: null,
+        }),
+      });
+    },
   },
 }));
 
@@ -89,7 +88,7 @@ function werte(over: Partial<ProfileFormValues> = {}): ProfileFormValues {
 
 beforeEach(() => {
   uploads.length = 0;
-  updatePayload = null;
+  gespeichert = null;
 });
 
 describe("saveProfile — Hintergrundbild", () => {
@@ -106,8 +105,8 @@ describe("saveProfile — Hintergrundbild", () => {
     // unter dem gerade abgelegt wurde. Zeigte die Spalte woanders hin, merkte
     // das keine Zeilenzählung. Die Zusicherung, dass keine Projektkennung mehr
     // hineingerät, steht daneben.
-    expect(updatePayload?.cover_url).toBe(uploads[0].path);
-    expect(updatePayload?.cover_url).not.toMatch(/^https?:/);
+    expect(gespeichert?.p_cover_url).toBe(uploads[0].path);
+    expect(gespeichert?.p_cover_url).not.toMatch(/^https?:/);
   });
 
   it("kanonisiert cover_url, wenn kein Bild dabei ist — nichts geht verloren", async () => {
@@ -118,7 +117,7 @@ describe("saveProfile — Hintergrundbild", () => {
     await saveProfile(UID, werte({ cover_url: "https://cdn.test/covers/alt.webp" }), null, null);
 
     expect(uploads).toHaveLength(0);
-    expect(updatePayload?.cover_url).toBe("alt.webp");
+    expect(gespeichert?.p_cover_url).toBe("alt.webp");
   });
 
   it("lässt ein fremd gehostetes Bild in Ruhe", async () => {
@@ -127,13 +126,13 @@ describe("saveProfile — Hintergrundbild", () => {
     const fremd = "https://i.pravatar.cc/300?u=x";
     await saveProfile(UID, werte({ cover_url: fremd }), null, null);
 
-    expect(updatePayload?.cover_url).toBe(fremd);
+    expect(gespeichert?.p_cover_url).toBe(fremd);
   });
 
   it("entfernt das Bild, indem es die Verknüpfung löst — nicht das Objekt", async () => {
     await saveProfile(UID, werte({ cover_url: null }), null, null);
 
-    expect(updatePayload?.cover_url).toBeNull();
+    expect(gespeichert?.p_cover_url).toBeNull();
     // Kein remove()-Aufruf: das Objekt bleibt im Bucket, genau wie beim Avatar.
     expect(uploads).toHaveLength(0);
   });

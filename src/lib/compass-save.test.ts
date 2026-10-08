@@ -38,15 +38,7 @@ function tableApi(name: string) {
     },
     select: () => {
       const result = { data: existing[name] ?? [], error: null };
-      return {
-        eq: () =>
-          Object.assign(Promise.resolve(result), {
-            single: async () => ({
-              data: { profile_completion: 40, potential_score: 12, dev_focus: "sein" },
-              error: null,
-            }),
-          }),
-      };
+      return { eq: () => Promise.resolve(result) };
     },
   };
 }
@@ -54,7 +46,18 @@ function tableApi(name: string) {
 vi.mock("./supabase", () => ({
   supabase: {
     from: (name: string) => tableApi(name),
-    rpc: async () => ({ error: null }),
+    // Seit AGE-1001 laufen `dev_focus` und das Nachlesen der Abschlusswerte
+    // ueber Funktionen. Der Rand ist beides: abwartbar fuer die
+    // Schreibaufrufe, und `.single()` fuer `mein_profil()`.
+    rpc: (name: string) => {
+      ops.push(`rpc:${name}`);
+      return Object.assign(Promise.resolve({ data: null, error: null }), {
+        single: async () => ({
+          data: { profile_completion: 40, potential_score: 12, dev_focus: "sein" },
+          error: null,
+        }),
+      });
+    },
   },
 }));
 vi.mock("./matches", () => ({ recomputeMyMatches: async () => {} }));

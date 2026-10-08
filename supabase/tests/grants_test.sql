@@ -87,8 +87,6 @@ profile_badges/authenticated=SELECT
 profile_contacts/authenticated=INSERT,SELECT,UPDATE
 profile_interests/authenticated=DELETE,INSERT,SELECT,UPDATE
 profile_theme_scores/authenticated=DELETE,INSERT,SELECT,UPDATE
-profiles/authenticated=SELECT
-profiles_public/authenticated=SELECT
 push_tokens/authenticated=DELETE,INSERT,SELECT,UPDATE
 release_entry_skips/authenticated=DELETE,INSERT,SELECT
 release_notes/authenticated=INSERT,SELECT,UPDATE
@@ -98,6 +96,24 @@ tags/anon=SELECT
 tags/authenticated=SELECT
 thread_read_positions/authenticated=INSERT,SELECT,UPDATE$$,
   'Tabellen-Grants: exakt das, was die Policies decken — und sonst nichts');
+
+-- ══ WAS AGE-1001 AUS DIESEM SCHNAPPSCHUSS GENOMMEN HAT ═════════════════════
+-- Bis dahin standen hier zwei Zeilen:
+--     profiles/authenticated=SELECT
+--     profiles_public/authenticated=SELECT
+-- Beide sind entzogen (Change `verzeichnis-dicht`). Der Grund steht im Kopf der
+-- Migration und kurz: beide Relationen waren fuer jedes angemeldete Konto als
+-- MENGE lesbar, und die Verzeichnisschwelle aus AGE-1000 galt damit an der
+-- Oberflaeche und an `search_directory`, aber nicht am Rohzugriff.
+--
+-- An ihrer Stelle stehen SECURITY DEFINER-Funktionen, die KENNUNGEN
+-- entgegennehmen: `mein_profil`, `meine_stufe`, `profil_karten`,
+-- `gespraechspartner_karten`, `profil_detail`. Sie sind in
+-- `verzeichnis_dicht_test.sql` einzeln gemessen.
+--
+-- **Dass hier zwei Zeilen FEHLEN, ist die Zusage** — ein Schnappschuss, dem man
+-- eine Zeile wegnimmt, ohne zu sagen warum, liest sich beim naechsten Mal wie
+-- ein Versehen und wird „repariert".
 
 -- AGE-528 hat zwei Tabellen dazugelegt, und beide Zeilen sind eine Aussage:
 -- `post_media/anon=SELECT` ist nicht Großzügigkeit, sondern Voraussetzung — ohne
@@ -181,10 +197,27 @@ select is(
 $$contact_requests.UPDATE=status
 platform_settings.UPDATE=open_contact
 posts.UPDATE=body,hashtags,veroeffentlicht_ab,visibility
-profiles.UPDATE=avatar_url,branche,company,competencies,cover_url,dev_focus,goals,headline,interests,is_public,name,region,roles,short_bio,socials,videos,website
 routing_queue.UPDATE=assigned_to,status
 thread_read_positions.UPDATE=last_read_at,profile_id,thread_id$$,
   'Spalten-Grants: nur die vom Client beschreibbaren Felder');
+
+-- ══ UND DIE 17 SPALTEN VON `profiles` SIND MIT AGE-1001 EBENFALLS WEG ══════
+-- Hier stand:
+--     profiles.UPDATE=avatar_url,branche,company,…,website
+--
+-- Sie fallen nicht aus Ordnungsliebe. `update … where id = $1` braucht `select`
+-- auf die Spalten der WHERE-Klausel — ohne Leserecht waeren die Schreibrechte
+-- unbenutzbar. Gemessen am 03.10. gegen den lokalen Stack:
+--
+--     nur UPDATE(spalte), kein SELECT: `update … where id = $1` -> VERWEIGERT
+--     dasselbe update OHNE where                                -> gelingt
+--     zusaetzlich SELECT(id): das update                        -> gelingt
+--     … und dann `select count(*)`                              -> ALLE ZEILEN
+--
+-- Die letzte Zeile ist der Grund, warum es kein `grant select (id)` als Flicken
+-- gibt: er stellte die Aufzaehlbarkeit wieder her, und Kennungen sind genau
+-- das, was die neuen Kartenfunktionen einloesen. Die vier Schreibstellen gehen
+-- deshalb ueber eigene DEFINER-Funktionen.
 
 -- `message_threads` steht am 26.08. in der Liste oben, ERZEUGT dort aber
 -- bewusst KEINE Zeile (AGE-583). Das ist die Aussage: die Tabelle traegt

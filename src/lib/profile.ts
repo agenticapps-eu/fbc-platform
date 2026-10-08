@@ -194,7 +194,7 @@ function socialString(socials: ProfileRow["socials"], key: string): string {
 /** Lädt Profilzeile + Interessen + Ziele und baut die Formular-Defaults. */
 export async function fetchProfileEditorData(uid: string): Promise<ProfileFormValues> {
   const [profileRes, interestsRes, goalsRes, contactRes] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", uid).single(),
+    supabase.rpc("mein_profil").single(),
     supabase.from("profile_interests").select("theme, label").eq("profile_id", uid).order("label"),
     supabase
       .from("goals")
@@ -340,26 +340,28 @@ export async function saveProfile(
   const avatarUrl = await uploadBild("avatars", uid, avatarBlob, values.avatar_url);
   const coverUrl = await uploadBild("covers", uid, coverBlob, values.cover_url);
 
+  // `profil_speichern` statt UPDATE + `.select()`-Kette (AGE-1001): das
+  // Schreibrecht auf `profiles` ist mit dem Leserecht gefallen — ein
+  // `update … where id = $1` braucht `select` auf die Spalten der
+  // WHERE-Klausel. Alle vierzehn Parameter sind Pflicht; die Funktion setzt,
+  // was sie bekommt, genau wie das abgeloeste UPDATE.
   const { data: updated, error: updateError } = await supabase
-    .from("profiles")
-    .update({
-      name: values.name.trim(),
-      region: values.region.trim(),
-      company: values.company.trim(),
-      short_bio: values.short_bio.trim(),
-      branche: emptyToNull(values.branche),
-      headline: emptyToNull(values.headline),
-      roles: values.roles,
-      competencies: values.competencies,
-      website: emptyToNull(values.website),
-      dev_focus: values.dev_focus === "" ? null : values.dev_focus,
-      socials: buildSocials(values.socials),
-      videos: sanitizeVideos(values.videos),
-      avatar_url: avatarUrl,
-      cover_url: coverUrl,
+    .rpc("profil_speichern", {
+      p_name: values.name.trim(),
+      p_region: values.region.trim(),
+      p_company: values.company.trim(),
+      p_short_bio: values.short_bio.trim(),
+      p_branche: emptyToNull(values.branche),
+      p_headline: emptyToNull(values.headline),
+      p_roles: values.roles,
+      p_competencies: values.competencies,
+      p_website: emptyToNull(values.website),
+      p_dev_focus: values.dev_focus === "" ? null : values.dev_focus,
+      p_socials: buildSocials(values.socials),
+      p_videos: sanitizeVideos(values.videos),
+      p_avatar_url: avatarUrl,
+      p_cover_url: coverUrl,
     })
-    .eq("id", uid)
-    .select("profile_completion, avatar_url, cover_url")
     .single();
   if (updateError) throw updateError;
 

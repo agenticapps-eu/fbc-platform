@@ -489,12 +489,15 @@ select is(
 -- mitsetzt und die vorhandenen Praedikate es ohnehin lesen — auch
 -- `profiles_public`, das mit `security_invoker = off` laeuft und deshalb sonst
 -- eine eigene Baustelle gewesen waere.
+-- Seit AGE-1001 ueber `profil_karten` statt ueber die Sicht: der Rohzugriff
+-- ist entzogen, das Praedikat der Sicht steht unveraendert in der Funktion.
+-- Die Zusage ist dieselbe.
 select is(
   pg_temp.zaehl_als('e5000000-0000-0000-0000-000000000006',
-    $$ select count(*)::int from public.profiles_public
-        where id = 'e5000000-0000-0000-0000-000000000005' $$),
+    $$ select count(*)::int from public.profil_karten(
+         array['e5000000-0000-0000-0000-000000000005']::uuid[]) $$),
   0,
-  'das geloeschte Mitglied ist aus profiles_public verschwunden');
+  'das geloeschte Mitglied kommt auch als Karte nicht mehr');
 
 -- ══ DER SCHEMAWAECHTER ═════════════════════════════════════════════════════
 -- ── 29. Bei unvorbereitetem Schema wird die Loeschung verweigert ────────────

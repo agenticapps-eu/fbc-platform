@@ -55,11 +55,14 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: CORS });
   }
 
+  // `meine_stufe()` statt der Einbettung auf `profiles` (AGE-1001): der
+  // Client oben traegt den ANON-Schluessel plus das Token des Mitglieds, laeuft
+  // also als `authenticated` — und diese Rolle haelt auf `profiles` seit dem
+  // Entzug kein Leserecht mehr. Die Funktion ist an die Sitzung gebunden; die
+  // Kennung aus dem `sub`-Claim bleibt fuer Stripe (client_reference_id).
   const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("tier, membership_tiers(level_rank)")
-    .eq("id", userId)
-    .single();
+    .rpc("meine_stufe")
+    .maybeSingle();
   if (profileError) {
     log("error", "profile_lookup_failed", { code: profileError.code });
     return new Response(JSON.stringify({ error: "profile_lookup_failed" }), {
@@ -67,8 +70,7 @@ Deno.serve(async (req) => {
       headers: CORS,
     });
   }
-  const currentRank =
-    (profile?.membership_tiers as { level_rank?: number } | null)?.level_rank ?? 0;
+  const currentRank = (profile as { level_rank?: number } | null)?.level_rank ?? 0;
 
   const parsed = parseUpgradeRequest(body, currentRank);
   if (!parsed.ok) {

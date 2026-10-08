@@ -5,6 +5,18 @@ import type { ReleaseEintrag } from "../types/release";
 
 export const RELEASE_EINTRAEGE: ReleaseEintrag[] = [
   {
+    "slug": "2026-10-08-verzeichnis-dicht",
+    "datum": "2026-10-08",
+    "titel": "Die Mitgliederliste lässt sich nicht mehr am Verzeichnis vorbei abholen",
+    "linear": "AGE-1001",
+    "aenderungen": [
+      "Niemand kann die Mitgliederliste mehr an der Verzeichnis-Suche vorbei abholen. Wer das Recht „Mitglieder suchen\" nicht hat, bekommt auch über Umwege keine Liste.",
+      "Für alle anderen Flächen ändert sich **nichts Sichtbares**: Namen und Profilbilder stehen weiterhin im Feed, im Chat, bei Events, in der Academy, bei Kontaktanfragen und in den Vorschlägen — auch für Mitglieder unterhalb der Verzeichnisschwelle.",
+      "Das eigene Profil bleibt vollständig lesbar und bearbeitbar.",
+      "Die Verzeichnis-Suche selbst arbeitet unverändert weiter, für die, die sie dürfen."
+    ]
+  },
+  {
     "slug": "2026-10-07-neuigkeiten-als-plattform",
     "datum": "2026-10-07",
     "titel": "Neuigkeiten kommen von der Plattform, nicht von einem Mitglied",

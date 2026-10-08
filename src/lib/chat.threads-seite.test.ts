@@ -23,16 +23,25 @@ interface Aufruf {
 }
 
 let aufrufe: Aufruf[] = [];
+let funktionen: string[] = [];
 let threadZeilen: Record<string, unknown>[] = [];
 let profilZeilen: Record<string, unknown>[] = [];
 
 vi.mock("./supabase", () => ({
   supabase: {
+    // Seit AGE-1001 holt `fetchThreads` die Partner ueber
+    // `gespraechspartner_karten` statt ueber die Basistabelle `profiles`.
+    rpc: (name: string) => {
+      funktionen.push(name);
+      return {
+        then: (auf: (r: { data: unknown; error: null }) => unknown, ab?: (e: unknown) => unknown) =>
+          Promise.resolve({ data: profilZeilen, error: null }).then(auf, ab),
+      };
+    },
     from: (table: string) => {
       const eintrag: Aufruf = { table, order: [] };
       aufrufe.push(eintrag);
-      const daten = () =>
-        table === "message_threads" ? threadZeilen : table === "profiles" ? profilZeilen : [];
+      const daten = () => (table === "message_threads" ? threadZeilen : []);
       const kette = {
         select: (spalten: string) => {
           eintrag.select = spalten;
@@ -84,6 +93,7 @@ const threadsAufruf = () => aufrufe.find((a) => a.table === "message_threads")!;
 
 beforeEach(() => {
   aufrufe = [];
+  funktionen = [];
   threadZeilen = [];
   profilZeilen = [];
 });
@@ -130,7 +140,7 @@ describe("fetchThreads — eine begrenzte, serverseitig sortierte Seite", () => 
     // Positivkontrolle: die Attrappe zeichnet sehr wohl auf — sonst wäre die
     // Abwesenheit oben von einem stummen Mock nicht zu trennen.
     expect(aufrufe.map((a) => a.table)).toContain("message_threads");
-    expect(aufrufe.map((a) => a.table)).toContain("profiles");
+    expect(funktionen).toContain("gespraechspartner_karten");
   });
 
   it("meldet den nächsten Versatz, solange die Seite voll war", async () => {
@@ -139,6 +149,7 @@ describe("fetchThreads — eine begrenzte, serverseitig sortierte Seite", () => 
     expect(voll.nextOffset).toBe(THREADS_SEITE);
 
     aufrufe = [];
+    funktionen = [];
     threadZeilen = [threadZeile("t1")];
     const rest = await fetchThreads(ICH);
     expect(rest.nextOffset).toBeNull();
@@ -184,6 +195,6 @@ describe("fetchThreads — eine begrenzte, serverseitig sortierte Seite", () => 
     const seite = await fetchThreads(ICH);
     expect(seite.threads).toEqual([]);
     expect(seite.nextOffset).toBeNull();
-    expect(aufrufe.map((a) => a.table)).not.toContain("profiles");
+    expect(funktionen).not.toContain("gespraechspartner_karten");
   });
 });

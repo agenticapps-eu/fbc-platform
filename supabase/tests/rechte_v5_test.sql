@@ -23,10 +23,16 @@
 --      weiter ein fremdes Vollprofil und meldet sich weiter zu einem Event an.
 --      Das ist Entscheidung E4 des Go-live-Plans, und sie ist leicht
 --      versehentlich mitzureissen.
---   7. **Der benannte Restbefund.** Ein Rang-4-Konto liest `profiles` und
---      `profiles_public` ohne Filter und bekommt Zeilen. Das ist der HEUTIGE
---      Zustand, festgehalten als Zusage, damit der Verschluss (Change
---      `verzeichnis-dicht`) diesen Test umdrehen MUSS und nicht vergisst.
+--   7. **Der Restbefund ist geschlossen (AGE-1001).** Bis dahin stand hier:
+--      „ein Rang-4-Konto liest `profiles` und `profiles_public` ohne Filter und
+--      bekommt Zeilen" — der HEUTIGE Zustand, festgehalten als Zusage, damit
+--      der Verschluss diesen Test umdrehen MUSS und nicht vergisst.
+--      Er hat es getan. Die drei Zusagen unten lauten jetzt umgekehrt, und die
+--      ausfuehrliche Fassung steht in `verzeichnis_dicht_test.sql`.
+--      **Sie bleiben hier stehen, statt dorthin zu wandern:** sie sind der
+--      Beleg, dass die Rechtematrix aus AGE-1000 am Rohzugriff ankommt, und
+--      genau das war die Luecke. Ein Test, der eine Luecke beschrieb, wird zum
+--      Test, der ihren Verschluss bewacht.
 --
 -- ══ FALLEN, DIE DIESES PROJEKT SCHON GESTELLT HAT ══════════════════════════
 --   * **Am RANG pruefen, nie am Schluesselnamen.** `discover` bedeutete vor
@@ -427,10 +433,13 @@ select is(pg_temp.als_text('a1000000-0000-0000-0000-000000000004',
   $$select public.register_for_event('a3000000-0000-0000-0000-000000000001'::uuid)$$),
   'registered', 'Rang 4 meldet sich weiter zu einem Mitglieder-Event an (E4)');
 
+-- Seit AGE-1001 ueber `profil_detail()` statt ueber die Tabelle: der Weg hat
+-- gewechselt, die Schwelle NICHT. Genau das ist hier die Zusage — E4 sagt, die
+-- Clubschwelle bleibt, wo sie war, und ein Verschluss des Rohzugriffs darf sie
+-- nicht heimlich mitnehmen.
 select is(pg_temp.als_zahl('a1000000-0000-0000-0000-000000000004',
-  $$select count(*)::int from public.profiles
-     where id = 'a2000000-0000-0000-0000-000000000001'$$),
-  1, 'Rang 4 liest weiter ein fremdes Vollprofil — der Einzelabruf bleibt');
+  $$select count(*)::int from public.profil_detail('a2000000-0000-0000-0000-000000000001')$$),
+  1, 'Rang 4 liest weiter ein fremdes Vollprofil — der Einzelabruf bleibt (E4)');
 
 select is(pg_temp.als_bool('a1000000-0000-0000-0000-000000000004',
   $$select public.darf_kontaktanfrage_senden('a2000000-0000-0000-0000-000000000001'::uuid)$$),
@@ -563,44 +572,48 @@ select is(
   || 'regs_write_own,theme_scores_select',
   'Genau fuenf Policies tragen die Clubschwelle als Zahl — und zwar diese fuenf');
 
--- ══ 10 · Der benannte Restbefund ═══════════════════════════════════════════
--- Diese zwei Zusagen halten den HEUTIGEN Zustand fest. Sie sind gruen, weil
--- `verzeichnis-dicht` noch nicht gefahren ist, und sie MUESSEN dort umgedreht
--- werden. Ohne sie waere der Befund nur Prosa in einem Dokument.
+-- ══ 10 · Der Restbefund ist geschlossen (AGE-1001) ═════════════════════════
+-- Diese Zusagen hielten bis AGE-1001 den OFFENEN Zustand fest. Sie lauten jetzt
+-- umgekehrt — und zwar ueber `try_as` statt ueber eine Zahl: ein NULL aus
+-- `als_zahl` hiesse nur „irgendetwas ging schief", waehrend `FEHLER:42501`
+-- genau „fehlendes Recht" heisst. Die ausfuehrliche Fassung samt den fuenf
+-- Ersatzfunktionen steht in `verzeichnis_dicht_test.sql`.
 
-select cmp_ok(
-  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles$$),
-  '>', 1,
-  'OFFEN: Rang 4 liest `profiles` ohne Filter — Verschluss in `verzeichnis-dicht`');
+select alike(
+  pg_temp.try_as('a1000000-0000-0000-0000-000000000004',
+    $$select count(*) from public.profiles$$),
+  'FEHLER:42501%',
+  'Rang 4 liest `profiles` NICHT mehr — Verschluss durch `verzeichnis-dicht`');
 
-select cmp_ok(
-  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles_public$$),
-  '>', 1,
-  'OFFEN: Rang 4 liest `profiles_public` ohne Filter — derselbe Verschluss');
+select alike(
+  pg_temp.try_as('a1000000-0000-0000-0000-000000000004',
+    $$select count(*) from public.profiles_public$$),
+  'FEHLER:42501%',
+  'Rang 4 liest `profiles_public` NICHT mehr — derselbe Verschluss');
 
 -- Und die weitere Haelfte desselben Befunds, die bisher nicht festgenagelt war:
 -- `profiles_public` traegt GAR KEINE Rangpruefung, nur `is_activated()` des
 -- Aufrufers. Ein Konto AUSSERHALB des Clubs liest die Sicht also ebenso. Die
 -- Anforderung im `directory-search`-Delta sagt das („ohne Rücksicht auf seine
 -- Stufe"), ihr Szenario nannte aber Rang 4 — gemeldet im Diff-Review (LOW).
-select cmp_ok(
-  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000003',
-    $$select count(*)::int from public.profiles_public$$),
-  '>', 1,
-  'OFFEN: auch Rang 3 liest `profiles_public` ohne Filter — die Sicht traegt '
-  'keine Rangpruefung');
+select alike(
+  pg_temp.try_as('a1000000-0000-0000-0000-000000000003',
+    $$select count(*) from public.profiles_public$$),
+  'FEHLER:42501%',
+  'auch Rang 3 kommt an die Sicht nicht mehr heran — der Entzug gilt fuer '
+  'jeden Rang, nicht erst ab einer Schwelle');
 
--- Die Gegenprobe, die den Unterschied zwischen den beiden Relationen festhaelt:
--- `profiles` traegt sehr wohl Rang 4, Rang 3 bekommt dort hoechstens die eigene
--- Zeile. Ohne sie saehe der Befund nach „alles offen" aus, und der Verschluss
--- in `verzeichnis-dicht` haette zwei verschiedene Probleme als eines behandelt.
-select is(
-  pg_temp.als_zahl('a1000000-0000-0000-0000-000000000003',
-    $$select count(*)::int from public.profiles$$),
-  1, 'Rang 3 bekommt aus `profiles` genau die eigene Zeile — DIESE Relation '
-     'traegt die Clubschwelle');
+-- Diese Gegenprobe hielt den UNTERSCHIED zwischen den beiden Relationen fest:
+-- `profiles` trug die Clubschwelle, `profiles_public` gar keine. Der
+-- Verschluss musste beide getrennt behandeln — und hat es getan. Danach sind
+-- sie gleich zu, und die Zusage sagt genau das.
+select alike(
+  pg_temp.try_as('a1000000-0000-0000-0000-000000000003',
+    $$select count(*) from public.profiles$$),
+  'FEHLER:42501%',
+  'Rang 3 bekommt aus `profiles` auch die EIGENE Zeile nicht mehr — sie '
+  'kommt jetzt aus `mein_profil()`, und die beiden Relationen unterscheiden '
+  'sich nach dem Entzug nicht mehr');
 
 select * from finish();
 rollback;

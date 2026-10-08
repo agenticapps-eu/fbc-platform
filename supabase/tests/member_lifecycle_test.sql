@@ -133,32 +133,36 @@ update public.profiles set deleted_at  = now() where id = 'd0000000-0000-0000-00
 
 -- Gegenprobe zuerst: das aktive Profil IST sichtbar. Ohne sie bewiese ein
 -- „nicht sichtbar" nur, dass die Abfrage nichts findet.
+-- Seit AGE-1001 ueber die Funktionen statt ueber die Relationen: die
+-- Lebenszyklus-Praedikate sind dorthin gewandert, die ZUSAGEN sind dieselben.
+-- Ueber die Kennung statt ueber den Namen — eine kennungsgebundene Funktion
+-- nimmt keinen Namensfilter entgegen, und das ist der Punkt.
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles where name = 'Lz Aktiv'$$),
-  1, 'Gegenprobe: das aktive Profil ist über die Policy sichtbar');
+    $$select count(*)::int from public.profil_detail('d0000000-0000-0000-0000-000000000001')$$),
+  1, 'Gegenprobe: das aktive Profil ist sichtbar');
 
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles where name = 'Lz Deaktiviert'$$),
-  0, 'Policy: ein deaktiviertes Profil ist nicht sichtbar');
+    $$select count(*)::int from public.profil_detail('d0000000-0000-0000-0000-000000000002')$$),
+  0, 'Praedikat: ein deaktiviertes Profil ist nicht sichtbar');
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles where name = 'Lz Geloescht'$$),
-  0, 'Policy: ein geloeschtes Profil ist nicht sichtbar');
+    $$select count(*)::int from public.profil_detail('d0000000-0000-0000-0000-000000000003')$$),
+  0, 'Praedikat: ein geloeschtes Profil ist nicht sichtbar');
 
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles_public where name = 'Lz Aktiv'$$),
-  1, 'Gegenprobe: das aktive Profil steht in profiles_public');
+    $$select count(*)::int from public.profil_karten(array['d0000000-0000-0000-0000-000000000001']::uuid[])$$),
+  1, 'Gegenprobe: das aktive Profil kommt als Karte');
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles_public where name = 'Lz Deaktiviert'$$),
-  0, 'profiles_public: ein deaktiviertes Profil steht nicht drin');
+    $$select count(*)::int from public.profil_karten(array['d0000000-0000-0000-0000-000000000002']::uuid[])$$),
+  0, 'Karten: ein deaktiviertes Profil kommt nicht');
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
-    $$select count(*)::int from public.profiles_public where name = 'Lz Geloescht'$$),
-  0, 'profiles_public: ein geloeschtes Profil steht nicht drin');
+    $$select count(*)::int from public.profil_karten(array['d0000000-0000-0000-0000-000000000003']::uuid[])$$),
+  0, 'Karten: ein geloeschtes Profil kommt nicht');
 
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000004',
@@ -196,12 +200,12 @@ select is(
 -- zweimal und die Policies nie.
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000002',
-    $$select count(*)::int from public.profiles where name = 'Lz Aktiv'$$),
+    $$select count(*)::int from public.profil_detail('d0000000-0000-0000-0000-000000000001')$$),
   0, 'Ein deaktivierter Aufrufer sieht keine fremden Profile');
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000002',
-    $$select count(*)::int from public.profiles_public where name = 'Lz Aktiv'$$),
-  0, 'Ein deaktivierter Aufrufer sieht profiles_public nicht');
+    $$select count(*)::int from public.profil_karten(array['d0000000-0000-0000-0000-000000000001']::uuid[])$$),
+  0, 'Ein deaktivierter Aufrufer bekommt auch keine Karten');
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000002',
     $$select count(*)::int from public.posts$$),
@@ -212,8 +216,9 @@ select is(
 -- Daten" sind dann die Daten des Bestohlenen.
 select is(
   pg_temp.int_as('d0000000-0000-0000-0000-000000000002',
-    $$select count(*)::int from public.profiles where id = 'd0000000-0000-0000-0000-000000000002'$$),
-  0, 'Ein deaktivierter Aufrufer sieht auch sein EIGENES Profil nicht');
+    $$select count(*)::int from public.mein_profil()$$),
+  0, 'Ein deaktivierter Aufrufer sieht auch sein EIGENES Profil nicht — '
+     '`mein_profil()` fuehrt dasselbe Praedikat, das vorher in der Policy stand');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 4. Eine Rolle überlebt den Entzug des Zugangs nicht
