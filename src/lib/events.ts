@@ -1,6 +1,7 @@
 import { captureException } from "@sentry/react";
 
 import { supabase } from "./supabase";
+import { profilKarten } from "./profil-karten";
 
 export type EventType = "online" | "presence" | "dinner" | "workshop" | "mastermind";
 /** Spiegelt `events_visibility_check` (20260715150000_six_level_model.sql:287). */
@@ -342,8 +343,9 @@ async function hostsFor(uid: string | null, rows: EventRow[]): Promise<Map<strin
   const [profilesRes, partnersRes] = await Promise.all([
     profileIds.length
       ? // `profil_karten` liefert alle zehn Felder der abgelösten Sicht; die
-        // Veranstalter-Karte braucht sieben davon.
-        supabase.rpc("profil_karten", { p_ids: profileIds })
+        // Veranstalter-Karte braucht sieben davon. Über `profilKarten`, damit
+        // die 200er-Grenze der Funktion hier niemanden angeht.
+        profilKarten(profileIds)
       : Promise.resolve({ data: [], error: null }),
     partnerIds.length
       ? supabase.from("partners").select("id, name, logo_url, description").in("id", partnerIds)
@@ -513,7 +515,11 @@ export async function fetchEventAttendees(eventId: string): Promise<AttendeeFace
   const rows = data ?? [];
   const ids = [...new Set(rows.map((r) => r.profile_id))];
   if (ids.length === 0) return [];
-  const { data: pdata } = await supabase.rpc("profil_karten", { p_ids: ids });
+  // UNGEBREMST: `event_attendees` liefert alle Anmeldungen einer
+  // Veranstaltung, ohne Seite. Deshalb über `profilKarten` — die Funktion
+  // wirft über 200 Kennungen, und still abschneiden täte sie seit dem
+  // Code-Review ohnehin nicht mehr.
+  const { data: pdata } = await profilKarten(ids);
   const profiles = new Map((pdata ?? []).map((p) => [p.id, p] as const));
   return rows.map((r) => {
     const p = profiles.get(r.profile_id);
@@ -541,7 +547,8 @@ export async function fetchAttendees(eventId: string): Promise<Attendee[]> {
     { name: string | null; avatar_url: string | null; tier: string | null }
   >();
   if (profileIds.length > 0) {
-    const { data: pdata } = await supabase.rpc("profil_karten", { p_ids: profileIds });
+    // UNGEBREMST wie oben: die Teilnehmerliste eines Events hat keine Seite.
+    const { data: pdata } = await profilKarten(profileIds);
     for (const p of pdata ?? []) {
       profiles.set(p.id, { name: p.name, avatar_url: p.avatar_url, tier: p.tier });
     }

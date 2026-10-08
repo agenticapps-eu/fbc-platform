@@ -2,6 +2,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import type { Database } from "./database.types";
 import { supabase } from "./supabase";
+import { gespraechspartnerKarten } from "./profil-karten";
 
 /**
  * Realtime-Chat (AGE-248) — Datenschicht. Spec: docs/matching-spec.md §9.
@@ -320,10 +321,7 @@ export async function fetchThreads(
   // Gesprächsfaden teilt. Das gemeinsame Gespräch IST hier die Berechtigung.
   // Ein Ersatz durch `profil_karten` liesse im Chat Namen verschwinden, und
   // zwar ausschliesslich bei den Zurückgezogenen.
-  const { data: profiles, error: profilesError } = await supabase.rpc(
-    "gespraechspartner_karten",
-    { p_ids: partnerIds },
-  );
+  const { data: profiles, error: profilesError } = await gespraechspartnerKarten(partnerIds);
   if (profilesError) throw profilesError;
 
   const partnerById = new Map((profiles ?? []).map((p) => [p.id, p]));

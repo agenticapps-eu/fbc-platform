@@ -225,11 +225,30 @@ zeichnet. Die übrigen Funktionen auf `profiles` sind bereits DEFINER und
 unberührt. Ohne diesen Nachzug bricht die Seitenleiste in dem Moment, in dem die
 Migration läuft.
 
-**Die Spalten-Grants für `update` SHALL unberührt bleiben** — dieser Change
-schliesst den Lese-, nicht den Schreibweg. Aber `update(...).select()` gibt die
-Zeile zurück und braucht `select` auf die zurückgegebenen Spalten; solche Ketten
-SHALL aufgelöst werden, sonst scheitert ein gelungener Schreibvorgang mit einem
-Fehler, der nach fehlendem Schreibrecht aussieht.
+**Die 17 Spalten-Grants für `update` SHALL MITFALLEN.** Das ist nicht die
+Absicht des Changes, sondern seine gemessene Folge, und es SHALL hier stehen,
+weil die naheliegende Reparatur die schlimmere ist:
+
+```
+nur UPDATE(spalte), kein SELECT:  update … where id = $1  →  VERWEIGERT
+dasselbe update OHNE where                               →  gelingt
+zusätzlich SELECT(id):            das update             →  gelingt
+… und dann select count(*)                               →  ALLE ZEILEN
+```
+
+`update … where id = $1` braucht `select` auf die Spalten der WHERE-Klausel —
+das Schreibrecht fällt also mit dem Leserecht. Ein `grant select (id)` als
+Flicken SHALL NOT ausgesprochen werden: er repariert das Schreiben **und stellt
+die Aufzählbarkeit wieder her**, also genau das, was dieser Change schliesst.
+
+Die Schreibwege SHALL stattdessen über eigene Funktionen laufen — je ein
+Schnitt, mit benannten Parametern statt einem `jsonb`-Beutel.
+
+**Die Obergrenze auf der Stapelgrösse SHALL WERFEN und NOT abschneiden.** Eine
+Grenze, die man überschreiten kann, ohne es zu merken, ist keine Grenze, sondern
+ein Datenverlust mit Obergrenze: die überzähligen Kennungen fielen lautlos
+heraus, und der Aufrufer zeigte für sie einen Rückfall ohne Namen und Bild. Wo
+eine Aufrufstelle ungebremst liest, SHALL sie in Stapeln fragen.
 
 **Was NICHT zugesagt wird, und das SHALL hier stehen:** eine Obergrenze auf der
 Stapelgrösse ist ein Betriebsmittel und **kein** Sicherheitsargument — wer 200
@@ -304,8 +323,18 @@ SHALL ab diesem Change geführt werden dürfen.
 - **THEN** trägt der Faden dessen Namen und Bild — über
   `gespraechspartner_karten`, nicht über das Prädikat der Sicht
 
+#### Scenario: Der gemeinsame Faden ersetzt die Clubschwelle
+
+- **WHEN** ein Mitglied **unterhalb** der Clubschwelle einen Gesprächsfaden mit
+  einem zurückgezogenen Profil teilt
+- **THEN** trägt der Faden dessen Namen — die abgelöste Policy verlangte dort
+  noch die Clubschwelle, und an ihre Stelle tritt das gemeinsame Gespräch: wer
+  miteinander schreibt, kennt einander ohnehin
+
 #### Scenario: Die aktivsten Mitglieder erscheinen weiterhin
 
 - **WHEN** ein Mitglied den Feed öffnet
 - **THEN** zeichnet die Seitenleiste „Die aktivsten Mitglieder" wie zuvor —
-  `feed_top_authors` ist mit dem Entzug auf `SECURITY DEFINER` umgestellt
+  `feed_top_authors` BLEIBT dabei `SECURITY INVOKER` und löst nur die Namen
+  über `profil_karten` auf. Als DEFINER zählte sie terminierte Beiträge mit,
+  weil beide SELECT-Policies auf `posts` `veroeffentlicht_ab <= now()` tragen

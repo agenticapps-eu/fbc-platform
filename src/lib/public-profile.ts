@@ -93,6 +93,9 @@ export async function fetchPublicProfile(id: string): Promise<PublicProfileData>
   // aus dieser Ansicht entfallen, und ein Rundlauf ohne Leser ist kein „Erhalten".
   // Tabelle und `recompute_potential_score` bleiben bestehen.
   const [publicRes, baseRes, interestsRes, offersRes, needsRes, postsRes] = await Promise.all([
+    // Direkt und nicht über `profilKarten`: hier steht GENAU EINE Kennung, die
+    // 200er-Grenze ist konstruktiv unerreichbar, und `.maybeSingle()` ist
+    // genau das, was diese Stelle braucht.
     supabase.rpc("profil_karten", { p_ids: [id] }).maybeSingle(),
     // `profil_detail` trägt dieselbe Schwelle, die vorher die Policy
     // `profiles_select_self_or_discover` trug: Clubschwelle oder eigene Zeile

@@ -2392,7 +2392,7 @@ export type Database = {
       };
       // ── AGE-1001 ────────────────────────────────────────────────────────
       // Von Hand nachgetragen wie die Nachbarn. Spiegelt
-      // 20261003160000_verzeichnis_dicht.sql. Diese elf Funktionen sind seit
+      // 20261008090000_verzeichnis_dicht.sql. Diese elf Funktionen sind seit
       // dem Entzug der KOMPLETTE Lesezugriff der Oberflaeche auf `profiles`
       // und `profiles_public`: `authenticated` haelt auf beiden Relationen
       // weder `select` noch `update`. Wer hier eine Spalte vermisst, traegt

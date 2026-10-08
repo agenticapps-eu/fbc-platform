@@ -3,6 +3,7 @@ import { captureException } from "@sentry/react";
 import { type Json } from "./database.types";
 import { POST_MEDIA_BUCKET, uploadPostMedia, type PostMediaEingabe } from "./post-media";
 import { supabase } from "./supabase";
+import { profilKarten } from "./profil-karten";
 import { tokenizePostBody } from "./video-url";
 
 /**
@@ -512,7 +513,7 @@ export async function fetchAuthors(
 ): Promise<Map<string, FeedAuthor>> {
   const byId = new Map<string, FeedAuthor>();
   if (!uid || ids.length === 0) return byId;
-  const { data, error } = await supabase.rpc("profil_karten", { p_ids: ids });
+  const { data, error } = await profilKarten(ids);
   if (error) return byId;
   for (const p of data ?? []) {
     byId.set(p.id, {

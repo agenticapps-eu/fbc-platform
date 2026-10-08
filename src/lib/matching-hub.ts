@@ -1,5 +1,6 @@
 import { categoryLabel } from "../config/matching";
 import { supabase } from "./supabase";
+import { profilKarten } from "./profil-karten";
 
 /**
  * Matching-Hub (AGE-246) — Datenschicht. Spec: docs/matching-spec.md §5.
@@ -185,7 +186,7 @@ export async function fetchMatchingHub(uid: string): Promise<MatchingHubData> {
   ];
 
   const [profilesRes, offersRes, needsRes, crRes] = await Promise.all([
-    supabase.rpc("profil_karten", { p_ids: partnerIds }),
+    profilKarten(partnerIds),
     supabase
       .from("offers")
       .select("id, profile_id, category, theme, title")

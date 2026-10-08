@@ -143,22 +143,43 @@ create function public.profil_karten(p_ids uuid[])
   returns table (id uuid, name text, avatar_url text, region text, company text,
                  short_bio text, tier text, roles text[], cover_url text,
                  branche text)
-  language sql
+  language plpgsql
   stable
   security definer
   set search_path = ''
 as $$
-  select p.id,
-         public.resolve_display_name(p.id, p.name),
-         p.avatar_url, p.region, p.company, p.short_bio, p.tier, p.roles,
-         p.cover_url, p.branche
-    from public.profiles p
-   where p.id = any(p_ids[1:200])
-     and p.is_public
-     and public.is_activated()
-     and p.activated_at is not null
-     and p.disabled_at is null
-     and p.deleted_at is null;
+declare
+  v_grenze constant int := 200;
+  v_anzahl int := coalesce(array_length(p_ids, 1), 0);
+begin
+  -- WIRFT, statt still abzuschneiden. Die erste Fassung las `p_ids[1:200]` —
+  -- jede Kennung jenseits der 200 fiel lautlos heraus, und der Aufrufer bekam
+  -- fuer sie den Rueckfall „Mitglied" ohne Bild. Das abgeloeste
+  -- `.in("id", ids)` hatte diese Grenze NICHT; es waere also eine Regression
+  -- gewesen, und zwar eine, die erst beim grossen Event auffaellt.
+  -- Befund des Code-Reviews auf dem Diff.
+  --
+  -- `former_member_entries` (20260823160000) macht es seit AGE-581 genauso.
+  -- Eine Grenze, die man ueberschreiten kann, ohne es zu merken, ist keine
+  -- Grenze, sondern ein Datenverlust mit Obergrenze.
+  if v_anzahl > v_grenze then
+    raise exception 'zu viele Kennungen: % (hoechstens %)', v_anzahl, v_grenze
+      using errcode = '22023';
+  end if;
+
+  return query
+    select p.id,
+           public.resolve_display_name(p.id, p.name),
+           p.avatar_url, p.region, p.company, p.short_bio, p.tier, p.roles,
+           p.cover_url, p.branche
+      from public.profiles p
+     where p.id = any(p_ids)
+       and p.is_public
+       and public.is_activated()
+       and p.activated_at is not null
+       and p.disabled_at is null
+       and p.deleted_at is null;
+end;
 $$;
 
 comment on function public.profil_karten(uuid[]) is
@@ -166,7 +187,8 @@ comment on function public.profil_karten(uuid[]) is
   'public.profiles_public (AGE-1001). Praedikat der Sicht unveraendert, '
   'einschliesslich is_public. Die Grenze 200 ist ein BETRIEBSMITTEL gegen '
   'teure Abfragen und KEIN Zugriffsschutz — wer 200 einloesen darf, darf auch '
-  'fuenfzig Mal 200.';
+  'fuenfzig Mal 200. Sie WIRFT (22023) statt abzuschneiden: eine stille '
+  'Abschneidung waere Datenverlust mit Obergrenze.';
 
 revoke execute on function public.profil_karten(uuid[])
   from public, anon, authenticated, service_role;
@@ -186,32 +208,50 @@ create function public.gespraechspartner_karten(p_ids uuid[])
   returns table (id uuid, name text, avatar_url text, region text, company text,
                  short_bio text, tier text, roles text[], cover_url text,
                  branche text)
-  language sql
+  language plpgsql
   stable
   security definer
   set search_path = ''
 as $$
-  select p.id,
-         public.resolve_display_name(p.id, p.name),
-         p.avatar_url, p.region, p.company, p.short_bio, p.tier, p.roles,
-         p.cover_url, p.branche
-    from public.profiles p
-   where p.id = any(p_ids[1:200])
-     and public.is_activated()
-     and p.activated_at is not null
-     and p.disabled_at is null
-     and p.deleted_at is null
-     and exists (
-       select 1 from public.message_threads t
-        where (t.a_profile_id = (select auth.uid()) and t.b_profile_id = p.id)
-           or (t.b_profile_id = (select auth.uid()) and t.a_profile_id = p.id));
+declare
+  v_grenze constant int := 200;
+  v_anzahl int := coalesce(array_length(p_ids, 1), 0);
+begin
+  if v_anzahl > v_grenze then
+    raise exception 'zu viele Kennungen: % (hoechstens %)', v_anzahl, v_grenze
+      using errcode = '22023';
+  end if;
+
+  return query
+    select p.id,
+           public.resolve_display_name(p.id, p.name),
+           p.avatar_url, p.region, p.company, p.short_bio, p.tier, p.roles,
+           p.cover_url, p.branche
+      from public.profiles p
+     where p.id = any(p_ids)
+       and public.is_activated()
+       and p.activated_at is not null
+       and p.disabled_at is null
+       and p.deleted_at is null
+       and exists (
+         select 1 from public.message_threads t
+          where (t.a_profile_id = (select auth.uid()) and t.b_profile_id = p.id)
+             or (t.b_profile_id = (select auth.uid()) and t.a_profile_id = p.id));
+end;
 $$;
 
 comment on function public.gespraechspartner_karten(uuid[]) is
   'Basisfelder von Gespraechspartnern — OHNE is_public, dafuer nur bei '
   'gemeinsamem Faden. Ersetzt den bewussten Zugriff von chat.ts auf die '
   'Basistabelle (AGE-1001): ein zurueckgezogenes Profil traegt im Chat '
-  'weiterhin seinen Namen. Grenze 200 = Betriebsmittel, kein Schutz.';
+  'weiterhin seinen Namen. Grenze 200 = Betriebsmittel, kein Schutz; sie '
+  'WIRFT (22023) statt abzuschneiden. '
+  'KEINE RANGSCHWELLE, und das ist der Unterschied zur abgeloesten Policy: '
+  '`profiles_select_self_or_discover` trug `has_level(4)`. Hier ersetzt der '
+  'GEMEINSAME FADEN sie — wer miteinander schreibt, kennt einander ohnehin, '
+  'und `threads_select` traegt selbst keine Rangschwelle. Ein Konto unterhalb '
+  'von Rang 4 bekommt damit die Karte eines zurueckgezogenen Fadenpartners, '
+  'wo es vorher nichts bekam. Benannt, nicht uebersehen (Code-Review).';
 
 revoke execute on function public.gespraechspartner_karten(uuid[])
   from public, anon, authenticated, service_role;
@@ -393,15 +433,27 @@ grant execute on function public.onboarding_bild_setzen(text) to authenticated;
 -- `search_directory` liest `profiles_public` und waere nach dem Entzug fuer
 -- jeden gescheitert. Sie wird DEFINER — unveraendert in allem uebrigen.
 --
--- WAS SICH DABEI VERSCHIEBT: sie liest daneben `left join public.profiles p`
--- fuer die erweiterten Spalten. Als INVOKER maskierte die RLS `p.competencies`
--- fuer jeden unterhalb von Rang 4. Als DEFINER tut sie das nicht mehr — die
--- Maskierung haengt dann ALLEIN am Eintrittstor unten. Dass das Ergebnis
--- dasselbe bleibt, folgt daraus, dass Rang 6 den Rang 4 einschliesst und der
--- Selbst-Zweig nur die eigene Zeile liefert. Das ist nach dieser Umstellung
--- keine Eigenschaft der Datenbank mehr, sondern eine Eigenschaft DIESER
--- where-Klausel — und steht deshalb als Zusage in `verzeichnis_dicht_test.sql`,
--- nicht nur als dieser Kommentar.
+-- WAS SICH DABEI VERSCHIEBT — und es ist MEHR als die erste Fassung dieses
+-- Kommentars nannte (Befund des Code-Reviews). Als INVOKER maskierte die RLS
+-- VIER Dinge, die der Rumpf liest:
+--
+--   `p.competencies` und `p.search_doc` ueber die Policy auf `profiles` (Rang 4)
+--   `has_offers` / `offer_categories` ueber `offers_select`      (Rang 5)
+--   `has_needs`  / `need_categories` ueber `needs_select`        (Rang 5)
+--   der `p_theme`-Filter ueber `interests_select`                (Rang 4)
+--
+-- Als DEFINER maskiert sie keines davon mehr — die Maskierung haengt ALLEIN am
+-- Eintrittstor unten. Dass das Ergebnis
+-- dasselbe bleibt, folgt daraus, dass das Tor (`verzeichnis.suchen`, Rang 6)
+-- ueber BEIDEN liegt — Rang 5 fuer suche_biete, Rang 4 fuer die Clubschwelle —
+-- und der Selbst-Zweig nur die eigene Zeile liefert.
+--
+-- ⚠ DAS IST NACH DIESER UMSTELLUNG KEIN NETZ MEHR, SONDERN EINE ORDNUNG.
+-- Vorher trug die RLS die Maskierung auch dann, wenn die Rangordnung in
+-- `berechtigungen` je verrutschte. Jetzt entscheidet DIESE where-Klausel
+-- allein, und sie haelt nur, solange `verzeichnis.suchen` >= `suche_biete` >=
+-- Clubschwelle gilt. Wer eine dieser Zahlen senkt, senkt hier mit. Deshalb
+-- steht es als Zusage in `verzeichnis_dicht_test.sql` und nicht nur hier.
 alter function public.search_directory(text, text, text, text, text, text, text[], text[])
   security definer;
 

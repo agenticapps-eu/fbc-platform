@@ -129,7 +129,7 @@ describe("Events — Hosts", () => {
     // von der anderen Seite: verspricht die Vorrichtung MEHR als die Funktion,
     // ist jede Zusage darüber grün, die in der Datenbank `undefined` bekäme.
     // Die Liste ist zeichengleich mit dem `returns table (…)` in
-    // 20261003160000_verzeichnis_dicht.sql und mit `database.types.ts`.
+    // 20261008090000_verzeichnis_dicht.sql und mit `database.types.ts`.
     expect(Object.keys(ZEILEN.profil_karten[0]).sort()).toEqual(
       [
         "avatar_url",

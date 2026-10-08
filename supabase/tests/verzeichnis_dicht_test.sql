@@ -47,7 +47,7 @@
 --     zwar als Eigentuemer der Transaktion, also an der RLS vorbei.
 
 begin;
-select plan(41);
+select plan(44);
 
 -- ── Fixtures ────────────────────────────────────────────────────────────────
 -- `auth.users`-Insert feuert `handle_new_user()` und legt die
@@ -94,7 +94,14 @@ update public.profiles
 -- die `chat.ts` heute ueber die Basistabelle loest.
 insert into public.message_threads (id, a_profile_id, b_profile_id) values
   ('b3000000-0000-0000-0000-000000000001',
-   'b1000000-0000-0000-0000-000000000006', 'b2000000-0000-0000-0000-000000000002');
+   'b1000000-0000-0000-0000-000000000006', 'b2000000-0000-0000-0000-000000000002'),
+  -- Ein ZWEITER Faden, und zwar von einem Konto UNTERHALB der Clubschwelle.
+  -- Er misst den Rang-Unterschied, den `gespraechspartner_karten` gegenueber
+  -- der abgeloesten Policy hat: die trug `has_level(4)`, die Funktion traegt
+  -- stattdessen den gemeinsamen Faden. Befund des Code-Reviews — bis dahin
+  -- wurde Rang 4 OHNE Faden gemessen, nicht Rang 3 MIT.
+  ('b3000000-0000-0000-0000-000000000002',
+   'b1000000-0000-0000-0000-000000000003', 'b2000000-0000-0000-0000-000000000002');
 
 -- Zwei Beitraege des oeffentlichen Ziels: einer sichtbar, einer TERMINIERT.
 -- Der zweite ist die Zusage, die `feed_top_authors` als INVOKER begruendet.
@@ -416,6 +423,33 @@ select is(
   0, 'und ein Konto unterhalb der Verzeichnisschwelle findet weiterhin NUR '
      'sich selbst — die Zusage bleibt, ihr Traeger ist jetzt das Eintrittstor '
      'der Funktion statt der RLS');
+
+-- ── Der Rang-Unterschied, benannt und gemessen ─────────────────────────────
+select is(
+  pg_temp.als_zahl('b1000000-0000-0000-0000-000000000003',
+    $$select count(*)::int from public.gespraechspartner_karten(
+        array['b2000000-0000-0000-0000-000000000002']::uuid[])$$),
+  1, 'Rang 3 MIT Faden bekommt die Karte des zurueckgezogenen Partners — der '
+     'gemeinsame Faden ersetzt die Clubschwelle, die die abgeloeste Policy '
+     'trug. Das ist der einzige Punkt, an dem dieser Change etwas OEFFNET, '
+     'und deshalb steht er als Zusage da.');
+
+select is(
+  pg_temp.als_zahl('b1000000-0000-0000-0000-000000000003',
+    $$select count(*)::int from public.profil_karten(
+        array['b2000000-0000-0000-0000-000000000002']::uuid[])$$),
+  0, 'Gegenprobe: ueber `profil_karten` bekommt dasselbe Konto NICHTS — der '
+     'Faden ist die Berechtigung, nicht die Kennung');
+
+-- ── Die Stapelgrenze WIRFT, sie schneidet nicht ab ─────────────────────────
+select alike(
+  pg_temp.try_as('b1000000-0000-0000-0000-000000000006',
+    $$select count(*) from public.profil_karten(
+        (select array_agg(gen_random_uuid()) from generate_series(1, 201)))$$),
+  'FEHLER:22023%',
+  '201 Kennungen werfen (22023) statt still abgeschnitten zu werden — eine '
+  'Grenze, die man ueberschreiten kann, ohne es zu merken, ist ein '
+  'Datenverlust mit Obergrenze. Befund des Code-Reviews.');
 
 select * from finish();
 rollback;

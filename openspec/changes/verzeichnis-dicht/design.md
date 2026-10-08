@@ -148,7 +148,7 @@ sichtbar machen soll.
 **Verworfen: den Chat auf `profil_karten` umstellen und den Unterschied
 hinnehmen.** Das wäre der stille Namensverlust aus Messung 4.
 
-## Entscheidung 3 — `search_directory` und `feed_top_authors` werden DEFINER
+## Entscheidung 3 — `search_directory` wird DEFINER, `feed_top_authors` NICHT
 
 Beide, nicht nur die erste. Ohne das ist der Entzug ein Ausfall.
 

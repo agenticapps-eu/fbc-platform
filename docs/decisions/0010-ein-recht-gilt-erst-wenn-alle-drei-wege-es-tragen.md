@@ -24,7 +24,7 @@ abzuzählen. Die Matrix galt für die Oberfläche; am Rohzugriff kam sie nicht a
 
 `select` auf `public.profiles` und `public.profiles_public` wird **allen vier
 Rollen namentlich entzogen** (`public`, `anon`, `authenticated`,
-`service_role`). An ihre Stelle treten **neun SECURITY-DEFINER-Funktionen**, die
+`service_role`). An ihre Stelle treten **elf SECURITY-DEFINER-Funktionen**, die
 jeweils genau einen Schnitt liefern und die Lebenszyklus-Prüfungen **selbst
 führen** — `is_activated()`, `activated_at`, `disabled_at`, `deleted_at`, für
 Aufrufer **und** Ziel.
@@ -56,7 +56,8 @@ Ablehnung: der Flicken, der das repariert, **stellt die Aufzählbarkeit wieder
 her**. `count(*)` über eine einzige Spalte zählt den Bestand genauso.
 
 Deshalb fallen die 17 Spalten-Grants für `update` mit, und die Schreibwege
-laufen über vier eigene Funktionen.
+laufen über **sechs** eigene Funktionen (vier sind die betroffenen *Dateien*,
+nicht die Funktionen).
 
 ## Die zweite abgelehnte Alternative
 

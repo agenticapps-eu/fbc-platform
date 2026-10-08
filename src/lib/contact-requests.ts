@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { profilKarten } from "./profil-karten";
 import { CLUB_RANK } from "../config/levels";
 
 /**
@@ -133,7 +134,8 @@ export async function fetchIncomingRequests(uid: string): Promise<IncomingReques
   if (rows.length === 0) return [];
 
   const fromIds = [...new Set(rows.map((r) => r.from_id))];
-  const profilesRes = await supabase.rpc("profil_karten", { p_ids: fromIds });
+  // Die offenen Anfragen werden ohne Grenze gelesen — also in Stapeln fragen.
+  const profilesRes = await profilKarten(fromIds);
   if (profilesRes.error) throw profilesRes.error;
 
   const byId = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));

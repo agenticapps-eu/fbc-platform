@@ -536,8 +536,17 @@ select is(
 -- `search_directory` (`coalesce(p.competencies, '{}')`) nach AGE-903
 -- UNERREICHBAR. Jede Zeile, die ein Aufrufer bekommt, ist entweder seine eigene
 -- — dann gefüllt — oder er steht ab Rang 4, und dann sieht er alles. Sie bleibt
--- trotzdem stehen: sie ist die Grenze, das Eintrittstor ist nur die Tür davor.
--- Sinkt das Tor je wieder, trägt sie sofort.
+-- trotzdem stehen.
+--
+-- ⚠ SEIT AGE-1001 IST SIE ABER KEIN NETZ MEHR. Bis dahin hätte die RLS auf
+-- `profiles` die Maskierung auch dann getragen, wenn die Rangordnung in
+-- `berechtigungen` je verrutschte — „sinkt das Tor je wieder, trägt sie
+-- sofort". Die Funktion ist jetzt `SECURITY DEFINER` (sonst nähme ihr der
+-- Entzug die Grundlage), und damit entscheidet die where-Klausel des
+-- Eintrittstors ALLEIN. Dasselbe gilt für `offers_select`, `needs_select`
+-- (Rang 5) und `interests_select` (Rang 4), die den Rumpf ebenfalls speisen.
+-- Die Maskierung hier ist seitdem Gürtel ohne Hosenträger: sie hält, solange
+-- `verzeichnis.suchen` >= `suche_biete` >= Clubschwelle gilt.
 select is(
   pg_temp.names_as('d1000000-0000-0000-0000-000000000007', $q$
     select competencies::text || ' | ' || has_offers::text || ' | '
