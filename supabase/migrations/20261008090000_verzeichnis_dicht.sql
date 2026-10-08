@@ -1,6 +1,26 @@
 -- Der Rohzugriff auf `profiles` und `profiles_public` wird geschlossen
 -- (AGE-1001, Change `verzeichnis-dicht`).
 --
+-- ⚠ ZUM ZEITSTEMPEL DIESER DATEI
+--
+-- Sie hiess bis zum 08.10. `20261003160000_verzeichnis_dicht.sql` und ist auf
+-- den heutigen Tag gezogen worden — NACH
+-- `20261007120000_aktivste_mitglieder_ohne_neuigkeiten.sql`. Der Grund ist
+-- gemessen und nicht kosmetisch:
+--
+--   * CI baut die Datenbank FRISCH auf und spielt nach Zeitstempel ein. Mit dem
+--     alten Stempel lief diese Datei dort ZUERST und AGE-1004 danach — der
+--     Filter stand am Ende da, alles gruen.
+--   * PROD spielt in der Reihenfolge der MERGES ein. Dort lief AGE-1004 zuerst,
+--     und diese Datei kaeme mit einem aelteren Stempel hinterher und
+--     ueberschriebe die Funktion.
+--
+-- Ein Test im Neuaufbau kann diesen Unterschied gar nicht sehen. Das Umhaengen
+-- ist deshalb die eigentliche Massnahme, der Test nur ihr Waechter. Erlaubt ist
+-- es, weil diese Migration zum Zeitpunkt des Umhaengens NIRGENDS eingespielt
+-- war ausser auf dem geteilten lokalen Stack — nicht auf DEV, nicht auf PROD.
+-- Befund der Plan-Review zu AGE-1004 (codex, HIGH).
+--
 -- ══ WARUM ══════════════════════════════════════════════════════════════════
 -- Beide Relationen waren fuer jedes angemeldete Konto als MENGE lesbar:
 --   * `profiles` ab Rang 4 (`profiles_select_self_or_discover`), einschliesslich
@@ -394,6 +414,18 @@ alter function public.search_directory(text, text, text, text, text, text, text[
 -- Nur die NAMENSAUFLOESUNG wechselt: von `join profiles_public` auf
 -- `profil_karten`. Das Zaehlen bleibt beim Aufrufer, der Entzug trifft genau
 -- die Stelle, die er treffen soll.
+--
+-- ⚠ DER FILTER AUS AGE-1004 WANDERT MIT, UND DAS IST KEIN BEIWERK.
+--
+-- `20261007120000_aktivste_mitglieder_ohne_neuigkeiten.sql` hat dieser Funktion
+-- `where p.kind in ('member', 'event')` gegeben: Produktmitteilungen zaehlen
+-- nicht mehr mit, Veranstaltungen weiterhin schon (Entscheidung Donald,
+-- 25.08.). Diese Migration schreibt denselben Rumpf neu — ohne den Filter naehme
+-- sie ihn LAUTLOS wieder weg.
+--
+-- Nichts schluege dabei fehl. Deshalb haengt die Zusage nicht an diesem
+-- Kommentar, sondern an `feed_sidebar_test.sql`: wer den Filter hier entfernt,
+-- wird dort rot. Befund der Plan-Review zu AGE-1004 (codex, HIGH).
 create or replace function public.feed_top_authors(p_limit int default 5)
   returns table (profile_id uuid, name text, avatar_url text, post_count bigint)
   language sql
@@ -404,6 +436,7 @@ as $$
   select k.id, k.name, k.avatar_url, z.anzahl
     from (select p.author_id, count(*) as anzahl
             from public.posts p
+           where p.kind in ('member', 'event')
            group by p.author_id) z
     cross join lateral public.profil_karten(array[z.author_id]) k
    order by z.anzahl desc, k.name, k.id
@@ -417,7 +450,9 @@ comment on function public.feed_top_authors(int) is
   'tragen veroeffentlicht_ab <= now(). Nur die Namensaufloesung geht seitdem '
   'ueber profil_karten statt ueber ein Leserecht auf profiles_public; die '
   'Funktion schliesst damit weiterhin zurueckgezogene, unbestaetigte, '
-  'deaktivierte und geloeschte Profile aus.';
+  'deaktivierte und geloeschte Profile aus. Gezaehlt werden weiterhin NUR '
+  'kind = ''member'' und kind = ''event'' (AGE-1004) — Produktmitteilungen '
+  'nicht, Veranstaltungen schon.';
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 5 · Der Entzug

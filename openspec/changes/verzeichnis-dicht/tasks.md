@@ -107,6 +107,29 @@
       ausser in Tests und `src/vision/`. Das Zählen über nur eine Wurzel ist der
       Fehler, den die Plan-Review hier gefunden hat.
 
+## 3c. Die Verkopplung mit AGE-1004 aufloesen
+
+> Befund der Plan-Review zu AGE-1004 (codex, HIGH). Diese Migration traegt einen
+> **vollstaendigen** `create or replace` von `feed_top_authors`. AGE-1004 ist am
+> 07.10. gemerged und hat derselben Funktion einen `kind`-Filter gegeben. Ohne
+> Nacharbeit nimmt diese Datei ihn auf PROD **lautlos** wieder weg.
+
+- [x] 3c.1 `origin/main` in den Branch mergen.
+- [x] 3c.2 Die Migration umhaengen: `20261003160000` -> `20261008090000`, also
+      NACH AGE-1004. Grund: CI baut frisch auf und spielt nach Zeitstempel ein,
+      PROD in der Reihenfolge der Merges — ein Test im Neuaufbau kann den
+      PROD-Fall gar nicht sehen. Erlaubt, weil die Datei nirgends ausser auf dem
+      geteilten lokalen Stack eingespielt war.
+- [x] 3c.3 Den Filter `kind in ('member', 'event')` in den Rumpf uebernehmen,
+      samt Begruendung im Kopf.
+- [x] 3c.4 Den geteilten Stack ausrichten: Historie auf die neuen Nummern, den
+      Endzustand der Funktion einspielen. In EINER Transaktion.
+- [x] 3c.5 **Richtung 1 (Hochruesten) gemessen**: ein Stand mit AGE-1004 bekommt
+      diese Migration nachgereicht — die Funktion traegt danach Filter UND
+      `profil_karten`. 43 Dateien, 1531 Zusagen, gruen.
+- [ ] 3c.6 **Richtung 2 (Neuaufbau)**: CI baut aus leer. Ergebnis im PR
+      festhalten, nicht annehmen.
+
 ## 4. Nachweisen
 
 - [ ] 4.1 pgTAP grün, volle Vitest-Suite, `lint`, `typecheck`, `build`. Nach dem
