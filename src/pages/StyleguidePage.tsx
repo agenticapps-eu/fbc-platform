@@ -295,10 +295,10 @@ export default function StyleguidePage() {
               <div className="mt-5 flex flex-col gap-1">
                 <span className="relative rounded-md bg-chrome-elevated px-3 py-2 text-sm font-medium text-accent">
                   <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-accent" />
-                  Aktive Route (Akzent-Label + Akzent-Linksbalken)
+                  Hervorgehobene Zeile auf Chrome (Akzent-Label + Linksbalken)
                 </span>
                 <span className="rounded-md px-3 py-2 text-sm text-on-chrome-muted">
-                  Inaktive Route
+                  Gedämpfter Text auf Chrome (Onboarding, Willkommen)
                 </span>
               </div>
             </div>
@@ -306,6 +306,15 @@ export default function StyleguidePage() {
               Die Sidebar sitzt am Rand, nicht schwebend — Entscheidung aus dem Meeting, sie gilt
               besonders im Navy-Theme. Im hellen Theme ist die Chrome-Fläche weiß, im Navy-Theme
               tiefes Navy; die Token-Namen bleiben in beiden dieselben.
+            </p>
+            <p className="text-sm text-muted">
+              Seit AGE-1018 zeigt dieser Abschnitt <strong>nicht</strong> mehr die Schrift der
+              linken Navigation. Die hängt an <code>--leiste-ink</code> und{" "}
+              <code>--leiste-ink-muted</code> und ist im Navy-Theme weiß wie die
+              Nachrichtenleiste. Was hier steht, färbt die Vollflächen von{" "}
+              <code>/onboarding</code> und <code>/willkommen</code> sowie{" "}
+              <code>Button variant=&quot;secondary&quot;</code> — genau deshalb hat die Leiste
+              eigene Token bekommen.
             </p>
           </Section>
 

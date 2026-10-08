@@ -141,7 +141,7 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
           )}
         >
           {section.title && !collapsed && !istKlappbar && (
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted">
+            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-[color:var(--leiste-ink-muted)]">
               {section.title}
             </p>
           )}
@@ -153,7 +153,7 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
               // Fokusring auf `--leiste-focus` statt `ring-accent` (AGE-1003):
               // auf der Leistenflaeche `#002B51` traegt der Akzent nur 2,83:1.
               // Im hellen Modus ist der Token zeichengleich mit dem Akzent.
-              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-on-chrome-muted transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]"
+              className="flex items-center gap-1 rounded-md px-3 pb-1 pt-0.5 text-xs font-semibold uppercase tracking-wider text-[color:var(--leiste-ink-muted)] transition-colors hover:text-on-chrome-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--leiste-focus)]"
             >
               {/* Aus dem Icon-Satz, nicht inline gezeichnet: `icons.test.ts`
                   hält fest, dass jeder wiederverwendbare Glyph dort steht — ein
@@ -201,7 +201,19 @@ export function SidebarNav({ sections, onNavigate, collapsed = false }: SidebarN
                   navEintragAbstaende(collapsed),
                   isActive
                     ? "bg-chrome-active font-semibold text-on-chrome-active"
-                    : "text-on-chrome hover:bg-chrome-elevated hover:text-on-chrome-active",
+                    : // `--leiste-ink` statt `text-on-chrome` (AGE-1018): im dunklen
+                      // Modus weiss wie die Namen in der Leiste rechts. Das
+                      // `hover:text-on-chrome-active` bleibt stehen, obwohl es dort
+                      // auf denselben Wert zeigt und damit wirkungslos wird — im
+                      // HELLEN Modus wechselt es weiter von #475569 auf #1F53B0 und
+                      // ist dort das Hauptmerkmal. Im Dunkeln traegt die Flaeche den
+                      // Hover, genau wie rechts.
+                      //
+                      // Folge, die man hier sehen muss: `NavIcon` erbt
+                      // `currentColor`. Eingeklappt unterscheidet sich das aktive
+                      // Symbol vom inaktiven damit nur noch in der FORM (`solid`
+                      // gegen `line`), nicht mehr in der Farbe. Benannt in der Spec.
+                      "text-[color:var(--leiste-ink)] hover:bg-chrome-elevated hover:text-on-chrome-active",
                 )
               }
             >

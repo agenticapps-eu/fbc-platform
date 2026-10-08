@@ -307,6 +307,44 @@ const MASSIV: Partial<Record<GlyphName, ReactElement>> = {
   heart: (
     <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c1.8 0 3 .9 3.8 2 .8-1.1 2-2 3.8-2 3 0 4.5 3 3 6C19 15.65 12 20 12 20Z" />
   ),
+
+  /** AGE-1018, und das ist eine REPARATUR, kein Beiwerk.
+   *
+   *  Der Kopf dieses Blocks verspricht: „Das traegt die Auswahl auch dann, wenn
+   *  die Leiste eingeklappt ist und kein Label danebensteht." Gemessen hielt das
+   *  Versprechen fuer NEUN von DREIZEHN Leisten-Eintraegen. Vier fehlten:
+   *  `/hilfe/tutorials` traegt `bulb`, `/admin/mitglieder`, `/admin/feedback`
+   *  und `/admin/neuigkeiten` fallen auf `dot` zurueck — und keiner der beiden
+   *  Glyphen hatte eine gefuellte Fassung. (Erst gezaehlt: drei von zwoelf. Der
+   *  vierte kam vom Code-Review, und er lag in derselben Quelle wie die anderen
+   *  drei — die Lektion hat sich also noch einmal wiederholt.) Eingeklappt war ihr aktiver Zustand allein an
+   *  der SYMBOLFARBE erkennbar, also allein an Farbe, und genau das verbietet
+   *  die Anforderung „Farbe traegt nie allein eine Bedeutung".
+   *
+   *  Aufgefallen ist es, weil AGE-1018 inaktive Eintraege auf denselben
+   *  Weisston setzt: aus „allein an der Farbe" waere „an nichts" geworden.
+   *
+   *  `dot` ist der RUECKFALL von `NavIcon` fuer jeden Pfad ohne eigenes Symbol.
+   *  Damit gilt die Zusage ab hier auch fuer jede Route, die noch niemand
+   *  gezeichnet hat — robust gebaut statt daran erinnert. */
+  /* `4.2` und nicht `3.8`: die uebrigen Kreise im Satz wachsen gefuellt um
+     ~0,4 (`members` 3,2→3,6, `profile` 3,6→4,0), dieser um 0,8. Der Grund ist,
+     dass er KEIN Innenleben hat — 4,2 ist genau die Aussenkante der 1,6er
+     Kontur, die Silhouette bleibt also identisch und nur hohl→voll aendert
+     sich. Bei den anderen Glyphen traegt die Form den Unterschied, hier nur
+     die Fuellung. Befund des Code-Reviews. */
+  dot: <circle cx="12" cy="12" r="4.2" />,
+  bulb: (
+    <>
+      <path d="M12 2.6a6.4 6.4 0 0 0-4.3 11.1c.7.7.9 1.2.9 2.1 0 .4.3.7.7.7h5.4c.4 0 .7-.3.7-.7 0-.9.2-1.4.9-2.1A6.4 6.4 0 0 0 12 2.6Z" />
+      {/* Deckungsgleich mit der Linienfassung: `M9.5 18h5` mit
+          `strokeLinecap="round"` deckt 8,7…15,3 ab, `M10.5 21h3` entsprechend
+          9,7…14,3. Die erste Fassung war schmaler und waere sichtbar
+          geschrumpft. Befund des Code-Reviews. */}
+      <rect x="8.7" y="17.3" width="6.6" height="1.4" rx=".7" />
+      <rect x="9.7" y="20.3" width="4.6" height="1.4" rx=".7" />
+    </>
+  ),
 };
 
 /** Glyphen ohne Linienfassung — sie sind als Fläche gedacht und würden als

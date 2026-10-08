@@ -77,6 +77,13 @@ const LINKE_LEISTE_TOKENS = [
   "--leiste-focus",
   "--leiste-badge",
   "--leiste-badge-ink",
+  // AGE-1018: die Schrift. Bis dahin hing sie an `--color-on-chrome` und
+  // `--color-on-chrome-muted` — und die lesen 22 Stellen in WillkommenPage,
+  // 17 in OnboardingPage und `Button variant="secondary"`.
+  "--leiste-ink",
+  "--leiste-ink-muted",
+  // Der Einklapp-Pill, gespiegelt zu `--thread-chrome-ink` (Befund des Reviews).
+  "--leiste-chrome-ink",
 ] as const;
 
 /**
@@ -94,8 +101,14 @@ const LINKE_LEISTE_TOKENS = [
  * 4,5:1 fuer Text, 3:1 fuer bedeutungstragende Grafik.
  */
 const AUF_DER_LEISTE: { token: string; schwelle: number; was: string }[] = [
-  { token: "--color-on-chrome", schwelle: 4.5, was: "inaktiver Menueintrag" },
-  { token: "--color-on-chrome-muted", schwelle: 4.5, was: "Abschnittsmarke" },
+  // AGE-1018: hier standen `--color-on-chrome` und `--color-on-chrome-muted`.
+  // Sie sind NICHT durchgefallen — sie trugen 6,78:1 und 5,70:1 und waren
+  // gruen. Die Leiste LIEST sie nur nicht mehr. Ein Test, der Tokens gegen
+  // eine Flaeche rechnet, die sie nicht beruehren, ist gruen und misst das
+  // Falsche; das ist schlimmer als rot.
+  { token: "--leiste-ink", schwelle: 4.5, was: "inaktiver Menueintrag, Symbol" },
+  { token: "--leiste-ink-muted", schwelle: 4.5, was: "Abschnittsmarke" },
+  { token: "--leiste-chrome-ink", schwelle: 4.5, was: "Einklapp-Pill" },
   { token: "--color-on-chrome-active", schwelle: 4.5, was: "aktiver Eintrag, Wortmarke" },
   { token: "--color-accent-on-chrome", schwelle: 3, was: "Punkte der Wortmarke" },
   { token: "--leiste-focus", schwelle: 3, was: "Fokusring" },
@@ -114,6 +127,49 @@ const FOKUS_STELLEN = [
   "src/components/ui/SidebarNav.tsx",
   "src/components/feedback/FeedbackButton.tsx",
   "src/components/LeistenPill.tsx",
+] as const;
+
+/**
+ * Die Stellen, die die Schrift der linken Leiste malen (AGE-1018).
+ *
+ * Dieselbe Begruendung wie bei `FOKUS_STELLEN`: ein Token im CSS belegt nicht,
+ * dass es jemand liest. `SidebarNav` steht zweimal drin, weil es BEIDE Toene
+ * fuehrt — die Abschnittsmarke und den Menueintrag.
+ */
+const INK_STELLEN = [
+  // AM ELEMENT VERANKERT, nicht an der Datei (Befund des Code-Reviews). Eine
+  // Zusage „die Datei enthaelt `var(--leiste-ink)`" ist bei einer Datei mit
+  // ZWEI Toenen von jedem der beiden erfuellt: wer Abschnittsmarke und
+  // Menueintrag vertauscht, bleibt gruen. Genau diese Falle benennt der
+  // Fokus-Waechter weiter unten und loest sie so.
+  [
+    "src/components/ui/SidebarNav.tsx",
+    "--leiste-ink-muted",
+    /uppercase tracking-wider text-\[color:var\(--leiste-ink-muted\)\]/,
+    "die Abschnittsmarke",
+  ],
+  [
+    "src/components/ui/SidebarNav.tsx",
+    "--leiste-ink",
+    // An der KLASSENKETTE des Elements verankert, nicht am `isActive` davor:
+    // zwischen beiden steht ein Kommentarblock, und eine Zeichenzahl als
+    // Abstand waere eine Zusage ueber die Laenge eines Kommentars.
+    // `hover:bg-chrome-elevated` kommt in dieser Datei nur am Menueintrag vor.
+    /"text-\[color:var\(--leiste-ink\)\] hover:bg-chrome-elevated/,
+    "der inaktive Menueintrag",
+  ],
+  [
+    "src/components/feedback/FeedbackButton.tsx",
+    "--leiste-ink",
+    /text-sm text-\[color:var\(--leiste-ink\)\] transition-colors/,
+    "der Knopf auf der Leistenflaeche",
+  ],
+  [
+    "src/components/LeistenPill.tsx",
+    "--leiste-chrome-ink",
+    /fbc-sidebar-surface text-\[color:var\(--leiste-chrome-ink\)\]/,
+    "der Einklapp-Pill",
+  ],
 ] as const;
 
 /**
@@ -495,6 +551,12 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     const paare: [string, string][] = [
       ["--sidebar-surface", "#ffffff"],
       ["--leiste-focus", "#2f6bd1"],
+      // AGE-1018: die beiden Schrift-Tokens tragen im Hellen GENAU die Werte,
+      // die `--color-on-chrome` und `--color-on-chrome-muted` dort heute
+      // haben. Das ist die ganze Zusage „im hellen Modus aendert sich nichts".
+      ["--leiste-ink", "#475569"],
+      ["--leiste-ink-muted", "#64748b"],
+      ["--leiste-chrome-ink", "#475569"],
     ];
     for (const [name, soll] of paare) {
       expect(wert(theme(), name)?.toLowerCase(), `${name} im hellen Modus`).toBe(soll);
@@ -505,11 +567,81 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     expect(wert(theme(), "--leiste-focus")?.toLowerCase()).toBe(
       wert(theme(), "--color-accent")?.toLowerCase(),
     );
+    // Dieselbe Bindung fuer die Schrift: die beiden Werte SIND die der
+    // abgeloesten Tokens. Driftet eines davon, weist diese Zeile darauf hin,
+    // statt den Gleichstand im Hellen stillschweigend zu verlieren.
+    expect(wert(theme(), "--leiste-ink")?.toLowerCase()).toBe(
+      wert(theme(), "--color-on-chrome")?.toLowerCase(),
+    );
+    expect(wert(theme(), "--leiste-ink-muted")?.toLowerCase()).toBe(
+      wert(theme(), "--color-on-chrome-muted")?.toLowerCase(),
+    );
   });
 
   it("setzt im dunklen Modus die Flaeche und einen eigenen Fokusring", () => {
     expect(wert(navy(), "--sidebar-surface")?.toLowerCase()).toBe("#002b51");
     expect(wert(navy(), "--leiste-focus")?.toLowerCase()).toBe("#b9cce6");
+  });
+
+  it("traegt im dunklen Modus die Schrift der Nachrichtenleiste (AGE-1018)", () => {
+    expect(wert(navy(), "--leiste-ink")?.toLowerCase()).toBe("#ffffff");
+    expect(wert(navy(), "--leiste-ink-muted")?.toLowerCase()).toBe("#b9cce6");
+  });
+
+  it("und es sind DIESELBEN Werte, die rechts stehen", () => {
+    // Die Vorgabe war Paritaet, nicht „ungefaehr gleich hell". Driftet eine
+    // Seite, wird es hier rot — und zwar auf der Seite, die drueckt.
+    //
+    // ABER KEINE ABLEITUNG im CSS: `--thread-ink` sitzt auf `.fbc-chat-rail`
+    // und nicht auf `html`. Ein Element der linken Leiste liegt nicht in dem
+    // Teilbaum und bekaeme bei `var(--thread-ink)` den Rueckfallwert. Die
+    // Gleichheit ist Absicht und steht deshalb HIER statt dort.
+    const rechts = block('html[data-variant="navy"] .fbc-chat-rail');
+    expect(wert(navy(), "--leiste-ink")?.toLowerCase()).toBe(
+      wert(rechts, "--thread-ink")?.toLowerCase(),
+    );
+    expect(wert(navy(), "--leiste-ink-muted")?.toLowerCase()).toBe(
+      wert(rechts, "--thread-muted")?.toLowerCase(),
+    );
+    // Der Einklapp-Pill ist ein GESPIEGELTES Bauteil, kein aehnliches — die
+    // Spec verlangt „denselben Schalter an derselben Stelle". In BEIDEN Modi.
+    expect(wert(navy(), "--leiste-chrome-ink")?.toLowerCase()).toBe(
+      wert(rechts, "--thread-chrome-ink")?.toLowerCase(),
+    );
+    expect(wert(theme(), "--leiste-chrome-ink")?.toLowerCase()).toBe(
+      wert(theme(), "--thread-chrome-ink")?.toLowerCase(),
+    );
+  });
+
+  it("die Schrift haelt 4,5:1 auch im HELLEN Modus", () => {
+    // Befund des Code-Reviews: `AUF_DER_LEISTE` rechnet nur gegen die
+    // navy-Flaeche. Ein Token, der nur im Dunklen geprueft wird, darf im
+    // Hellen beliebig driften — und `--leiste-ink-muted` hat dort gemessen nur
+    // 0,26 Reserve (4,76:1). Genau dort, wo bis zu diesem Review zwei falsche
+    // Zahlen im Kommentar standen.
+    const hell = (name: string) => parse(wert(theme(), name)!);
+    for (const name of ["--leiste-ink", "--leiste-ink-muted", "--leiste-chrome-ink"]) {
+      const v = kontrast(hell(name), hell("--sidebar-surface"));
+      expect(auf2(v), `${name} im hellen Modus: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("die Schrift haelt 4,5:1 auch auf Hover- und Aktivflaeche", () => {
+    // Die Grundflaeche deckt `AUF_DER_LEISTE` ab, die beiden anderen Flaechen
+    // der Leiste nicht. Und auf der Aktivflaeche faellt die naheliegende Wahl
+    // durch: `--leiste-ink-muted` (#B9CCE6) traegt dort nur 4,39:1. Dass die
+    // Abschnittsmarken nie auf der Aktivflaeche stehen, ist der Grund, dass
+    // der Fall gruen ist — kein Zufall. Deshalb steht hier genau, was wo
+    // vorkommen kann, und nicht jede Farbe gegen jede Flaeche.
+    const faelle = [
+      ["--leiste-ink", "--color-chrome-elevated", "Hover-Flaeche"],
+      ["--leiste-ink", "--color-chrome-active", "Aktivflaeche"],
+      ["--leiste-ink-muted", "--color-chrome-elevated", "Hover-Flaeche"],
+    ] as const;
+    for (const [name, flaechenToken, wo] of faelle) {
+      const v = kontrast(token(name), token(flaechenToken));
+      expect(auf2(v), `${name} auf der ${wo}: ${auf2(v)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("laesst `--color-chrome` im dunklen Modus auf #081527 stehen", () => {
@@ -601,19 +733,42 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     // eingeklappten Zustand nie gemessen. Befund des Code-Reviews.
   });
 
-  it("die Hover-Flaeche traegt das Signal NICHT, und der Beleg dafuer steht hier", () => {
-    // Vermutet war, der Farbwechsel mache den Hover-Zustand kaputt. Gerechnet:
-    // 1,11:1 auf #081527, 1,15:1 auf #002B51 — die Flaeche hat sich vorher
-    // schon nicht abgehoben. Das Signal ist die Schrift.
+  it("der Hover: im Dunkeln traegt ihn die Flaeche, im Hellen die Schrift", () => {
+    // UMGESCHRIEBEN MIT AGE-1018 (Befund des Code-Reviews). Bis dahin stand
+    // hier „Das Signal ist die Schrift" und wurde mit 16,51:1 belegt — einer
+    // Zahl, die seit AGE-1018 nichts mehr ueber den HOVER sagt: Ruhezustand
+    // und Hover tragen im navy-Modus dieselbe Farbe. Der Fall blieb gruen und
+    // mass nichts mehr.
     const hover = token("--color-chrome-elevated");
     expect(auf2(kontrast(hover, flaeche())), "die Hover-Flaeche hebt sich kaum ab").toBeLessThan(
       1.5,
     );
-    const schrift = kontrast(token("--color-on-chrome-active"), hover);
+
+    // Im DUNKLEN Modus ist der Schriftwechsel bewusst TOT — festgehalten als
+    // Gleichheit, damit niemand ihn fuer kaputt haelt und „repariert".
     expect(
-      auf2(schrift),
-      `Schrift auf der Hover-Flaeche: ${auf2(schrift)}:1`,
-    ).toBeGreaterThanOrEqual(4.5);
+      wert(navy(), "--leiste-ink")?.toLowerCase(),
+      "im Dunkeln soll der Hover-Schriftwechsel wirkungslos sein",
+    ).toBe(wert(navy(), "--color-on-chrome-active")?.toLowerCase());
+
+    // Im HELLEN Modus wechselt er und ist dort das Hauptmerkmal.
+    expect(
+      wert(theme(), "--leiste-ink")?.toLowerCase(),
+      "im Hellen muss der Hover die Schrift wechseln",
+    ).not.toBe(wert(theme(), "--color-on-chrome-active")?.toLowerCase());
+
+    // Und der Pill, der KEINE Hover-Flaeche hat, wechselt deshalb in BEIDEN
+    // Modi die Schrift. Ohne diese Zeile waere der Befund, der ihm einen
+    // eigenen Token gegeben hat, nicht gegen eine Rueckdrehung gesichert.
+    for (const [rumpf, wo] of [
+      [navy(), "navy"],
+      [theme(), "hell"],
+    ] as const) {
+      expect(
+        wert(rumpf, "--leiste-chrome-ink")?.toLowerCase(),
+        `der Einklapp-Pill haette in ${wo} keinen Hover mehr`,
+      ).not.toBe(wert(rumpf, "--color-on-chrome-active")?.toLowerCase());
+    }
   });
 
   it("alle vier Stellen lesen den Fokus-Token wirklich", () => {
@@ -624,6 +779,61 @@ describe("Linke Navigation: dieselbe Flaeche, und alles darauf bleibt lesbar", (
     for (const pfad of FOKUS_STELLEN) {
       expect(readFileSync(pfad, "utf8"), `${pfad} liest --leiste-focus nicht`).toContain(
         "var(--leiste-focus)",
+      );
+    }
+  });
+
+  it("alle Stellen lesen die Schrift-Tokens wirklich (AGE-1018)", () => {
+    // Derselbe Waechter wie fuer den Fokusring, aus demselben Grund: bei
+    // AGE-1002 war die Umlegung unvollstaendig, der Test pruefte genau die
+    // umgelegten Tokens, und der Defekt wanderte in einen Zustand, den
+    // niemand ansah.
+    for (const [pfad, gesucht, muster, was] of INK_STELLEN) {
+      expect(muster.test(readFileSync(pfad, "utf8")), `${was} liest ${gesucht} nicht`).toBe(true);
+    }
+  });
+
+  it("und keine davon liest auf der Leiste noch die alten Tokens", () => {
+    // Gegenprobe: ein `var(--leiste-ink)` IRGENDWO in der Datei ist von einem
+    // zweiten Vorkommen erfuellt, waehrend die eigentliche Stelle auf
+    // `text-on-chrome` stehen bleibt.
+    //
+    // `text-on-chrome-active` BLEIBT ueberall, wo es steht — aktiver Eintrag,
+    // Wortmarke, Hover. Die Regex muss das Suffix also ausschliessen, sonst
+    // waere sie von genau den Stellen erfuellt, die bleiben sollen.
+    const altesInk = /\btext-on-chrome(-muted)?(?![-\w])/;
+
+    for (const [pfad, , muster] of INK_STELLEN) {
+      // Kommentare raus: sie SOLLEN die alten Namen nennen und erklaeren,
+      // warum sie weg sind.
+      const ohneKommentare = readFileSync(pfad, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+      // POSITIVKONTROLLE zum Stripper (Befund des Code-Reviews): fraesse er
+      // kuenftig mehr als Kommentare — ein `//` in einer Zeichenkette, eine
+      // protokollrelative Adresse —, waere die Zeile darunter LEER-gruen. Der
+      // Fall darueber liest die ROHE Datei und faellt dann auch nicht aus.
+      expect(muster.test(ohneKommentare), `${pfad}: der Kommentar-Stripper frisst Code`).toBe(
+        true,
+      );
+      expect(
+        altesInk.test(ohneKommentare),
+        `${pfad} traegt auf der Leiste noch text-on-chrome`,
+      ).toBe(false);
+    }
+  });
+
+  it("und die beiden Vollseiten sind UNBERUEHRT geblieben", () => {
+    // Die Positivkontrolle zur Zeile darueber, und sie ist der Grund fuer die
+    // eigenen Tokens: dort soll `text-on-chrome` weiter stehen. Waere die
+    // Umlegung ein globales Suchen-und-Ersetzen gewesen, faellt dieser Fall.
+    for (const pfad of [
+      "src/pages/WillkommenPage.tsx",
+      "src/pages/OnboardingPage.tsx",
+      "src/components/ui/Button.tsx",
+    ]) {
+      expect(readFileSync(pfad, "utf8"), `${pfad} hat text-on-chrome verloren`).toContain(
+        "text-on-chrome",
       );
     }
   });
