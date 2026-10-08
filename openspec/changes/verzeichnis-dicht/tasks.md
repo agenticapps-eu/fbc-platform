@@ -143,9 +143,17 @@
 - [x] 4.3 **Der Datenverlust-Pfad**: ein Profil speichern und nachmessen, dass
       die Änderung wirklich steht. `try_as(...) = 'OK'` belegt bei UPDATE
       nichts — null getroffene Zeilen sind kein Fehler.
-- [ ] 4.4 Sichtprobe: Feed-Seitenleiste („Die aktivsten Mitglieder"), ein
+- [x] 4.4 Sichtprobe: Feed-Seitenleiste („Die aktivsten Mitglieder"), ein
       Gesprächsfaden mit einem zurückgezogenen Profil, ein fremdes Profil,
       der Profil-Editor. Zählstände vorher/nachher, `.env.local` löschen.
+      **Alle vier gesehen**, alle Netzaufrufe 200. Der Faden zeigt den Namen
+      des zurückgezogenen Partners — der Unterschied, für den
+      `gespraechspartner_karten` existiert. Der Editor hat über die Oberfläche
+      geschrieben und die Datenbank trägt es (`profile_completion` 16 → 41).
+      **Eine Falle dabei:** `pnpm dev` ist `infisical run --env=dev -- vite` —
+      die DEV-Secrets aus der Prozessumgebung schlagen jede `.env.local`, und
+      die erste Anmeldung ging an DEV statt an den lokalen Stack. Gegen den
+      lokalen Stack gehört `npx vite` ohne Infisical.
 - [x] 4.5 Zahlen vor und nach der Migration auf dem lokalen Stack
       protokollieren — der Stack ist geteilt.
 - [x] 4.6 **Die Probe zu gemini's Fremdschlüssel-Befund**: in eine Tabelle
@@ -158,7 +166,7 @@
 
 ## 5. Abschliessen
 
-- [ ] 5.1 ADR in `docs/decisions/` — Nummer eins über der höchsten dort
+- [x] 5.1 ADR in `docs/decisions/` — Nummer eins über der höchsten dort
       vorhandenen, erst `ls`.
 - [ ] 5.2 `REVIEWS.md` mit **zwei** Fremdreviewern verschiedener Anbieter.
       Schema, Rechte, Sicherheit — Donalds Regel vom 26.08. greift hier.
